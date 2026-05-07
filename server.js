@@ -164,52 +164,72 @@ function resolveNameFromMap(userId) {
   return null;
 }
 
+function resolvePName(p) {
+  const uid = p.uniqueId || p.displayId || "";
+  const nn  = p.nickname || p.displayName || p.name || "";
+  const userId = String(p.userId || p.id || "");
+  let hostName = (uid && !/^\d{8,}$/.test(uid)) ? uid : "";
+  let hostNickname = nn || uid || "";
+  if (!hostName) {
+    const resolved = resolveNameFromMap(userId);
+    if (resolved) { hostName = resolved.uniqueId; hostNickname = resolved.nickname; }
+    else hostName = userId || "?";
+  }
+  const pts = Number(p.points || p.battleScore || p.score || p.teamPoints || p.point || p.totalScore || 0);
+  return { hostName, hostNickname, userId, points: pts };
+}
+
 function extractTeams(data) {
   if (Array.isArray(data.battleArmies) && data.battleArmies.length > 0) {
-    // Soporta batallas de 2, 3 o 4 equipos (LIVE BOSS 2v2, 1v1, etc.)
+    // Detectar LIVE BOSS 2v2: armies con múltiples participantes individuales
+    const hasMulti = data.battleArmies.some(a => Array.isArray(a.participants) && a.participants.length > 1);
+
+    if (hasMulti) {
+      // Devolver los participantes INDIVIDUALES con sus puntos propios (no del equipo)
+      const individuals = [];
+      data.battleArmies.forEach(army => {
+        if (!Array.isArray(army.participants)) return;
+        army.participants.forEach(p => {
+          registerUser(p);
+          const r = resolvePName(p);
+          if (r.hostName && r.hostName !== "?") individuals.push(r);
+        });
+      });
+      if (individuals.length > 0) return individuals;
+    }
+
+    // Batalla simple: 1 participante por army (1v1, 1v1v1...)
     return data.battleArmies.map(army => {
-      // TikTok puede enviar puntos en distintos campos según el tipo de batalla
       const pts = Number(
         army.points || army.teamScore || army.teamPoints ||
         army.score  || army.battleScore || army.point ||
         army.totalScore || army.totalPoints || 0
       );
       const hostUserId = String(army.hostUserId || army.hostId || "");
-
       let hostName     = hostUserId || "?";
       let hostNickname = hostName;
 
-      // 1) Buscar entre participantes del equipo
       if (Array.isArray(army.participants) && army.participants.length > 0) {
         army.participants.forEach(p => registerUser(p));
-
-        const hostParticipant = army.participants.find(p =>
-          String(p.userId)   === hostUserId ||
-          String(p.uniqueId) === hostUserId ||
-          String(p.id)       === hostUserId
+        const hp = army.participants.find(p =>
+          String(p.userId) === hostUserId || String(p.uniqueId) === hostUserId
         ) || army.participants[0];
-
-        if (hostParticipant) {
-          const uid = hostParticipant.uniqueId || hostParticipant.displayId || "";
-          const nn  = hostParticipant.nickname || hostParticipant.displayName || hostParticipant.name || "";
+        if (hp) {
+          const uid = hp.uniqueId || hp.displayId || "";
+          const nn  = hp.nickname || hp.displayName || hp.name || "";
           if (uid && !/^\d{8,}$/.test(uid)) hostName = uid;
           hostNickname = nn || uid || hostName;
         }
       }
-
-      // 2) Intentar userMap acumulado de eventos previos (chat/gift/member)
       if (/^\d{8,}$/.test(hostName) || hostName === "?") {
-        const resolved = resolveNameFromMap(hostUserId);
-        if (resolved) { hostName = resolved.uniqueId; hostNickname = resolved.nickname; }
+        const r = resolveNameFromMap(hostUserId);
+        if (r) { hostName = r.uniqueId; hostNickname = r.nickname; }
       }
-
-      // 3) Usar hostUser directo si existe
       if ((/^\d{8,}$/.test(hostName) || hostName === "?") && army.hostUser) {
         const uid = army.hostUser.uniqueId || army.hostUser.displayId || "";
         const nn  = army.hostUser.nickname || army.hostUser.name || uid;
         if (uid && !/^\d{8,}$/.test(uid)) { hostName = uid; hostNickname = nn; }
       }
-
       return { hostName, hostNickname, userId: hostUserId, points: pts };
     }).filter(t => t.hostName !== "?");
   }
@@ -257,13 +277,18 @@ function emitUpdatedBattle(ownerUsername, lastTeams, status) {
   };
 }
 
-async function startTikTokConnection(username) {
-  const tiktok = new WebcastPushConnection(username, {
+async function startTikTokConnection(username, sessionId) {
+  const opts = {
     processInitialData: false,
     enableExtendedGiftInfo: true,
     enableWebsocketUpgrade: true,
     requestPollingIntervalMs: 2000,
-  });
+  };
+  // sessionId permite conectar sin websocket upgrade (requerido por TikTok en algunos casos)
+  if (sessionId && sessionId.trim()) {
+    opts.sessionId = sessionId.trim();
+  }
+  const tiktok = new WebcastPushConnection(username, opts);
 
   await tiktok.connect();
   const ownerUsername = username.replace(/^@/, "").toLowerCase();
@@ -319,15 +344,7 @@ async function startTikTokConnection(username) {
     registerUser(data);
     const user     = data.uniqueId || data.displayId || "";
     const nickname = data.nickname || data.displayName || user;
-    if (user && user !== "?") {
-      activeUsersMap.set(user, { user, nickname, viewers: 0, joinTime: Date.now() });
-      // Emitir viewers actualizado con todos los acumulados (máx 300)
-      const allActive = [...activeUsersMap.values()].slice(-300);
-      io.emit("viewers", {
-        count: activeUsersMap.size,
-        topViewers: allActive,
-      });
-    }
+    // Solo emitir evento de entrada, NO afectar el top activos
     io.emit("member", { user, nickname, timestamp:Date.now() });
   });
 
@@ -397,13 +414,13 @@ app.get("/", (req, res) => res.json({ status:"TikPanel Server ✅", connections:
 app.get("/status/:username", (req, res) => res.json({ connected: !!sessions[req.params.username]?.tiktok }));
 
 app.post("/connect", async (req, res) => {
-  const { username } = req.body;
+  const { username, sessionId } = req.body;
   if (!username) return res.status(400).json({ error:"Username requerido" });
   cleanSession(username);
   let lastErr = "";
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      await startTikTokConnection(username);
+      await startTikTokConnection(username, sessionId);
       return res.json({ success:true, message:`Conectado a @${username}` });
     } catch(err) {
       lastErr = err.message || "Error desconocido";
