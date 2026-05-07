@@ -1500,11 +1500,12 @@ function App() {
                     const teams = battle.teams;
                     const totalPts = teams.reduce((s,t) => s + t.points, 0) || 1;
 
-                    // ── Detectar si es 2v2 (4 equipos con labels A1,A2,B1,B2)
-                    // o simplemente N participantes individuales
-                    const is4way = teams.length >= 4;
+                    // ── Detectar modo de batalla:
+                    // 2 teams  → 1v1 clásico
+                    // 3+ teams → ranking individual (battle de múltiples anfitriones)
+                    const isMulti = teams.length >= 3;
 
-                    if (is4way) {
+                    if (isMulti) {
                       // Ordenar por puntos desc para mostrar ranking
                       const sorted = [...teams].sort((a,b) => b.points - a.points);
                       const COLORS = ["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#34d399","#f97316"];

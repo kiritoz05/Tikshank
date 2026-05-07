@@ -181,21 +181,64 @@ function resolvePName(p) {
 
 function extractTeams(data) {
   if (Array.isArray(data.battleArmies) && data.battleArmies.length > 0) {
-    // Detectar LIVE BOSS 2v2: armies con múltiples participantes individuales
+    // Detectar LIVE BOSS 2v2: armies con múltiples participantes
+    // IMPORTANTE: los participants son fans/MVPs que enviaron regalos, NO los anfitriones.
+    // El anfitrión real de cada army es army.hostUser / army.hostUserId.
+    // Los puntos del anfitrión = puntos del army completo (army.points / army.teamPoints).
     const hasMulti = data.battleArmies.some(a => Array.isArray(a.participants) && a.participants.length > 1);
 
     if (hasMulti) {
-      // Devolver los participantes INDIVIDUALES con sus puntos propios (no del equipo)
-      const individuals = [];
+      // Cada army = 1 anfitrión con sus puntos de equipo
+      const hosts = [];
       data.battleArmies.forEach(army => {
-        if (!Array.isArray(army.participants)) return;
-        army.participants.forEach(p => {
-          registerUser(p);
-          const r = resolvePName(p);
-          if (r.hostName && r.hostName !== "?") individuals.push(r);
-        });
+        // Registrar todos los participantes para el userMap (pueden ayudar a resolver IDs)
+        if (Array.isArray(army.participants)) army.participants.forEach(p => registerUser(p));
+        if (army.hostUser) registerUser(army.hostUser);
+
+        // Obtener el host del army
+        const hostUserId = String(army.hostUserId || army.hostId || army.hostUser?.userId || army.hostUser?.id || "");
+        const pts = Number(
+          army.points || army.teamScore || army.teamPoints ||
+          army.score  || army.battleScore || army.point ||
+          army.totalScore || army.totalPoints || 0
+        );
+
+        let hostName     = "";
+        let hostNickname = "";
+
+        // 1. Intentar desde army.hostUser directamente
+        if (army.hostUser) {
+          const uid = army.hostUser.uniqueId || army.hostUser.displayId || "";
+          const nn  = army.hostUser.nickname || army.hostUser.displayName || army.hostUser.name || "";
+          if (uid && !/^\d{8,}$/.test(uid)) hostName = uid;
+          hostNickname = nn || uid;
+        }
+
+        // 2. Si no, buscar en participants el que coincida con hostUserId
+        if (!hostName && hostUserId && Array.isArray(army.participants)) {
+          const hp = army.participants.find(p =>
+            String(p.userId||p.id) === hostUserId || String(p.uniqueId) === hostUserId
+          );
+          if (hp) {
+            const uid = hp.uniqueId || hp.displayId || "";
+            const nn  = hp.nickname || hp.displayName || hp.name || "";
+            if (uid && !/^\d{8,}$/.test(uid)) hostName = uid;
+            hostNickname = nn || uid;
+          }
+        }
+
+        // 3. Fallback: userMap
+        if (!hostName) {
+          const r = resolveNameFromMap(hostUserId);
+          if (r) { hostName = r.uniqueId; hostNickname = r.nickname; }
+          else hostName = hostUserId || "?";
+        }
+
+        if (hostName && hostName !== "?") {
+          hosts.push({ hostName, hostNickname, userId: hostUserId, points: pts });
+        }
       });
-      if (individuals.length > 0) return individuals;
+      if (hosts.length > 0) return hosts;
     }
 
     // Batalla simple: 1 participante por army (1v1, 1v1v1...)
