@@ -1500,26 +1500,119 @@ function App() {
                     const teams = battle.teams;
                     const totalPts = teams.reduce((s,t) => s + t.points, 0) || 1;
 
-                    // ── Detectar modo de batalla:
-                    // 2 teams  → 1v1 clásico
-                    // 3+ teams → ranking individual (battle de múltiples anfitriones)
-                    const isMulti = teams.length >= 3;
+                    // ── Detectar modo:
+                    // teams con teamIdx → 2v2 (4 anfitriones en 2 equipos)
+                    // teams.length >= 3 sin teamIdx → ranking multi
+                    // teams.length === 2 → 1v1 clásico
+                    const has2v2 = teams.some(t => t.teamIdx !== undefined && t.teamIdx !== null);
 
-                    if (isMulti) {
-                      // Ordenar por puntos desc para mostrar ranking
-                      const sorted = [...teams].sort((a,b) => b.points - a.points);
-                      const COLORS = ["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#34d399","#f97316"];
-                      const maxPts = sorted[0]?.points || 1;
+                    if (has2v2 || teams.length === 4) {
+                      // Agrupar por equipo
+                      const teamGroups = {};
+                      teams.forEach(t => {
+                        const gi = t.teamIdx !== undefined ? t.teamIdx : (teams.indexOf(t) < teams.length/2 ? 0 : 1);
+                        if (!teamGroups[gi]) teamGroups[gi] = [];
+                        teamGroups[gi].push(t);
+                      });
+                      const groupKeys = Object.keys(teamGroups).sort();
+                      const TEAM_COLORS = [["#fe2c55","#ff6b81"], ["#25f4ee","#0ea5e9"]];
+                      const TEAM_LABELS = ["Equipo A", "Equipo B"];
+                      // Puntos totales por equipo
+                      const teamTotals = groupKeys.map(k => teamGroups[k].reduce((s,t)=>s+t.points,0));
+                      const grandTotal = teamTotals.reduce((s,v)=>s+v,0) || 1;
+                      const winnerGroup = teamTotals[0] >= teamTotals[1] ? 0 : 1;
 
                       return (
                         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                          {/* Header */}
+                          {/* Barra VS equipos */}
+                          <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:"12px 14px"}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+                              {groupKeys.map((k,gi) => (
+                                <React.Fragment key={k}>
+                                  <div style={{flex:1,textAlign:gi===0?"left":"right",minWidth:0}}>
+                                    <div style={{fontSize:10,fontWeight:800,color:TEAM_COLORS[gi%2][0]}}>
+                                      {TEAM_LABELS[gi%2]}
+                                    </div>
+                                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:28,color:TEAM_COLORS[gi%2][0],lineHeight:1}}>
+                                      {teamTotals[gi].toLocaleString()}
+                                    </div>
+                                  </div>
+                                  {gi < groupKeys.length-1 && (
+                                    <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:13,color:"#333",letterSpacing:2,flexShrink:0}}>VS</span>
+                                  )}
+                                </React.Fragment>
+                              ))}
+                            </div>
+                            <div style={{height:10,borderRadius:5,background:"#0d0d18",overflow:"hidden",display:"flex"}}>
+                              {groupKeys.map((k,gi) => {
+                                const pct = Math.round(teamTotals[gi]/grandTotal*100);
+                                const [c1,c2] = TEAM_COLORS[gi%2];
+                                return <div key={k} style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${c1},${c2})`,transition:"width 1s ease"}}/>;
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Cada equipo con sus anfitriones individuales */}
+                          {groupKeys.map((k, gi) => {
+                            const members = teamGroups[k];
+                            const [c1] = TEAM_COLORS[gi%2];
+                            const isWinTeam = gi === winnerGroup;
+                            const maxMemberPts = Math.max(...members.map(m=>m.points)) || 1;
+                            return (
+                              <div key={k} style={{background:"#12121e",
+                                border:`1px solid ${isWinTeam?"rgba(255,215,0,.25)":"#1e1e2e"}`,
+                                borderRadius:13,padding:"12px 13px"}}>
+                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+                                  {isWinTeam && <span style={{fontSize:15}}>👑</span>}
+                                  <span style={{fontSize:11,fontWeight:800,color:c1}}>{TEAM_LABELS[gi%2]}</span>
+                                  <span style={{fontSize:9,color:"#555",marginLeft:"auto"}}>{teamTotals[gi].toLocaleString()} pts totales</span>
+                                </div>
+                                {/* Anfitriones individuales */}
+                                {members.map((m, mi) => {
+                                  const nm = getName(m);
+                                  const barPct = Math.round(m.points/maxMemberPts*100);
+                                  return (
+                                    <div key={mi} style={{marginBottom: mi<members.length-1?10:0}}>
+                                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                                        <div style={{flex:1,minWidth:0}}>
+                                          <span style={{fontWeight:800,fontSize:12,color:c1,
+                                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>
+                                            @{nm}
+                                          </span>
+                                        </div>
+                                        <div style={{textAlign:"right",flexShrink:0}}>
+                                          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:c1,lineHeight:1}}>
+                                            {m.points.toLocaleString()}
+                                          </span>
+                                          <span style={{fontSize:9,color:"#555",marginLeft:4}}>pts</span>
+                                        </div>
+                                      </div>
+                                      <div style={{height:4,background:"#0d0d18",borderRadius:2,overflow:"hidden"}}>
+                                        <div style={{height:"100%",width:`${barPct}%`,borderRadius:2,
+                                          transition:"width 1s ease",background:`linear-gradient(90deg,${c1},${c1}55)`}}/>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+
+                    // ── Ranking multi (3+ anfitriones individuales sin equipos) ──
+                    if (teams.length >= 3) {
+                      const sorted = [...teams].sort((a,b) => b.points - a.points);
+                      const COLORS = ["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#34d399","#f97316"];
+                      const maxPts = sorted[0]?.points || 1;
+                      return (
+                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
                           <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:"12px 14px"}}>
                             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                               <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>🏆 {teams.length} participantes</span>
                               <span style={{fontSize:9,color:"#555"}}>{totalPts.toLocaleString()} puntos totales</span>
                             </div>
-                            {/* Barra apilada con todos */}
                             <div style={{height:10,borderRadius:5,background:"#0d0d18",overflow:"hidden",display:"flex"}}>
                               {sorted.map((t,i) => {
                                 const pct = Math.round(t.points / totalPts * 100);
@@ -1527,8 +1620,6 @@ function App() {
                               })}
                             </div>
                           </div>
-
-                          {/* Cards individuales — RANKING */}
                           {sorted.map((t,i) => {
                             const nm = getName(t);
                             const c  = COLORS[i % COLORS.length];
@@ -1543,8 +1634,7 @@ function App() {
                                     {i===0?"👑":i===1?"🥈":i===2?"🥉":(i+1)+"."}
                                   </span>
                                   <div style={{flex:1,minWidth:0}}>
-                                    <div style={{fontWeight:800,fontSize:12,color:c,
-                                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                    <div style={{fontWeight:800,fontSize:12,color:c,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                                       @{nm}
                                     </div>
                                   </div>
