@@ -199,90 +199,77 @@ function extractTeams(data) {
       if (Array.isArray(army.participants)) army.participants.forEach(p => registerUser(p));
     });
 
-    // ── Detectar estructura del battle ──────────────────────────────────────
-    // TikTok 2v2 (LIVE BOSS): 2 armies, cada army tiene participants[] con
-    // los anfitriones del equipo (2 por army) y sus puntos individuales en
-    // p.battleScore / p.score / p.points.
-    // Los "fans" que envían regalos NO aparecen en participants[], solo los hosts.
+    // ── ESTRUCTURA REAL DE TIKTOK 2v2 ────────────────────────────────────────
+    // TikTok manda 1 army POR CADA ANFITRIÓN (no 1 army por equipo).
+    // Ejemplo 2v2: 4 armies, cada uno con su hostUserId/hostUser y sus puntos propios.
+    // Los "participants" dentro de cada army son los FANS/MVPs top que apoyan al anfitrión,
+    // NO son los anfitriones. El anfitrión está en army.hostUser o army.hostUserId.
     //
-    // TikTok 1v1 simple: 2 armies, cada army tiene 1 participant (el host)
-    // y los puntos están en army.points / army.teamPoints.
+    // TikTok 1v1: 2 armies, misma estructura.
+    // TikTok 3-way: 3 armies, misma estructura.
+    //
+    // Para detectar si es 2v2 vs 1v1: se usa army.armyType, army.teamId,
+    // o simplemente el número de armies (4 = 2v2).
 
-    const hasMultiParticipants = data.battleArmies.some(
-      a => Array.isArray(a.participants) && a.participants.length > 1
-    );
-
-    if (hasMultiParticipants) {
-      // ── Modo 2v2: sacar CADA participant con sus puntos individuales ──────
-      // Marcamos a qué equipo (army index) pertenece cada anfitrión.
-      const result = [];
-      data.battleArmies.forEach((army, armyIdx) => {
-        if (!Array.isArray(army.participants) || army.participants.length === 0) return;
-
-        army.participants.forEach(p => {
-          const pts = Number(
-            p.battleScore || p.score || p.points || p.teamPoints ||
-            p.point || p.totalScore || 0
-          );
-          const { hostName, hostNickname, userId } = extractName(p);
-          if (hostName && hostName !== "?") {
-            result.push({ hostName, hostNickname, userId, points: pts, teamIdx: armyIdx });
-          }
-        });
-      });
-
-      // Si todos los puntos individuales son 0, usar puntos del army repartidos
-      // (a veces TikTok solo manda teamPoints, no individuales)
-      const allZero = result.every(r => r.points === 0);
-      if (allZero) {
-        const withArmyPts = [];
-        data.battleArmies.forEach((army, armyIdx) => {
-          const armyPts = Number(
-            army.points || army.teamScore || army.teamPoints ||
-            army.score  || army.battleScore || army.totalPoints || 0
-          );
-          if (!Array.isArray(army.participants)) return;
-          // Repartir puntos del army proporcionalmente (o igual si no hay data individual)
-          army.participants.forEach(p => {
-            const { hostName, hostNickname, userId } = extractName(p);
-            if (hostName && hostName !== "?") {
-              withArmyPts.push({ hostName, hostNickname, userId, points: armyPts, teamIdx: armyIdx });
-            }
-          });
-        });
-        if (withArmyPts.length > 0) return withArmyPts;
-      }
-
-      if (result.length > 0) return result;
-    }
-
-    // ── Modo simple: 1 anfitrión por army (1v1, 3-way, etc.) ────────────────
-    return data.battleArmies.map(army => {
+    const result = data.battleArmies.map((army, armyIdx) => {
       const pts = Number(
         army.points || army.teamScore || army.teamPoints ||
         army.score  || army.battleScore || army.point ||
         army.totalScore || army.totalPoints || 0
       );
 
-      // Prioridad: hostUser → primer participant → hostUserId
-      let base = null;
+      // ── El anfitrión de este army ──────────────────────────────────────────
+      // Prioridad 1: army.hostUser (objeto usuario completo)
+      // Prioridad 2: army.hostUserId + buscar en participants o userMap
+      // Prioridad 3: army.hostUserId como fallback numérico
+
+      let hostName = "";
+      let hostNickname = "";
+      let userId = "";
+
       if (army.hostUser) {
-        base = extractName(army.hostUser);
-      } else if (Array.isArray(army.participants) && army.participants.length > 0) {
-        const hostUserId = String(army.hostUserId || army.hostId || "");
-        const hp = (hostUserId && army.participants.find(p =>
-          String(p.userId||p.id) === hostUserId
-        )) || army.participants[0];
-        base = extractName(hp);
-      } else {
-        const hostUserId = String(army.hostUserId || army.hostId || "");
-        const r = resolveNameFromMap(hostUserId);
-        base = r ? { hostName: r.uniqueId, hostNickname: r.nickname, userId: hostUserId }
-                 : { hostName: hostUserId || "?", hostNickname: hostUserId || "?", userId: hostUserId };
+        const r = extractName(army.hostUser);
+        hostName     = r.hostName;
+        hostNickname = r.hostNickname;
+        userId       = r.userId || String(army.hostUser.userId || army.hostUser.id || "");
       }
 
-      return { ...base, points: pts };
-    }).filter(t => t.hostName && t.hostName !== "?");
+      // Si hostUser no tenía nombre legible, buscar por hostUserId
+      const rawHostId = String(army.hostUserId || army.hostId || "");
+      if ((!hostName || /^\d{8,}$/.test(hostName)) && rawHostId) {
+        userId = rawHostId;
+        // Buscar en participants si alguno coincide con el hostUserId
+        if (Array.isArray(army.participants)) {
+          const match = army.participants.find(p =>
+            String(p.userId || p.id || "") === rawHostId
+          );
+          if (match) {
+            const r = extractName(match);
+            if (r.hostName && !/^\d{8,}$/.test(r.hostName)) {
+              hostName     = r.hostName;
+              hostNickname = r.hostNickname;
+            }
+          }
+        }
+        // Buscar en userMap
+        if (!hostName || /^\d{8,}$/.test(hostName)) {
+          const r = resolveNameFromMap(rawHostId);
+          if (r) { hostName = r.uniqueId; hostNickname = r.nickname; }
+          else { hostName = rawHostId; hostNickname = rawHostId; }
+        }
+      }
+
+      if (!userId) userId = rawHostId || hostName || "";
+
+      // Determinar equipo: army.armyType, army.teamId, o paridad del índice
+      const teamIdx = army.armyType !== undefined ? Number(army.armyType) :
+                      army.teamId   !== undefined ? Number(army.teamId)   :
+                      armyIdx % 2; // fallback: alternancia 0,1,0,1
+
+      return { hostName, hostNickname, userId, points: pts, teamIdx };
+    }).filter(t => t.hostName && t.hostName !== "");
+
+    if (result.length > 0) return result;
   }
 
   if (Array.isArray(data.battleUsers) && data.battleUsers.length > 0) {
@@ -423,13 +410,15 @@ async function startTikTokConnection(username, sessionId) {
   let lastStatus = 1;
 
   tiktok.on("linkMicArmies", (data) => {
-    // Log completo para debug de estructura 2v2
-    const rawStr = JSON.stringify(data);
-    console.log("[linkMicArmies] FULL raw:", rawStr.slice(0, 3000));
+    // Log COMPLETO — crucial para depurar estructura 2v2
+    console.log("[linkMicArmies] RAW FULL:", JSON.stringify(data).slice(0, 4000));
     if (Array.isArray(data.battleArmies)) {
       data.battleArmies.forEach((army, i) => {
-        console.log(`[army ${i}] hostUserId=${army.hostUserId} points=${army.points||army.teamPoints||army.score} participants=${JSON.stringify((army.participants||[]).map(p=>({uid:p.uniqueId,nn:p.nickname,pts:p.battleScore||p.score||p.points||0})))}`);
-        if (army.hostUser) console.log(`[army ${i}] hostUser:`, JSON.stringify(army.hostUser).slice(0,200));
+        console.log(`[army ${i}] hostUserId=${army.hostUserId} armyType=${army.armyType} teamId=${army.teamId} points=${army.points||army.teamPoints||army.score||0}`);
+        if (army.hostUser) console.log(`[army ${i}] hostUser: uid=${army.hostUser.uniqueId} nn=${army.hostUser.nickname} id=${army.hostUser.userId||army.hostUser.id}`);
+        else console.log(`[army ${i}] hostUser: (vacío)`);
+        const parts = (army.participants||[]).slice(0,3).map(p=>({uid:p.uniqueId,nn:p.nickname,id:p.userId||p.id,pts:p.battleScore||p.score||p.points||0}));
+        console.log(`[army ${i}] participants[0..2]:`, JSON.stringify(parts));
       });
     }
 

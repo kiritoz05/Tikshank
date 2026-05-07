@@ -1501,10 +1501,13 @@ function App() {
                     const totalPts = teams.reduce((s,t) => s + t.points, 0) || 1;
 
                     // ── Detectar modo:
-                    // teams con teamIdx → 2v2 (4 anfitriones en 2 equipos)
-                    // teams.length >= 3 sin teamIdx → ranking multi
-                    // teams.length === 2 → 1v1 clásico
-                    const has2v2 = teams.some(t => t.teamIdx !== undefined && t.teamIdx !== null);
+                    // 4 teams con teamIdx 0/1 → 2v2 (mostrar por equipos)
+                    // 2 teams → 1v1 clásico
+                    // 3+ teams → ranking individual
+                    const uniqueTeamIdxs = [...new Set(teams.map(t => t.teamIdx))];
+                    const has2v2 = teams.length === 4 ||
+                      (teams.length > 2 && uniqueTeamIdxs.length === 2 &&
+                       teams.filter(t=>t.teamIdx===uniqueTeamIdxs[0]).length > 1);
 
                     if (has2v2 || teams.length === 4) {
                       // Agrupar por equipo
