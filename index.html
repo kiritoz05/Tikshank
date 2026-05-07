@@ -717,9 +717,13 @@ function App() {
 
     sock.on("viewers", d => {
       setStats(p=>({...p, viewers:d.count||0}));
-      // topViewers = lista de espectadores activos ahora
+      // topViewers = acumular todos los activos vistos (TikTok envía hasta 50 por evento)
       if (Array.isArray(d.topViewers) && d.topViewers.length > 0) {
-        setTopViewers(d.topViewers);
+        setTopViewers(prev => {
+          const map = new Map(prev.map(v => [v.user, v]));
+          d.topViewers.forEach(v => { if (v.user && v.user !== "?") map.set(v.user, v); });
+          return [...map.values()].sort((a,b) => (b.viewers||0)-(a.viewers||0));
+        });
       }
     });
     sock.on("member", d => {
@@ -797,6 +801,9 @@ function App() {
       if (d.success) {
         setConn2(false); setConn(true);
         setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0});
+        setTopViewers([]);
+        setTotDia(0)setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0});
+        setTopViewers([]);
         setTotDia(0); setTotLike(0); setTapR([]); setLikeR([]);
         setBattle(null);
         likeUserMapR.current = {}; // reset delta tracker
@@ -1459,7 +1466,6 @@ function App() {
                   </div>
 
                   {battle.teams && battle.teams.length >= 2 ? (() => {
-                    // Encontrar qué equipo es el dueño del live
                     const owner = (battle.ownerUsername || "").toLowerCase().replace(/^@/,"");
                     const isNumeric = s => /^\d{8,}$/.test(s||"");
                     const getName = t => {
@@ -1469,20 +1475,86 @@ function App() {
                       return nn || hn;
                     };
 
-                    // Siempre: dueño del live = izquierda (rojo), contrario = derecha (cyan)
-                    const ownerTeamIdx = battle.teams.findIndex(t => {
+                    const teams = battle.teams;
+                    const totalPts = teams.reduce((s,t) => s + t.points, 0) || 1;
+
+                    // ── Detectar si es 2v2 (4 equipos con labels A1,A2,B1,B2)
+                    // o simplemente N participantes individuales
+                    const is4way = teams.length >= 4;
+
+                    if (is4way) {
+                      // Ordenar por puntos desc para mostrar ranking
+                      const sorted = [...teams].sort((a,b) => b.points - a.points);
+                      const COLORS = ["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#34d399","#f97316"];
+                      const maxPts = sorted[0]?.points || 1;
+
+                      return (
+                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                          {/* Header */}
+                          <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:"12px 14px"}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                              <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>🏆 {teams.length} participantes</span>
+                              <span style={{fontSize:9,color:"#555"}}>{totalPts.toLocaleString()} puntos totales</span>
+                            </div>
+                            {/* Barra apilada con todos */}
+                            <div style={{height:10,borderRadius:5,background:"#0d0d18",overflow:"hidden",display:"flex"}}>
+                              {sorted.map((t,i) => {
+                                const pct = Math.round(t.points / totalPts * 100);
+                                return <div key={i} style={{height:"100%",width:`${pct}%`,background:COLORS[i%COLORS.length],transition:"width 1s ease"}}/>;
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Cards individuales — RANKING */}
+                          {sorted.map((t,i) => {
+                            const nm = getName(t);
+                            const c  = COLORS[i % COLORS.length];
+                            const pct = Math.round(t.points / totalPts * 100);
+                            const barPct = Math.round(t.points / maxPts * 100);
+                            return (
+                              <div key={i} style={{background:"#12121e",
+                                border:`1px solid ${i===0?"rgba(255,215,0,.3)":"#1e1e2e"}`,
+                                borderRadius:13,padding:"11px 13px"}}>
+                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
+                                  <span style={{fontSize:i===0?18:14,flexShrink:0}}>
+                                    {i===0?"👑":i===1?"🥈":i===2?"🥉":`${i+1}.`}
+                                  </span>
+                                  <div style={{flex:1,minWidth:0}}>
+                                    <div style={{fontWeight:800,fontSize:12,color:c,
+                                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                      @{nm}
+                                    </div>
+                                  </div>
+                                  <div style={{textAlign:"right",flexShrink:0}}>
+                                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:24,color:c,lineHeight:1}}>
+                                      {t.points.toLocaleString()}
+                                    </div>
+                                    <div style={{fontSize:9,color:"#555"}}>pts · {pct}%</div>
+                                  </div>
+                                </div>
+                                <div style={{height:5,background:"#0d0d18",borderRadius:3,overflow:"hidden"}}>
+                                  <div style={{height:"100%",width:`${barPct}%`,borderRadius:3,
+                                    transition:"width 1s ease",background:`linear-gradient(90deg,${c},${c}55)`}}/>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    }
+
+                    // ── Batalla 1v1 (2 equipos) — lógica original mejorada ──
+                    const ownerTeamIdx = teams.findIndex(t => {
                       const hn = (t.hostName||"").toLowerCase().replace(/^@/,"");
                       const nn = (t.hostNickname||"").toLowerCase().replace(/^@/,"");
                       return owner && (hn===owner || nn===owner || hn.includes(owner) || owner.includes(hn));
                     });
-                    // Si no encontramos por nombre, usar índice 0 por defecto
                     const idx0 = ownerTeamIdx >= 0 ? ownerTeamIdx : 0;
                     const idx1 = idx0 === 0 ? 1 : 0;
-                    const t0 = battle.teams[idx0]; // dueño — siempre izquierda ROJO
-                    const t1 = battle.teams[idx1]; // contrario — siempre derecha CYAN
-
-                    const total = (t0.points + t1.points) || 1;
-                    const pct0 = Math.round(t0.points / total * 100);
+                    const t0 = teams[idx0];
+                    const t1 = teams[idx1];
+                    const total2 = (t0.points + t1.points) || 1;
+                    const pct0 = Math.round(t0.points / total2 * 100);
                     const pct1 = 100 - pct0;
                     const win0 = t0.points >= t1.points;
                     const win1 = !win0;
@@ -1491,67 +1563,41 @@ function App() {
 
                     return (
                       <div style={{display:"flex",flexDirection:"column",gap:10}}>
-
-                        {/* ── VERSUS PRINCIPAL ── */}
-                        <div style={{background:"#12121e",border:"1px solid #1e1e2e",
-                          borderRadius:16,padding:16}}>
-
-                          {/* Nombres — FIJOS, sin corona */}
+                        <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:16,padding:16}}>
                           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
                             <div style={{flex:1,textAlign:"left",minWidth:0}}>
-                              <span style={{fontSize:11,fontWeight:800,color:"#fe2c55",
-                                wordBreak:"break-all",lineHeight:1.3}}>
+                              <span style={{fontSize:11,fontWeight:800,color:"#fe2c55",wordBreak:"break-all",lineHeight:1.3}}>
                                 @{name0}
                               </span>
                             </div>
                             <div style={{flexShrink:0,padding:"0 5px"}}>
-                              <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
-                                fontSize:13,color:"#333",letterSpacing:2}}>VS</span>
+                              <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:13,color:"#333",letterSpacing:2}}>VS</span>
                             </div>
                             <div style={{flex:1,textAlign:"right",minWidth:0}}>
-                              <span style={{fontSize:11,fontWeight:800,color:"#25f4ee",
-                                wordBreak:"break-all",lineHeight:1.3}}>
+                              <span style={{fontSize:11,fontWeight:800,color:"#25f4ee",wordBreak:"break-all",lineHeight:1.3}}>
                                 @{name1}
                               </span>
                             </div>
                           </div>
-
-                          {/* Puntajes — FIJOS en su lado, solo el número cambia */}
-                          <div style={{display:"flex",alignItems:"center",
-                            justifyContent:"space-between",marginBottom:10}}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                             <div style={{textAlign:"left"}}>
-                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
-                                fontSize:40,color:"#fe2c55",lineHeight:1}}>
+                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:40,color:"#fe2c55",lineHeight:1}}>
                                 {t0.points.toLocaleString()}
                               </div>
-                              <div style={{fontSize:10,color:"#fe2c5570",fontWeight:700}}>
-                                {pct0}%
-                              </div>
+                              <div style={{fontSize:10,color:"#fe2c5570",fontWeight:700}}>{pct0}%</div>
                             </div>
                             <div style={{textAlign:"right"}}>
-                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
-                                fontSize:40,color:"#25f4ee",lineHeight:1}}>
+                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:40,color:"#25f4ee",lineHeight:1}}>
                                 {t1.points.toLocaleString()}
                               </div>
-                              <div style={{fontSize:10,color:"#25f4ee70",fontWeight:700}}>
-                                {pct1}%
-                              </div>
+                              <div style={{fontSize:10,color:"#25f4ee70",fontWeight:700}}>{pct1}%</div>
                             </div>
                           </div>
-
-                          {/* Barra — SOLO ESTO se anima con transition */}
-                          <div style={{height:12,borderRadius:6,background:"#0d0d18",
-                            overflow:"hidden",display:"flex"}}>
-                            <div style={{height:"100%",width:`${pct0}%`,
-                              background:"linear-gradient(90deg,#fe2c55,#ff6b81)",
-                              transition:"width 1s ease"}}/>
-                            <div style={{height:"100%",width:`${pct1}%`,
-                              background:"linear-gradient(90deg,#0ea5e9,#25f4ee)",
-                              transition:"width 1s ease"}}/>
+                          <div style={{height:12,borderRadius:6,background:"#0d0d18",overflow:"hidden",display:"flex"}}>
+                            <div style={{height:"100%",width:`${pct0}%`,background:"linear-gradient(90deg,#fe2c55,#ff6b81)",transition:"width 1s ease"}}/>
+                            <div style={{height:"100%",width:`${pct1}%`,background:"linear-gradient(90deg,#0ea5e9,#25f4ee)",transition:"width 1s ease"}}/>
                           </div>
                         </div>
-
-                        {/* Cards individuales — también fijos */}
                         {[{team:t0,c:"#fe2c55",pct:pct0,isWin:win0,nm:name0},
                           {team:t1,c:"#25f4ee",pct:pct1,isWin:win1,nm:name1}].map(({team,c,pct,isWin,nm},i) => (
                           <div key={i} style={{background:"#12121e",
@@ -1560,14 +1606,12 @@ function App() {
                             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                               {isWin && <span style={{fontSize:16}}>👑</span>}
                               <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontWeight:800,fontSize:12,color:c,
-                                  overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                <div style={{fontWeight:800,fontSize:12,color:c,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                                   @{nm}
                                 </div>
                               </div>
                               <div style={{textAlign:"right",flexShrink:0}}>
-                                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
-                                  fontSize:28,color:c,lineHeight:1}}>
+                                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:28,color:c,lineHeight:1}}>
                                   {team.points.toLocaleString()}
                                 </div>
                                 <div style={{fontSize:9,color:"#555",fontWeight:600}}>puntos</div>

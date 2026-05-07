@@ -154,8 +154,19 @@ function normalizeBattleUser(u) {
 }
 
 // Extraer equipos
+function resolveNameFromMap(userId) {
+  if (!userId) return null;
+  const key = String(userId);
+  const mapped = userMap[key];
+  if (mapped && mapped.uniqueId && !/^\d{8,}$/.test(mapped.uniqueId)) {
+    return { uniqueId: mapped.uniqueId, nickname: mapped.nickname || mapped.uniqueId };
+  }
+  return null;
+}
+
 function extractTeams(data) {
   if (Array.isArray(data.battleArmies) && data.battleArmies.length > 0) {
+    // Soporta batallas de 2, 3 o 4 equipos (LIVE BOSS 2v2, 1v1, etc.)
     return data.battleArmies.map(army => {
       const pts        = Number(army.points || army.teamPoints || army.score || 0);
       const hostUserId = String(army.hostUserId || army.hostId || "");
@@ -163,42 +174,54 @@ function extractTeams(data) {
       let hostName     = hostUserId || "?";
       let hostNickname = hostName;
 
+      // 1) Buscar entre participantes del equipo
       if (Array.isArray(army.participants) && army.participants.length > 0) {
+        army.participants.forEach(p => registerUser(p));
+
         const hostParticipant = army.participants.find(p =>
-          String(p.userId)   === String(hostUserId) ||
-          String(p.uniqueId) === String(hostUserId) ||
-          String(p.id)       === String(hostUserId)
-        ) || null;
+          String(p.userId)   === hostUserId ||
+          String(p.uniqueId) === hostUserId ||
+          String(p.id)       === hostUserId
+        ) || army.participants[0];
 
         if (hostParticipant) {
-          hostNickname = hostParticipant.nickname || hostParticipant.displayName || hostParticipant.name || hostName;
-          if (hostParticipant.uniqueId) hostName = hostParticipant.uniqueId;
-        } else {
-          const mapped = userMap[hostUserId];
-          if (mapped?.uniqueId) {
-            hostName     = mapped.uniqueId;
-            hostNickname = mapped.nickname || mapped.uniqueId;
-          } else {
-            hostName = hostUserId || "?";
-            hostNickname = hostName;
-          }
+          const uid = hostParticipant.uniqueId || hostParticipant.displayId || "";
+          const nn  = hostParticipant.nickname || hostParticipant.displayName || hostParticipant.name || "";
+          if (uid && !/^\d{8,}$/.test(uid)) hostName = uid;
+          hostNickname = nn || uid || hostName;
         }
-      } else if (army.hostUser) {
-        hostName     = army.hostUser.uniqueId || army.hostUser.userId || hostName;
-        hostNickname = army.hostUser.nickname  || army.hostUser.name  || hostName;
+      }
+
+      // 2) Intentar userMap acumulado de eventos previos (chat/gift/member)
+      if (/^\d{8,}$/.test(hostName) || hostName === "?") {
+        const resolved = resolveNameFromMap(hostUserId);
+        if (resolved) { hostName = resolved.uniqueId; hostNickname = resolved.nickname; }
+      }
+
+      // 3) Usar hostUser directo si existe
+      if ((/^\d{8,}$/.test(hostName) || hostName === "?") && army.hostUser) {
+        const uid = army.hostUser.uniqueId || army.hostUser.displayId || "";
+        const nn  = army.hostUser.nickname || army.hostUser.name || uid;
+        if (uid && !/^\d{8,}$/.test(uid)) { hostName = uid; hostNickname = nn; }
       }
 
       return { hostName, hostNickname, userId: hostUserId, points: pts };
-    }).filter(t => t.hostNickname !== "?");
+    }).filter(t => t.hostName !== "?");
   }
 
   if (Array.isArray(data.battleUsers) && data.battleUsers.length > 0) {
-    return data.battleUsers.map(u => ({
-      hostName:     u.uniqueId   || u.displayId || u.userId || "?",
-      hostNickname: u.nickname   || u.displayName || u.uniqueId || "?",
-      userId:       String(u.userId || u.id || ""),
-      points:       Number(u.battleScore || u.score || u.points || 0),
-    })).filter(t => t.hostName !== "?");
+    return data.battleUsers.map(u => {
+      let hostName = u.uniqueId || u.displayId || "";
+      let hostNickname = u.nickname || u.displayName || hostName;
+      const userId = String(u.userId || u.id || "");
+
+      if (!hostName || /^\d{8,}$/.test(hostName)) {
+        const resolved = resolveNameFromMap(userId);
+        if (resolved) { hostName = resolved.uniqueId; hostNickname = resolved.nickname; }
+        else hostName = userId || "?";
+      }
+      return { hostName, hostNickname, userId, points: Number(u.battleScore || u.score || u.points || 0) };
+    }).filter(t => t.hostName !== "?");
   }
 
   const candidates = [data.battleItems, data.users, data.armies, data.items, data.teams].filter(Array.isArray);
@@ -266,7 +289,7 @@ async function startTikTokConnection(username) {
         user:     v.user?.uniqueId  || v.uniqueId  || v.userId    || "?",
         nickname: v.user?.nickname  || v.nickname  || v.displayName || "?",
         viewers:  v.memberCount || v.viewerCount || 0,
-      })).filter(v => v.user !== "?").slice(0, 50),
+      })).filter(v => v.user !== "?").slice(0, 200),
     });
   });
 
