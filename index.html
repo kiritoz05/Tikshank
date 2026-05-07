@@ -1501,19 +1501,22 @@ function App() {
                     const totalPts = teams.reduce((s,t) => s + t.points, 0) || 1;
 
                     // ── Detectar modo:
-                    // 4 teams con teamIdx 0/1 → 2v2 (mostrar por equipos)
+                    // 4 teams → siempre 2v2 (2 anfitriones por equipo)
+                    // 2 teams con teamIdx distintos y >1 por grupo → 2v2
                     // 2 teams → 1v1 clásico
-                    // 3+ teams → ranking individual
+                    // 3 teams → ranking individual
                     const uniqueTeamIdxs = [...new Set(teams.map(t => t.teamIdx))];
                     const has2v2 = teams.length === 4 ||
                       (teams.length > 2 && uniqueTeamIdxs.length === 2 &&
                        teams.filter(t=>t.teamIdx===uniqueTeamIdxs[0]).length > 1);
 
-                    if (has2v2 || teams.length === 4) {
-                      // Agrupar por equipo
+                    if (has2v2) {
+                      // Agrupar por equipo — si teamIdx no viene, usar índice posicional (0,1,0,1)
                       const teamGroups = {};
-                      teams.forEach(t => {
-                        const gi = t.teamIdx !== undefined ? t.teamIdx : (teams.indexOf(t) < teams.length/2 ? 0 : 1);
+                      teams.forEach((t, idx) => {
+                        const gi = (t.teamIdx !== undefined && t.teamIdx !== null)
+                          ? (Number(t.teamIdx) % 2)
+                          : (idx % 2);
                         if (!teamGroups[gi]) teamGroups[gi] = [];
                         teamGroups[gi].push(t);
                       });
@@ -1525,19 +1528,36 @@ function App() {
                       const grandTotal = teamTotals.reduce((s,v)=>s+v,0) || 1;
                       const winnerGroup = teamTotals[0] >= teamTotals[1] ? 0 : 1;
 
+                      // Nombres de los anfitriones por equipo para el header VS
+                      const teamHostNames = groupKeys.map(k =>
+                        teamGroups[k].map(m => getName(m)).filter(Boolean)
+                      );
+
                       return (
                         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                          {/* Barra VS equipos */}
+                          {/* Barra VS equipos — muestra nombres de anfitriones */}
                           <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:"12px 14px"}}>
                             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
                               {groupKeys.map((k,gi) => (
                                 <React.Fragment key={k}>
                                   <div style={{flex:1,textAlign:gi===0?"left":"right",minWidth:0}}>
-                                    <div style={{fontSize:10,fontWeight:800,color:TEAM_COLORS[gi%2][0]}}>
+                                    <div style={{fontSize:9,fontWeight:700,color:TEAM_COLORS[gi%2][0],marginBottom:2,opacity:.7}}>
                                       {TEAM_LABELS[gi%2]}
                                     </div>
-                                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:28,color:TEAM_COLORS[gi%2][0],lineHeight:1}}>
+                                    {/* Nombres de los anfitriones del equipo */}
+                                    <div style={{display:"flex",flexDirection:"column",gap:1,alignItems:gi===0?"flex-start":"flex-end"}}>
+                                      {teamHostNames[gi].map((nm,ni) => (
+                                        <span key={ni} style={{fontSize:10,fontWeight:800,color:TEAM_COLORS[gi%2][0],
+                                          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:"100%"}}>
+                                          @{nm}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:26,color:TEAM_COLORS[gi%2][0],lineHeight:1,marginTop:4}}>
                                       {teamTotals[gi].toLocaleString()}
+                                    </div>
+                                    <div style={{fontSize:9,color:`${TEAM_COLORS[gi%2][0]}80`,fontWeight:700}}>
+                                      {Math.round(teamTotals[gi]/grandTotal*100)}%
                                     </div>
                                   </div>
                                   {gi < groupKeys.length-1 && (
@@ -1555,44 +1575,64 @@ function App() {
                             </div>
                           </div>
 
-                          {/* Cada equipo con sus anfitriones individuales */}
+                          {/* Cada equipo con sus anfitriones — puntos INDIVIDUALES prominentes */}
                           {groupKeys.map((k, gi) => {
                             const members = teamGroups[k];
-                            const [c1] = TEAM_COLORS[gi%2];
+                            const [c1, c2] = TEAM_COLORS[gi%2];
                             const isWinTeam = gi === winnerGroup;
                             const maxMemberPts = Math.max(...members.map(m=>m.points)) || 1;
                             return (
                               <div key={k} style={{background:"#12121e",
-                                border:`1px solid ${isWinTeam?"rgba(255,215,0,.25)":"#1e1e2e"}`,
+                                border:`1px solid ${isWinTeam?"rgba(255,215,0,.3)":"#1e1e2e"}`,
                                 borderRadius:13,padding:"12px 13px"}}>
-                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-                                  {isWinTeam && <span style={{fontSize:15}}>👑</span>}
+                                {/* Header del equipo */}
+                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,
+                                  paddingBottom:8,borderBottom:"1px solid #1a1a2a"}}>
+                                  {isWinTeam && <span style={{fontSize:16}}>👑</span>}
                                   <span style={{fontSize:11,fontWeight:800,color:c1}}>{TEAM_LABELS[gi%2]}</span>
-                                  <span style={{fontSize:9,color:"#555",marginLeft:"auto"}}>{teamTotals[gi].toLocaleString()} pts totales</span>
+                                  <span style={{fontSize:9,color:"#555",marginLeft:"auto",fontFamily:"'JetBrains Mono',monospace"}}>
+                                    {teamTotals[gi].toLocaleString()} total
+                                  </span>
                                 </div>
-                                {/* Anfitriones individuales */}
+                                {/* Anfitriones individuales — tarjeta por cada uno */}
                                 {members.map((m, mi) => {
                                   const nm = getName(m);
                                   const barPct = Math.round(m.points/maxMemberPts*100);
+                                  const pctOfTotal = Math.round(m.points/totalPts*100);
                                   return (
-                                    <div key={mi} style={{marginBottom: mi<members.length-1?10:0}}>
-                                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                                    <div key={mi} style={{
+                                      marginBottom: mi<members.length-1?10:0,
+                                      background:"rgba(255,255,255,.02)",
+                                      borderRadius:9,padding:"10px 10px 8px",
+                                      border:`1px solid ${c1}22`
+                                    }}>
+                                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                                        {/* Avatar con inicial */}
+                                        <div style={{width:32,height:32,borderRadius:"50%",flexShrink:0,
+                                          background:`linear-gradient(135deg,${c1},${c2})`,
+                                          display:"flex",alignItems:"center",justifyContent:"center",
+                                          fontSize:13,fontWeight:900,color:"#000"}}>
+                                          {(nm[0]||"?").toUpperCase()}
+                                        </div>
                                         <div style={{flex:1,minWidth:0}}>
-                                          <span style={{fontWeight:800,fontSize:12,color:c1,
-                                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>
+                                          <div style={{fontWeight:800,fontSize:13,color:c1,
+                                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                                             @{nm}
-                                          </span>
+                                          </div>
+                                          <div style={{fontSize:9,color:"#555",marginTop:1}}>
+                                            {pctOfTotal}% del total
+                                          </div>
                                         </div>
                                         <div style={{textAlign:"right",flexShrink:0}}>
-                                          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:c1,lineHeight:1}}>
+                                          <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:26,color:c1,lineHeight:1}}>
                                             {m.points.toLocaleString()}
-                                          </span>
-                                          <span style={{fontSize:9,color:"#555",marginLeft:4}}>pts</span>
+                                          </div>
+                                          <div style={{fontSize:9,color:"#555",fontWeight:600}}>puntos</div>
                                         </div>
                                       </div>
-                                      <div style={{height:4,background:"#0d0d18",borderRadius:2,overflow:"hidden"}}>
-                                        <div style={{height:"100%",width:`${barPct}%`,borderRadius:2,
-                                          transition:"width 1s ease",background:`linear-gradient(90deg,${c1},${c1}55)`}}/>
+                                      <div style={{height:5,background:"#0d0d18",borderRadius:3,overflow:"hidden"}}>
+                                        <div style={{height:"100%",width:`${barPct}%`,borderRadius:3,
+                                          transition:"width 1s ease",background:`linear-gradient(90deg,${c1},${c2})`}}/>
                                       </div>
                                     </div>
                                   );

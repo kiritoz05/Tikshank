@@ -262,9 +262,14 @@ function extractTeams(data) {
       if (!userId) userId = rawHostId || hostName || "";
 
       // Determinar equipo: army.armyType, army.teamId, o paridad del índice
-      const teamIdx = army.armyType !== undefined ? Number(army.armyType) :
-                      army.teamId   !== undefined ? Number(army.teamId)   :
-                      armyIdx % 2; // fallback: alternancia 0,1,0,1
+      // Para 2v2 TikTok manda armies en orden: [equipo0_host0, equipo1_host0, equipo0_host1, equipo1_host1]
+      // O en algunas versiones: [equipo0_host0, equipo0_host1, equipo1_host0, equipo1_host1]
+      // Usamos armyType si existe, sino teamId, sino alternancia 0,1,0,1
+      const teamIdx = army.armyType !== undefined && army.armyType !== null
+                      ? (Number(army.armyType) % 2)
+                      : army.teamId !== undefined && army.teamId !== null
+                      ? (Number(army.teamId) % 2)
+                      : (armyIdx % 2); // alternancia segura: 0,1,0,1
 
       return { hostName, hostNickname, userId, points: pts, teamIdx };
     }).filter(t => t.hostName && t.hostName !== "");
