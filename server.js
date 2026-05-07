@@ -168,7 +168,12 @@ function extractTeams(data) {
   if (Array.isArray(data.battleArmies) && data.battleArmies.length > 0) {
     // Soporta batallas de 2, 3 o 4 equipos (LIVE BOSS 2v2, 1v1, etc.)
     return data.battleArmies.map(army => {
-      const pts        = Number(army.points || army.teamPoints || army.score || 0);
+      // TikTok puede enviar puntos en distintos campos según el tipo de batalla
+      const pts = Number(
+        army.points || army.teamScore || army.teamPoints ||
+        army.score  || army.battleScore || army.point ||
+        army.totalScore || army.totalPoints || 0
+      );
       const hostUserId = String(army.hostUserId || army.hostId || "");
 
       let hostName     = hostUserId || "?";
@@ -265,6 +270,9 @@ async function startTikTokConnection(username) {
   sessions[username]  = { tiktok, retryTimer: null, ownerUsername };
   console.log(`✅ Conectado a @${username}`);
 
+  // Mapa acumulado de todos los usuarios activos del live
+  const activeUsersMap = new Map();
+
   tiktok.on("chat", (data) => {
     registerUser(data);
     io.emit("event", { type:"chat", user:data.uniqueId, nickname:data.nickname||data.uniqueId, comment:data.comment, timestamp:Date.now() });
@@ -282,20 +290,45 @@ async function startTikTokConnection(username) {
   tiktok.on("share",     (data) => {                     io.emit("event", { type:"share",   user:data.uniqueId, nickname:data.nickname||data.uniqueId, timestamp:Date.now() }); });
 
   tiktok.on("roomUser", (data) => {
-    if (Array.isArray(data.topViewers)) data.topViewers.forEach(v => registerUser(v.user || v));
+    if (Array.isArray(data.topViewers)) {
+      data.topViewers.forEach(v => {
+        registerUser(v.user || v);
+        const u = v.user || v;
+        const user     = u.uniqueId || u.displayId || u.user || "";
+        const nickname = u.nickname || u.displayName || u.name || user;
+        if (user && user !== "?") {
+          const existing = activeUsersMap.get(user);
+          activeUsersMap.set(user, {
+            user, nickname,
+            viewers: v.memberCount || v.viewerCount || 0,
+            joinTime: existing?.joinTime || Date.now()
+          });
+        }
+      });
+    }
+    // Emitir: count real de TikTok + todos los usuarios acumulados
+    const allAccumulated = [...activeUsersMap.values()]
+      .sort((a,b) => (b.viewers||0) - (a.viewers||0));
     io.emit("viewers", {
       count: data.viewerCount || 0,
-      topViewers: (data.topViewers || []).map(v => ({
-        user:     v.user?.uniqueId  || v.uniqueId  || v.userId    || "?",
-        nickname: v.user?.nickname  || v.nickname  || v.displayName || "?",
-        viewers:  v.memberCount || v.viewerCount || 0,
-      })).filter(v => v.user !== "?").slice(0, 200),
+      topViewers: allAccumulated,
     });
   });
 
   tiktok.on("member", (data) => {
     registerUser(data);
-    io.emit("member", { user:data.uniqueId, nickname:data.nickname||data.uniqueId, timestamp:Date.now() });
+    const user     = data.uniqueId || data.displayId || "";
+    const nickname = data.nickname || data.displayName || user;
+    if (user && user !== "?") {
+      activeUsersMap.set(user, { user, nickname, viewers: 0, joinTime: Date.now() });
+      // Emitir viewers actualizado con todos los acumulados (máx 300)
+      const allActive = [...activeUsersMap.values()].slice(-300);
+      io.emit("viewers", {
+        count: activeUsersMap.size,
+        topViewers: allActive,
+      });
+    }
+    io.emit("member", { user, nickname, timestamp:Date.now() });
   });
 
   // ── linkMicBattle ──────────────────────────────────────────────────────
@@ -322,6 +355,7 @@ async function startTikTokConnection(username) {
   let lastStatus = 1;
 
   tiktok.on("linkMicArmies", (data) => {
+    console.log("[linkMicArmies] raw:", JSON.stringify(data).slice(0, 1200));
     if (Array.isArray(data.battleArmies)) {
       data.battleArmies.forEach(army => {
         if (Array.isArray(army.participants)) army.participants.forEach(p => registerUser(p));

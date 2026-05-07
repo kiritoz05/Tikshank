@@ -717,13 +717,9 @@ function App() {
 
     sock.on("viewers", d => {
       setStats(p=>({...p, viewers:d.count||0}));
-      // topViewers = acumular todos los activos vistos (TikTok envía hasta 50 por evento)
+      // topViewers = server ya manda acumulado; simplemente reemplazar
       if (Array.isArray(d.topViewers) && d.topViewers.length > 0) {
-        setTopViewers(prev => {
-          const map = new Map(prev.map(v => [v.user, v]));
-          d.topViewers.forEach(v => { if (v.user && v.user !== "?") map.set(v.user, v); });
-          return [...map.values()].sort((a,b) => (b.viewers||0)-(a.viewers||0));
-        });
+        setTopViewers(d.topViewers.filter(v => v.user && v.user !== "?"));
       }
     });
     sock.on("member", d => {
