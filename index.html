@@ -7,7 +7,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -222,53 +221,51 @@ function fileToBase64(file) {
 }
 const EV_TYPES = ["Follow Alert", "Gift Alert", "Like Alert", "Sub Alert", "Share Alert"];
 const TIKTOK_GIFTS_LIST = [
-  // ── Regalos baratos (1-99 monedas) ──
-  { id: "rose", name: "Rose", emoji: "", coins: 1 },
-  { id: "icecream", name: "Ice Cream Cone", emoji: "", coins: 1 },
-  { id: "tiktokico", name: "TikTok", emoji: "", coins: 1 },
-  { id: "thumb", name: "Thumbs Up", emoji: "", coins: 1 },
-  { id: "heart", name: "Heart", emoji: "\u2764\uFE0F", coins: 1 },
-  { id: "winkwink", name: "Wink wink", emoji: "", coins: 2 },
-  { id: "gg", name: "GG", emoji: "", coins: 3 },
-  { id: "pop", name: "Pop", emoji: "", coins: 5 },
-  { id: "finger", name: "Finger Heart", emoji: "", coins: 5 },
-  { id: "glowstick", name: "Glow Stick", emoji: "", coins: 5 },
-  { id: "hat", name: "Hat", emoji: "", coins: 10 },
-  { id: "cakeslice", name: "Cake Slice", emoji: "", coins: 10 },
-  { id: "lollipop", name: "Lollipop", emoji: "", coins: 10 },
-  { id: "squirrel", name: "Squirrel", emoji: "\uFE0F", coins: 20 },
-  { id: "sunglasses", name: "Sunglasses", emoji: "", coins: 30 },
-  { id: "chilli", name: "Chilli Pepper", emoji: "\uFE0F", coins: 50 },
-  { id: "corgi", name: "Corgi", emoji: "", coins: 69 },
-  { id: "bunny", name: "Bunny", emoji: "", coins: 77 },
-  { id: "tulip", name: "Tulip", emoji: "", coins: 99 },
-  { id: "perfume", name: "Perfume", emoji: "", coins: 99 },
-  { id: "sunflower", name: "Sunflower", emoji: "", coins: 99 },
-  // ── Regalos medios (100-999 monedas) ──
-  { id: "dancer", name: "Air Dancer", emoji: "", coins: 150 },
-  { id: "rainbow", name: "Rainbow Puke", emoji: "", coins: 199 },
-  { id: "pixelheart", name: "Pixel Heart", emoji: "", coins: 199 },
-  { id: "confetti", name: "Confetti", emoji: "", coins: 299 },
-  { id: "panda", name: "Panda", emoji: "", coins: 300 },
-  { id: "butterfly", name: "Let Butterfly", emoji: "", coins: 399 },
-  { id: "alien", name: "Alien Buddy", emoji: "", coins: 399 },
-  { id: "dolphin", name: "Dolphin", emoji: "", coins: 399 },
-  { id: "owl", name: "Owl", emoji: "", coins: 500 },
-  { id: "babychicks", name: "Baby Chicks", emoji: "", coins: 500 },
-  { id: "mermaid", name: "Mermaid", emoji: "", coins: 699 },
-  { id: "elephant", name: "Elephant", emoji: "", coins: 699 },
-  { id: "garfield", name: "Garfield", emoji: "", coins: 699 },
-  { id: "gorilla", name: "Gorilla", emoji: "", coins: 799 },
-  { id: "disco", name: "Disco Ball", emoji: "", coins: 799 },
-  { id: "mishka", name: "Mishka", emoji: "", coins: 899 },
-  { id: "leon1", name: "Lion", emoji: "", coins: 999 },
-  // ── Regalos caros (1000-9999 monedas) ──
-  { id: "rocket", name: "Rocket", emoji: "", coins: 1e3 },
-  { id: "leonlion", name: "Leon and Lion", emoji: "", coins: 1500 },
-  { id: "astrobear", name: "Astrobear", emoji: "\u200D\u2744\uFE0F", coins: 1500 },
-  { id: "animalband", name: "Animal Band", emoji: "", coins: 2500 },
-  { id: "ferris", name: "Ferris Wheel", emoji: "", coins: 2888 },
-  { id: "drama", name: "Drama Queen", emoji: "", coins: 5e3 },
+  // ── Regalos 1 moneda ──
+  { id: "rose", name: "Rose", emoji: "", coins: 1, img: "https://p19-webcast.tiktokcdn.com/img/maliva/webcast-va/eba3a7a2f88371695aa9a0f8d5571d39~tplv-obj:1:1.image" },
+  { id: "icecream", name: "Ice Cream Cone", emoji: "", coins: 1, img: "https://p19-webcast.tiktokcdn.com/img/maliva/webcast-va/c34f6e9f4cbbd04b0c47e7a4be59d98e~tplv-obj:1:1.image" },
+  { id: "tiktokico", name: "TikTok", emoji: "", coins: 1, img: "https://p19-webcast.tiktokcdn.com/img/maliva/webcast-va/e73168a92e4aaa8c3d2e3c6b7b7cefd6~tplv-obj:1:1.image" },
+  { id: "thumb", name: "Thumbs Up", emoji: "", coins: 1, img: "https://p19-webcast.tiktokcdn.com/img/maliva/webcast-va/1cd5c5de4ade0ca05cb59afb9bcddbb0~tplv-obj:1:1.image" },
+  { id: "heart", name: "Heart", emoji: "\u2764\uFE0F", coins: 1, img: "https://p19-webcast.tiktokcdn.com/img/maliva/webcast-va/7f523c20d65c3a99def78b7c68caa5d7~tplv-obj:1:1.image" },
+  { id: "winkwink", name: "Wink wink", emoji: "", coins: 2, img: "https://p19-webcast.tiktokcdn.com/img/maliva/webcast-va/e5f5c1b9e5f5c1b9~tplv-obj:1:1.image" },
+  { id: "gg", name: "GG", emoji: "", coins: 3, img: "https://p19-webcast.tiktokcdn.com/img/maliva/webcast-va/a80a48dc5c4e4fcb892e9c1754a88b16~tplv-obj:1:1.image" },
+  { id: "pop", name: "Pop", emoji: "", coins: 5, img: "" },
+  { id: "finger", name: "Finger Heart", emoji: "", coins: 5, img: "" },
+  { id: "glowstick", name: "Glow Stick", emoji: "", coins: 5, img: "" },
+  { id: "hat", name: "Hat", emoji: "", coins: 10, img: "" },
+  { id: "cakeslice", name: "Cake Slice", emoji: "", coins: 10, img: "" },
+  { id: "lollipop", name: "Lollipop", emoji: "", coins: 10, img: "" },
+  { id: "squirrel", name: "Squirrel", emoji: "\uFE0F", coins: 20, img: "" },
+  { id: "sunglasses", name: "Sunglasses", emoji: "", coins: 30, img: "" },
+  { id: "chilli", name: "Chilli Pepper", emoji: "\uFE0F", coins: 50, img: "" },
+  { id: "corgi", name: "Corgi", emoji: "", coins: 69, img: "" },
+  { id: "bunny", name: "Bunny", emoji: "", coins: 77, img: "" },
+  { id: "tulip", name: "Tulip", emoji: "", coins: 99, img: "" },
+  { id: "perfume", name: "Perfume", emoji: "", coins: 99, img: "" },
+  { id: "sunflower", name: "Sunflower", emoji: "", coins: 99, img: "" },
+  { id: "dancer", name: "Air Dancer", emoji: "", coins: 150, img: "" },
+  { id: "rainbow", name: "Rainbow Puke", emoji: "", coins: 199, img: "" },
+  { id: "pixelheart", name: "Pixel Heart", emoji: "", coins: 199, img: "" },
+  { id: "confetti", name: "Confetti", emoji: "", coins: 299, img: "" },
+  { id: "panda", name: "Panda", emoji: "", coins: 300, img: "" },
+  { id: "butterfly", name: "Let Butterfly", emoji: "", coins: 399, img: "" },
+  { id: "alien", name: "Alien Buddy", emoji: "", coins: 399, img: "" },
+  { id: "dolphin", name: "Dolphin", emoji: "", coins: 399, img: "" },
+  { id: "owl", name: "Owl", emoji: "", coins: 500, img: "" },
+  { id: "babychicks", name: "Baby Chicks", emoji: "", coins: 500, img: "" },
+  { id: "mermaid", name: "Mermaid", emoji: "", coins: 699, img: "" },
+  { id: "elephant", name: "Elephant", emoji: "", coins: 699, img: "" },
+  { id: "garfield", name: "Garfield", emoji: "", coins: 699, img: "" },
+  { id: "gorilla", name: "Gorilla", emoji: "", coins: 799, img: "" },
+  { id: "disco", name: "Disco Ball", emoji: "", coins: 799, img: "" },
+  { id: "mishka", name: "Mishka", emoji: "", coins: 899, img: "" },
+  { id: "leon1", name: "Lion", emoji: "", coins: 999, img: "" },
+  { id: "rocket", name: "Rocket", emoji: "", coins: 1e3, img: "" },
+  { id: "leonlion", name: "Leon and Lion", emoji: "", coins: 1500, img: "" },
+  { id: "astrobear", name: "Astrobear", emoji: "", coins: 1500, img: "" },
+  { id: "animalband", name: "Animal Band", emoji: "", coins: 2500, img: "" },
+  { id: "ferris", name: "Ferris Wheel", emoji: "", coins: 2888, img: "" },
+  { id: "drama", name: "Drama Queen", emoji: "", coins: 5e3, img: "" },
   { id: "castle", name: "Castle", emoji: "", coins: 6999 },
   { id: "concert", name: "Concert", emoji: "", coins: 8e3 },
   { id: "whale", name: "Sam the Whale", emoji: "", coins: 9999 },
@@ -505,62 +502,116 @@ function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, on
   return /* @__PURE__ */ React.createElement("div", { className: "mo", onClick: (e) => e.target.classList.contains("mo") && onClose() }, /* @__PURE__ */ React.createElement("div", { className: "mb" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 } }, /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16 } }, action ? "\u270F\uFE0F Editar Acci\xF3n" : "\u2795 Nueva Acci\xF3n"), /* @__PURE__ */ React.createElement("button", { onClick: onClose, style: { background: "#1a1a28", border: "none", borderRadius: 6, width: 26, height: 26, cursor: "pointer", color: "#555", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" } }, "\u2715")), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Nombre de la acci\xF3n"), /* @__PURE__ */ React.createElement("input", { value: f.name, onChange: (e) => set("name", e.target.value), placeholder: "Ej: Rosa Sound", style: inp })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Evento"), /* @__PURE__ */ React.createElement("select", { value: f.event, onChange: (e) => set("event", e.target.value), style: __spreadProps(__spreadValues({}, inp), { cursor: "pointer" }) }, EV_TYPES.map((t) => /* @__PURE__ */ React.createElement("option", { key: t }, t)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Duraci\xF3n (seg)"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "1", max: "120", value: f.duration, onChange: (e) => set("duration", Number(e.target.value)), style: inp }))), f.event === "Gift Alert" && /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 9, marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Cantidad m\xEDnima"), /* @__PURE__ */ React.createElement("input", { type: "number", min: "1", value: f.minCount, onChange: (e) => set("minCount", Number(e.target.value)), style: inp })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "flex-end" } }, f.giftName && f.giftName !== "Cualquier regalo" && (() => {
     const found = TIKTOK_GIFTS_LIST.find((g) => g.name === f.giftName);
     return found ? /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, background: "rgba(254,44,85,.08)", border: "1px solid rgba(254,44,85,.2)", borderRadius: 8, padding: "6px 10px", fontSize: 11, width: "100%" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 20 } }, found.emoji), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { color: "#fff", fontWeight: 700 } }, found.name), /* @__PURE__ */ React.createElement("div", { style: { color: "#fbbf24", fontSize: 9 } }, " ", found.coins))) : /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.03)", border: "1px solid #252535", borderRadius: 8, padding: "6px 10px", fontSize: 11, width: "100%", color: "#aaa" } }, f.giftName);
-  })(), (!f.giftName || f.giftName === "Cualquier regalo") && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.03)", border: "1px solid #252535", borderRadius: 8, padding: "6px 10px", fontSize: 11, width: "100%", color: "#555" } }, "Cualquier regalo"))), /* @__PURE__ */ React.createElement("label", { style: lbl }, "Regalo de TikTok (base de datos visual)"), /* @__PURE__ */ React.createElement(
-    "div",
-    {
-      onClick: () => set("giftName", "Cualquier regalo"),
-      style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 10px",
-        borderRadius: 8,
-        cursor: "pointer",
-        background: f.giftName === "Cualquier regalo" ? "rgba(254,44,85,.12)" : "rgba(255,255,255,.02)",
-        border: `1px solid ${f.giftName === "Cualquier regalo" ? "rgba(254,44,85,.35)" : "#1e1e2e"}`,
-        marginBottom: 6
-      }
-    },
-    /* @__PURE__ */ React.createElement("span", { style: { fontSize: 22 } }),
-    /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fff" } }, "Cualquier regalo"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555" } }, "Se activa con cualquier regalo recibido")),
-    f.giftName === "Cualquier regalo" && /* @__PURE__ */ React.createElement("span", { style: { color: "#fe2c55", fontSize: 14 } }, "\u2713")
-  ), /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0a0f", border: "1px solid #1e1e2e", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { maxHeight: 200, overflowY: "auto", padding: "6px", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 4 } }, TIKTOK_GIFTS_LIST.map((g) => {
-    const sel = f.giftName === g.name;
-    return /* @__PURE__ */ React.createElement(
-      "div",
+  })(), (!f.giftName || f.giftName === "Cualquier regalo") && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.03)", border: "1px solid #252535", borderRadius: 8, padding: "6px 10px", fontSize: 11, width: "100%", color: "#555" } }, "Cualquier regalo"))), /* @__PURE__ */ React.createElement("label", { style: lbl }, "Regalo de TikTok (base de datos visual)"), (() => {
+    const [gSearch, setGSearch] = React.useState("");
+    const [gFilter, setGFilter] = React.useState("todos");
+    const filtered = TIKTOK_GIFTS_LIST.filter((g) => {
+      const q = gSearch.toLowerCase();
+      if (q && !g.name.toLowerCase().includes(q)) return false;
+      if (gFilter === "baratos") return g.coins <= 99;
+      if (gFilter === "medios") return g.coins >= 100 && g.coins <= 999;
+      if (gFilter === "caros") return g.coins >= 1e3;
+      return true;
+    }).sort((a, b) => a.coins - b.coins);
+    return /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement(
+      "input",
       {
-        key: g.id,
-        onClick: () => set("giftName", g.name),
+        value: gSearch,
+        onChange: (e) => setGSearch(e.target.value),
+        placeholder: " Buscar regalo por nombre...",
+        style: { width: "100%", background: "#0a0a0f", border: "1px solid #252535", borderRadius: 8, padding: "7px 10px", color: "#fff", fontSize: 11, outline: "none", marginBottom: 6 }
+      }
+    ), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 4, marginBottom: 6 } }, [["todos", "Todos"], ["baratos", " 1-99"], ["medios", " 100-999"], ["caros", " 1000+"]].map(([k, l]) => /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: k,
+        onClick: () => setGFilter(k),
         style: {
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          padding: "8px 4px",
-          borderRadius: 8,
+          flex: 1,
+          padding: "4px 2px",
+          fontSize: 9,
+          fontWeight: 700,
+          border: "1px solid",
+          borderRadius: 6,
           cursor: "pointer",
-          background: sel ? "rgba(254,44,85,.15)" : "rgba(255,255,255,.02)",
-          border: `1px solid ${sel ? "rgba(254,44,85,.4)" : "transparent"}`,
-          transition: "all .12s",
-          gap: 3
-        },
-        onMouseEnter: (e) => {
-          if (!sel) {
-            e.currentTarget.style.background = "rgba(255,255,255,.05)";
-            e.currentTarget.style.borderColor = "#252535";
-          }
-        },
-        onMouseLeave: (e) => {
-          if (!sel) {
-            e.currentTarget.style.background = "rgba(255,255,255,.02)";
-            e.currentTarget.style.borderColor = "transparent";
-          }
+          background: gFilter === k ? "rgba(254,44,85,.15)" : "rgba(255,255,255,.02)",
+          borderColor: gFilter === k ? "rgba(254,44,85,.4)" : "#252535",
+          color: gFilter === k ? "#fe2c55" : "#555"
         }
       },
-      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 24 } }, g.emoji),
-      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: sel ? "#fff" : "#aaa", fontWeight: 600, textAlign: "center", lineHeight: 1.2, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, g.name),
-      /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#fbbf24", background: "rgba(251,191,36,.08)", padding: "1px 5px", borderRadius: 20 } }, g.coins)
-    );
-  }))), /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 9, marginTop: 4 } }, " Selecciona el regalo del grid \xB7 Puedes filtrar el tipo y cantidad m\xEDnima")), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Sonido de alerta (MP3/WAV/OGG)"), /* @__PURE__ */ React.createElement("div", { className: `ua ${f.soundName ? "has" : ""}` }, /* @__PURE__ */ React.createElement("input", { type: "file", accept: "audio/*", onChange: handleFile, disabled: busy }), /* @__PURE__ */ React.createElement("div", { style: { width: 32, height: 32, borderRadius: 8, background: "rgba(37,244,238,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 } }, busy ? /* @__PURE__ */ React.createElement("span", { className: "spinner" }) : ""), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: f.soundName ? "#25f4ee" : "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, busy ? "Cargando..." : f.soundName || "Toca para subir audio"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: f.soundName ? "rgba(37,244,238,.6)" : "#444", marginTop: 2 } }, f.soundName ? "\u2713 Guardado \u2014 no se pierde al recargar" : "MP3, WAV, OGG")), f.soundData && /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
+      l
+    ))), /* @__PURE__ */ React.createElement(
+      "div",
+      {
+        onClick: () => set("giftName", "Cualquier regalo"),
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "8px 10px",
+          borderRadius: 8,
+          cursor: "pointer",
+          background: f.giftName === "Cualquier regalo" ? "rgba(254,44,85,.12)" : "rgba(255,255,255,.02)",
+          border: `1px solid ${f.giftName === "Cualquier regalo" ? "rgba(254,44,85,.35)" : "#1e1e2e"}`,
+          marginBottom: 6
+        }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 22 } }),
+      /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fff" } }, "Cualquier regalo"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555" } }, "Se activa con cualquier regalo recibido")),
+      f.giftName === "Cualquier regalo" && /* @__PURE__ */ React.createElement("span", { style: { color: "#fe2c55", fontSize: 14 } }, "\u2713")
+    ), /* @__PURE__ */ React.createElement("div", { style: { background: "#0a0a0f", border: "1px solid #1e1e2e", borderRadius: 10, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { maxHeight: 220, overflowY: "auto", padding: "6px", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 5 } }, filtered.length === 0 && /* @__PURE__ */ React.createElement("div", { style: { gridColumn: "1/-1", textAlign: "center", color: "#444", fontSize: 11, padding: "16px 0" } }, "Sin resultados"), filtered.map((g) => {
+      const sel = f.giftName === g.name;
+      const badgeColor = g.coins >= 1e3 ? "#fe2c55" : g.coins >= 100 ? "#f5c518" : "#4ade80";
+      return /* @__PURE__ */ React.createElement(
+        "div",
+        {
+          key: g.id,
+          onClick: () => set("giftName", g.name),
+          style: {
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "7px 3px",
+            borderRadius: 9,
+            cursor: "pointer",
+            background: sel ? "rgba(254,44,85,.18)" : "rgba(255,255,255,.02)",
+            border: `1px solid ${sel ? "rgba(254,44,85,.5)" : "#1a1a28"}`,
+            transition: "all .12s",
+            gap: 2,
+            position: "relative"
+          },
+          onMouseEnter: (e) => {
+            if (!sel) {
+              e.currentTarget.style.background = "rgba(255,255,255,.06)";
+              e.currentTarget.style.borderColor = "#2a2a3a";
+            }
+          },
+          onMouseLeave: (e) => {
+            if (!sel) {
+              e.currentTarget.style.background = "rgba(255,255,255,.02)";
+              e.currentTarget.style.borderColor = "#1a1a28";
+            }
+          }
+        },
+        g.img ? /* @__PURE__ */ React.createElement(
+          "img",
+          {
+            src: g.img,
+            alt: g.name,
+            style: { width: 36, height: 36, objectFit: "contain" },
+            onError: (e) => {
+              e.target.style.display = "none";
+              e.target.nextSibling.style.display = "block";
+            }
+          }
+        ) : null,
+        /* @__PURE__ */ React.createElement("span", { style: { fontSize: 26, display: g.img ? "none" : "block" } }, g.emoji),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: sel ? "#fff" : "#ccc", fontWeight: 700, textAlign: "center", lineHeight: 1.2, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", paddingInline: 2 } }, g.name),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: badgeColor, background: `${badgeColor}18`, padding: "1px 4px", borderRadius: 10, fontWeight: 700 } }, g.coins >= 1e3 ? `${(g.coins / 1e3).toFixed(g.coins % 1e3 === 0 ? 0 : 1)}k` : g.coins),
+        sel && /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 3, right: 3, width: 10, height: 10, borderRadius: "50%", background: "#fe2c55", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 6, color: "#fff" } }, "\u2713")
+      );
+    }))), /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 9, marginTop: 4 } }, filtered.length, " regalos \xB7 ordenados por precio  barato \u2192  caro"));
+  })()), /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 12 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "Sonido de alerta (MP3/WAV/OGG)"), /* @__PURE__ */ React.createElement("div", { className: `ua ${f.soundName ? "has" : ""}` }, /* @__PURE__ */ React.createElement("input", { type: "file", accept: "audio/*", onChange: handleFile, disabled: busy }), /* @__PURE__ */ React.createElement("div", { style: { width: 32, height: 32, borderRadius: 8, background: "rgba(37,244,238,.08)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 } }, busy ? /* @__PURE__ */ React.createElement("span", { className: "spinner" }) : ""), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: f.soundName ? "#25f4ee" : "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, busy ? "Cargando..." : f.soundName || "Toca para subir audio"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: f.soundName ? "rgba(37,244,238,.6)" : "#444", marginTop: 2 } }, f.soundName ? "\u2713 Guardado \u2014 no se pierde al recargar" : "MP3, WAV, OGG")), f.soundData && /* @__PURE__ */ React.createElement("button", { onClick: (e) => {
     e.preventDefault();
     e.stopPropagation();
     testSound();
@@ -1313,29 +1364,26 @@ function App() {
     "button",
     {
       style: { width: "100%", background: "linear-gradient(135deg,#1DB954,#17a349)", border: "none", borderRadius: 10, padding: "13px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 },
-      onClick: () => {
+      onClick: async () => {
         const clientId = "TU_SPOTIFY_CLIENT_ID";
-        const redirectUri = encodeURIComponent(window.location.href.split("?")[0]);
-        const scopes = encodeURIComponent("streaming user-read-playback-state user-modify-playback-state user-read-currently-playing");
-        const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${redirectUri}&scope=${scopes}&show_dialog=true`;
-        const popup = window.open(authUrl, "spotify-auth", "width=500,height=700");
-        const check = setInterval(() => {
-          var _a2, _b2;
-          try {
-            const hash = ((_a2 = popup == null ? void 0 : popup.location) == null ? void 0 : _a2.hash) || "";
-            if (hash.includes("access_token")) {
-              const token = (_b2 = hash.match(/access_token=([^&]+)/)) == null ? void 0 : _b2[1];
-              if (token) {
-                clearInterval(check);
-                popup.close();
-                setSpotifyConnected(true);
-                showT("\u2705 Spotify conectado");
-              }
-            }
-            if (popup == null ? void 0 : popup.closed) clearInterval(check);
-          } catch (e) {
-          }
-        }, 500);
+        const redirectUri = window.location.href.split("?")[0];
+        const scopes = "user-read-playback-state user-modify-playback-state user-read-currently-playing";
+        const verifier = crypto.getRandomValues(new Uint8Array(32));
+        const verifierStr = btoa(String.fromCharCode(...verifier)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+        const enc = new TextEncoder().encode(verifierStr);
+        const digest = await crypto.subtle.digest("SHA-256", enc);
+        const challenge = btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+        sessionStorage.setItem("sp_verifier", verifierStr);
+        const params = new URLSearchParams({
+          client_id: clientId,
+          response_type: "code",
+          redirect_uri: redirectUri,
+          scope: scopes,
+          code_challenge_method: "S256",
+          code_challenge: challenge,
+          show_dialog: "true"
+        });
+        window.location.href = "https://accounts.spotify.com/authorize?" + params.toString();
       }
     },
     "Conectar con Spotify"
@@ -1367,7 +1415,18 @@ function App() {
       const pct = Math.round(team.points / totalAll * 100);
       return /* @__PURE__ */ React.createElement("div", { key: idx, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 9, background: isOwner ? "rgba(254,44,85,.07)" : "rgba(255,255,255,.02)", border: `1px solid ${isOwner ? "rgba(254,44,85,.2)" : "#1a1a28"}`, marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20 } }, "\uFE0F"), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: accentColor, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "@", team.hostNickname || team.hostName), isOwner && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#fe2c55", background: "rgba(254,44,85,.12)", padding: "1px 5px", borderRadius: 20, flexShrink: 0 } }, "T\xDA")), /* @__PURE__ */ React.createElement("div", { style: { height: 4, background: "#1e1e2e", borderRadius: 2, overflow: "hidden", marginTop: 4 } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: `${pct}%`, background: isOwner ? "linear-gradient(90deg,#fe2c55,#ff6b81)" : `linear-gradient(90deg,${accentColor},${accentColor}88)`, borderRadius: 2, transition: "width .6s ease" } }))), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 900, color: "#fff" } }, " ", team.points.toLocaleString()), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555" } }, pct, "%")));
     };
-    return /* @__PURE__ */ React.createElement("div", null, is2v2 && /* @__PURE__ */ React.createElement("div", { style: __spreadProps(__spreadValues({}, C), { marginBottom: 10 }) }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#aaa", marginBottom: 8, textAlign: "center", letterSpacing: 1 } }, "PUNTOS POR EQUIPO"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: "#fe2c55" } }, " Equipo A \xB7 ", totalA.toLocaleString(), " "), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: "#25f4ee" } }, " Equipo B \xB7 ", totalB.toLocaleString(), " ")), /* @__PURE__ */ React.createElement("div", { style: { height: 10, background: "#1e1e2e", borderRadius: 5, overflow: "hidden", display: "flex" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: `${pctA}%`, background: "linear-gradient(90deg,#fe2c55,#ff6b81)", borderRadius: "5px 0 0 5px", transition: "width .6s ease" } }), /* @__PURE__ */ React.createElement("div", { style: { height: "100%", flex: 1, background: "linear-gradient(90deg,#1a9ba0,#25f4ee)", borderRadius: "0 5px 5px 0" } })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#fe2c55" } }, pctA, "%"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#25f4ee" } }, pctB, "%"))), is2v2 ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "#fe2c55", letterSpacing: 1, marginBottom: 8, textAlign: "center" } }, " EQUIPO A"), teamA.map((t, i) => renderPlayer(t, i, "#fe2c55"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "#25f4ee", letterSpacing: 1, marginBottom: 8, textAlign: "center" } }, " EQUIPO B"), teamB.map((t, i) => renderPlayer(t, i, "#25f4ee")))) : /* @__PURE__ */ React.createElement("div", { style: C }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fff", marginBottom: 10 } }, "\u2694\uFE0F Puntos individuales"), teams.map((t, i) => renderPlayer(t, i, i === 0 ? "#fe2c55" : "#25f4ee"))));
+    return /* @__PURE__ */ React.createElement("div", null, is2v2 && /* @__PURE__ */ React.createElement("div", { style: __spreadProps(__spreadValues({}, C), { marginBottom: 10 }) }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 700, color: "#aaa", marginBottom: 8, textAlign: "center", letterSpacing: 1 } }, "PUNTOS POR EQUIPO"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 5 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: "#fe2c55" } }, " Equipo A \xB7 ", totalA.toLocaleString(), " "), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 12, fontWeight: 800, color: "#25f4ee" } }, " Equipo B \xB7 ", totalB.toLocaleString(), " ")), /* @__PURE__ */ React.createElement("div", { style: { height: 10, background: "#1e1e2e", borderRadius: 5, overflow: "hidden", display: "flex" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: `${pctA}%`, background: "linear-gradient(90deg,#fe2c55,#ff6b81)", borderRadius: "5px 0 0 5px", transition: "width .6s ease" } }), /* @__PURE__ */ React.createElement("div", { style: { height: "100%", flex: 1, background: "linear-gradient(90deg,#1a9ba0,#25f4ee)", borderRadius: "0 5px 5px 0" } })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#fe2c55" } }, pctA, "%"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#25f4ee" } }, pctB, "%"))), is2v2 ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "#fe2c55", letterSpacing: 1, marginBottom: 8, textAlign: "center" } }, " EQUIPO A"), teamA.map((t, i) => renderPlayer(t, i, "#fe2c55"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "#25f4ee", letterSpacing: 1, marginBottom: 8, textAlign: "center" } }, " EQUIPO B"), teamB.map((t, i) => renderPlayer(t, i, "#25f4ee")))) : (() => {
+      var _a2, _b2;
+      const p1 = teams[0], p2 = teams[1];
+      if (!p1 || !p2) return /* @__PURE__ */ React.createElement("div", { style: __spreadProps(__spreadValues({}, C), { textAlign: "center", color: "#555", padding: "20px 0" }) }, "Esperando participantes...");
+      const tot = p1.points + p2.points || 1;
+      const pct1 = Math.round(p1.points / tot * 100);
+      const pct2 = 100 - pct1;
+      const leader = p1.points >= p2.points ? 0 : 1;
+      const isOwner1 = ((_a2 = p1.hostName) == null ? void 0 : _a2.toLowerCase()) === battle.ownerUsername;
+      const isOwner2 = ((_b2 = p2.hostName) == null ? void 0 : _b2.toLowerCase()) === battle.ownerUsername;
+      return /* @__PURE__ */ React.createElement("div", { style: C }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, fontWeight: 800, color: "#fe2c55", letterSpacing: 1, flex: 1, textAlign: "center" } }, " ", (p1.hostNickname || p1.hostName).toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { background: "linear-gradient(135deg,#fe2c55,#25f4ee)", borderRadius: 6, padding: "3px 8px", fontSize: 10, fontWeight: 900, color: "#fff", flexShrink: 0 } }, "VS"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, fontWeight: 800, color: "#25f4ee", letterSpacing: 1, flex: 1, textAlign: "center" } }, (p2.hostNickname || p2.hostName).toUpperCase(), " ")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 8, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "14px 8px", borderRadius: 12, background: isOwner1 ? "rgba(254,44,85,.1)" : "rgba(255,255,255,.02)", border: `1px solid ${leader === 0 ? "rgba(254,44,85,.4)" : "#1a1a28"}` } }, isOwner1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#fe2c55", fontWeight: 700, marginBottom: 4, letterSpacing: 1 } }, "T\xDA"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 28, fontWeight: 900, color: leader === 0 ? "#fe2c55" : "#fff", lineHeight: 1, transition: "all .4s ease" } }, p1.points.toLocaleString()), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#555", marginTop: 2 } }, " diamantes"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: leader === 0 ? "#fe2c55" : "#555", marginTop: 4 } }, pct1, "%")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", textAlign: "center" } }, "\u26A1"), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "14px 8px", borderRadius: 12, background: isOwner2 ? "rgba(37,244,238,.05)" : "rgba(255,255,255,.02)", border: `1px solid ${leader === 1 ? "rgba(37,244,238,.4)" : "#1a1a28"}` } }, isOwner2 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#25f4ee", fontWeight: 700, marginBottom: 4, letterSpacing: 1 } }, "T\xDA"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 28, fontWeight: 900, color: leader === 1 ? "#25f4ee" : "#fff", lineHeight: 1, transition: "all .4s ease" } }, p2.points.toLocaleString()), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#555", marginTop: 2 } }, " diamantes"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: leader === 1 ? "#25f4ee" : "#555", marginTop: 4 } }, pct2, "%"))), /* @__PURE__ */ React.createElement("div", { style: { height: 10, background: "#1e1e2e", borderRadius: 5, overflow: "hidden", display: "flex", marginBottom: 6 } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: `${pct1}%`, background: "linear-gradient(90deg,#fe2c55,#ff6b81)", transition: "width .6s ease", borderRadius: pct1 > 97 ? "5px" : "5px 0 0 5px" } }), /* @__PURE__ */ React.createElement("div", { style: { height: "100%", flex: 1, background: "linear-gradient(90deg,#1a9ba0,#25f4ee)", borderRadius: pct2 > 97 ? "5px" : "0 5px 5px 0" } })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#fe2c55", fontWeight: 700 } }, pct1, "%"), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#555" } }, tot.toLocaleString(), " total "), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#25f4ee", fontWeight: 700 } }, pct2, "%")), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "8px", background: "rgba(255,255,255,.02)", borderRadius: 8, border: "1px solid #1a1a28" } }, p1.points === p2.points ? /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: "#f5c518", fontWeight: 700 } }, "\u2696\uFE0F Empate exacto") : /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, color: "#aaa" } }, /* @__PURE__ */ React.createElement("span", { style: { color: leader === 0 ? "#fe2c55" : "#25f4ee", fontWeight: 800 } }, leader === 0 ? p1.hostNickname || p1.hostName : p2.hostNickname || p2.hostName), " va ganando por ", /* @__PURE__ */ React.createElement("span", { style: { color: "#fff", fontWeight: 700 } }, Math.abs(p1.points - p2.points).toLocaleString()))));
+    })());
   })()), tab === "espect" && /* @__PURE__ */ React.createElement("div", { className: "ai" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, ["historial", "activos"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, className: `mode-btn${vTab === t ? " act" : ""}`, onClick: () => setVTab(t) }, t === "historial" ? " Historial" : "\uFE0F Activos ahora"))), /* @__PURE__ */ React.createElement("div", { style: C }, vTab === "historial" && (viewR.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin entradas a\xFAn..." : "Conecta el LIVE") : viewR.map((u, i) => {
     var _a2;
     return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#555", flexShrink: 0 } }, (_a2 = (u.nickname || u.user)[0]) == null ? void 0 : _a2.toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, color: "#fff" } }, "@", u.nickname || u.user), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555" } }, new Date(u.joinTime).toLocaleTimeString()));
