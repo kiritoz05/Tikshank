@@ -85,27 +85,42 @@ const ld = (k,d)=>{ try{ const v=localStorage.getItem("tp_"+k); return v!==null?
    Prioridad: ElevenLabs → Web Speech API             */
 const ttsQueue = [];
 let ttsActive = false;
+let _synthKA = null; // keep-alive interval para Chrome/Android
+
+function _startSynthKA() {
+  if (_synthKA) return;
+  _synthKA = setInterval(() => {
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause();
+      window.speechSynthesis.resume();
+    }
+  }, 8000);
+}
+function _stopSynthKA() {
+  if (_synthKA) { clearInterval(_synthKA); _synthKA = null; }
+}
+
 function enqueueTTS(text, voiceId, vol, mode) {
   if (!text || !text.trim()) return;
   ttsQueue.push({ text: text.trim(), voiceId, vol, mode });
   if (!ttsActive) drainQueue();
 }
 async function drainQueue() {
-  if (ttsQueue.length === 0) { ttsActive = false; return; }
+  if (ttsQueue.length === 0) { ttsActive = false; _stopSynthKA(); return; }
   ttsActive = true;
   const item = ttsQueue.shift();
   try {
     if (item.mode === "elevenlabs") await speakElevenLabs(item.text, item.voiceId, item.vol);
     else await speakNative(item.text, item.voiceId, item.vol);
   } catch(e) { console.warn("TTS falló:", e.message); }
-  setTimeout(drainQueue, 50);
+  setTimeout(drainQueue, 80);
 }
 async function speakElevenLabs(text, voiceId, vol) {
   const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
     method:"POST",
     headers:{"xi-api-key":EL_KEY,"Content-Type":"application/json","Accept":"audio/mpeg"},
     body:JSON.stringify({text, model_id:"eleven_multilingual_v2", voice_settings:{stability:0.5, similarity_boost:0.75}}),
-    signal:AbortSignal.timeout(10000),
+    signal:AbortSignal.timeout(12000),
   });
   if (!r.ok) throw new Error("EL HTTP "+r.status);
   const blob = await r.blob();
@@ -116,16 +131,41 @@ async function speakElevenLabs(text, voiceId, vol) {
 function speakNative(text, voiceId, vol) {
   return new Promise((res) => {
     if (!window.speechSynthesis) { res(); return; }
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.volume = Math.min(1, Math.max(0, vol));
-    utt.rate = 1.05; utt.pitch = 1; utt.lang = "es-MX";
-    const voices = window.speechSynthesis.getVoices();
-    const match = voices.find(v => v.name === voiceId || v.lang.startsWith("es"));
-    if (match) utt.voice = match;
-    utt.onend = res; utt.onerror = res;
-    window.speechSynthesis.speak(utt);
-    setTimeout(res, 15000);
+
+    const doSpeak = () => {
+      window.speechSynthesis.cancel();
+      // Pequeña pausa para que cancel() surta efecto (bug Chrome)
+      setTimeout(() => {
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.volume = Math.min(1, Math.max(0, vol));
+        utt.rate = 1.0; utt.pitch = 1; utt.lang = "es-MX";
+        const voices = window.speechSynthesis.getVoices();
+        // Priorizar voz en español, luego la guardada, luego cualquiera
+        const match = voices.find(v => v.lang === "es-MX")
+          || voices.find(v => v.lang.startsWith("es-"))
+          || voices.find(v => v.name === voiceId)
+          || voices.find(v => v.lang.startsWith("es"))
+          || voices[0];
+        if (match) utt.voice = match;
+
+        let done = false;
+        const finish = () => { if (!done) { done = true; res(); } };
+        utt.onend = finish;
+        utt.onerror = (e) => { console.warn("synth error:", e.error); finish(); };
+
+        _startSynthKA(); // Keep-alive para que Chrome no se calle
+        window.speechSynthesis.speak(utt);
+        setTimeout(finish, 22000); // max 22s por utterance
+      }, 120);
+    };
+
+    // Voces pueden no estar listas aún (primera carga en Android)
+    const vv = window.speechSynthesis.getVoices();
+    if (vv.length > 0) { doSpeak(); }
+    else {
+      window.speechSynthesis.addEventListener("voiceschanged", doSpeak, { once: true });
+      setTimeout(doSpeak, 1500); // fallback si el evento no llega
+    }
   });
 }
 function playAudio(src, vol) {
@@ -149,30 +189,78 @@ function fileToBase64(file) {
 /* ─── Datos ─────────────────────────────────────────── */
 const EV_TYPES = ["Follow Alert","Gift Alert","Like Alert","Sub Alert","Share Alert"];
 
+// Base de datos de regalos TikTok con emojis representativos y precio en monedas
 const TIKTOK_GIFTS_LIST = [
-  {id:"rose",      name:"Rose",          emoji:"🌹", coins:1},
-  {id:"icecream",  name:"Ice Cream Cone",emoji:"🍦", coins:1},
-  {id:"tiktok",    name:"TikTok",        emoji:"📱", coins:1},
-  {id:"thumb",     name:"Thumbs Up",     emoji:"👍", coins:1},
-  {id:"heart",     name:"Heart",         emoji:"❤️",  coins:1},
-  {id:"finger",    name:"Finger Heart",  emoji:"🤞", coins:5},
-  {id:"hat",       name:"Hat",           emoji:"🎩", coins:10},
-  {id:"sunglasses",name:"Sunglasses",    emoji:"😎", coins:30},
-  {id:"tulip",     name:"Tulip",         emoji:"🌷", coins:99},
-  {id:"perfume",   name:"Perfume",       emoji:"🌸", coins:99},
-  {id:"butterfly", name:"Let Butterfly", emoji:"🦋", coins:399},
-  {id:"alien",     name:"Alien Buddy",   emoji:"👾", coins:399},
-  {id:"dancer",    name:"Air Dancer",    emoji:"💃", coins:300},
-  {id:"panda",     name:"Panda",         emoji:"🐼", coins:300},
-  {id:"babychicks",name:"Baby Chicks",   emoji:"🐥", coins:500},
-  {id:"owl",       name:"Owl",           emoji:"🦉", coins:500},
-  {id:"leon",      name:"Lion",          emoji:"🦁", coins:1000},
-  {id:"astrobear", name:"Astrobear",     emoji:"🐻", coins:1500},
-  {id:"animalband",name:"Animal Band",   emoji:"🎷", coins:2500},
-  {id:"drama",     name:"Drama Queen",   emoji:"👑", coins:5000},
-  {id:"park",      name:"Amusement Park",emoji:"🎡", coins:17000},
-  {id:"adream",    name:"Adam's Dream",  emoji:"🌌", coins:25999},
-  {id:"universe",  name:"Universe",      emoji:"🌍", coins:34999},
+  // ── Regalos baratos (1-99 monedas) ──
+  {id:"rose",       name:"Rose",            emoji:"🌹", coins:1},
+  {id:"icecream",   name:"Ice Cream Cone",  emoji:"🍦", coins:1},
+  {id:"tiktokico",  name:"TikTok",          emoji:"📱", coins:1},
+  {id:"thumb",      name:"Thumbs Up",       emoji:"👍", coins:1},
+  {id:"heart",      name:"Heart",           emoji:"❤️",  coins:1},
+  {id:"winkwink",   name:"Wink wink",       emoji:"😉", coins:2},
+  {id:"gg",         name:"GG",              emoji:"🎮", coins:3},
+  {id:"pop",        name:"Pop",             emoji:"🎈", coins:5},
+  {id:"finger",     name:"Finger Heart",   emoji:"🤞", coins:5},
+  {id:"glowstick",  name:"Glow Stick",      emoji:"🌟", coins:5},
+  {id:"hat",        name:"Hat",             emoji:"🎩", coins:10},
+  {id:"cakeslice",  name:"Cake Slice",      emoji:"🍰", coins:10},
+  {id:"lollipop",   name:"Lollipop",        emoji:"🍭", coins:10},
+  {id:"squirrel",   name:"Squirrel",        emoji:"🐿️", coins:20},
+  {id:"sunglasses", name:"Sunglasses",      emoji:"😎", coins:30},
+  {id:"chilli",     name:"Chilli Pepper",   emoji:"🌶️", coins:50},
+  {id:"corgi",      name:"Corgi",           emoji:"🐕", coins:69},
+  {id:"bunny",      name:"Bunny",           emoji:"🐰", coins:77},
+  {id:"tulip",      name:"Tulip",           emoji:"🌷", coins:99},
+  {id:"perfume",    name:"Perfume",         emoji:"🌸", coins:99},
+  {id:"sunflower",  name:"Sunflower",       emoji:"🌻", coins:99},
+  // ── Regalos medios (100-999 monedas) ──
+  {id:"dancer",     name:"Air Dancer",      emoji:"💃", coins:150},
+  {id:"rainbow",    name:"Rainbow Puke",    emoji:"🌈", coins:199},
+  {id:"pixelheart", name:"Pixel Heart",     emoji:"💝", coins:199},
+  {id:"confetti",   name:"Confetti",        emoji:"🎊", coins:299},
+  {id:"panda",      name:"Panda",           emoji:"🐼", coins:300},
+  {id:"butterfly",  name:"Let Butterfly",   emoji:"🦋", coins:399},
+  {id:"alien",      name:"Alien Buddy",     emoji:"👾", coins:399},
+  {id:"dolphin",    name:"Dolphin",         emoji:"🐬", coins:399},
+  {id:"owl",        name:"Owl",             emoji:"🦉", coins:500},
+  {id:"babychicks", name:"Baby Chicks",     emoji:"🐥", coins:500},
+  {id:"mermaid",    name:"Mermaid",         emoji:"🧜", coins:699},
+  {id:"elephant",   name:"Elephant",        emoji:"🐘", coins:699},
+  {id:"garfield",   name:"Garfield",        emoji:"🐱", coins:699},
+  {id:"gorilla",    name:"Gorilla",         emoji:"🦍", coins:799},
+  {id:"disco",      name:"Disco Ball",      emoji:"🪩", coins:799},
+  {id:"mishka",     name:"Mishka",          emoji:"🐻", coins:899},
+  {id:"leon1",      name:"Lion",            emoji:"🦁", coins:999},
+  // ── Regalos caros (1000-9999 monedas) ──
+  {id:"rocket",     name:"Rocket",          emoji:"🚀", coins:1000},
+  {id:"leonlion",   name:"Leon and Lion",   emoji:"🦁", coins:1500},
+  {id:"astrobear",  name:"Astrobear",       emoji:"🐻‍❄️", coins:1500},
+  {id:"animalband", name:"Animal Band",     emoji:"🎷", coins:2500},
+  {id:"ferris",     name:"Ferris Wheel",    emoji:"🎡", coins:2888},
+  {id:"drama",      name:"Drama Queen",     emoji:"👑", coins:5000},
+  {id:"castle",     name:"Castle",          emoji:"🏰", coins:6999},
+  {id:"concert",    name:"Concert",         emoji:"🎤", coins:8000},
+  {id:"whale",      name:"Sam the Whale",   emoji:"🐋", coins:9999},
+  // ── Regalos premium (10000+ monedas) ──
+  {id:"rhinomech",  name:"Rinoceronte gua",emoji:"🦏", coins:10999},
+  {id:"park",       name:"Amusement Park",  emoji:"🎠", coins:17000},
+  {id:"trex",       name:"T-rex",           emoji:"🦖", coins:19999},
+  {id:"dragonflame",name:"Dragon Flame",    emoji:"🐉", coins:20000},
+  {id:"zeus",       name:"Zeus",            emoji:"⚡", coins:25000},
+  {id:"sealwhale",  name:"Foca y ballena",  emoji:"🐳", coins:29999},
+  {id:"bigcat",     name:"Big Cat",         emoji:"🐆", coins:29999},
+  {id:"adream",     name:"Adam's Dream",   emoji:"🌌", coins:29999},
+  {id:"boxing",     name:"Boxing Gloves",   emoji:"🥊", coins:29999},
+  {id:"leonlion2",  name:"Leon & Lion 2",   emoji:"🦁", coins:30000},
+  {id:"gorilla2",   name:"Gorila",          emoji:"🦍", coins:30000},
+  {id:"supernova",  name:"Super Nova",      emoji:"💫", coins:30000},
+  {id:"ufo",        name:"UFO",             emoji:"🛸", coins:34000},
+  {id:"chest",      name:"Cofre del tesoro",emoji:"📦", coins:34999},
+  {id:"universe",   name:"Universe",        emoji:"🌍", coins:34999},
+  {id:"dragon",     name:"Dragon",          emoji:"🐲", coins:36000},
+  {id:"phoenix",    name:"Phoenix",         emoji:"🦅", coins:38000},
+  {id:"ttstars",    name:"TikTok Stars",    emoji:"⭐", coins:39999},
+  {id:"ttuniverse", name:"TikTok Universe", emoji:"🌐", coins:44999},
 ];
 
 // Lista plana para selects del modal de acciones
@@ -301,17 +389,72 @@ function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, on
           </div>
         </div>
         {f.event==="Gift Alert" && (
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:12}}>
-            <div>
-              <label style={lbl}>Regalo de TikTok</label>
-              <select value={f.giftName} onChange={e=>set("giftName",e.target.value)} style={{...inp,cursor:"pointer"}}>
-                {TIKTOK_GIFTS.map(g=><option key={g}>{g}</option>)}
-              </select>
+          <div style={{marginBottom:12}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:10}}>
+              <div>
+                <label style={lbl}>Cantidad mínima</label>
+                <input type="number" min="1" value={f.minCount} onChange={e=>set("minCount",Number(e.target.value))} style={inp}/>
+              </div>
+              <div style={{display:"flex",alignItems:"flex-end"}}>
+                {f.giftName && f.giftName !== "Cualquier regalo" && (() => {
+                  const found = TIKTOK_GIFTS_LIST.find(g=>g.name===f.giftName);
+                  return found ? (
+                    <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",borderRadius:8,padding:"6px 10px",fontSize:11,width:"100%"}}>
+                      <span style={{fontSize:20}}>{found.emoji}</span>
+                      <div>
+                        <div style={{color:"#fff",fontWeight:700}}>{found.name}</div>
+                        <div style={{color:"#fbbf24",fontSize:9}}>🪙 {found.coins}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,.03)",border:"1px solid #252535",borderRadius:8,padding:"6px 10px",fontSize:11,width:"100%",color:"#aaa"}}>
+                      🎁 {f.giftName}
+                    </div>
+                  );
+                })()}
+                {(!f.giftName || f.giftName === "Cualquier regalo") && (
+                  <div style={{display:"flex",alignItems:"center",gap:6,background:"rgba(255,255,255,.03)",border:"1px solid #252535",borderRadius:8,padding:"6px 10px",fontSize:11,width:"100%",color:"#555"}}>
+                    🎁 Cualquier regalo
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <label style={lbl}>Cantidad mínima</label>
-              <input type="number" min="1" value={f.minCount} onChange={e=>set("minCount",Number(e.target.value))} style={inp}/>
+            <label style={lbl}>Regalo de TikTok (base de datos visual)</label>
+            {/* Opción "Cualquier regalo" */}
+            <div
+              onClick={()=>set("giftName","Cualquier regalo")}
+              style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,cursor:"pointer",
+                background:f.giftName==="Cualquier regalo"?"rgba(254,44,85,.12)":"rgba(255,255,255,.02)",
+                border:`1px solid ${f.giftName==="Cualquier regalo"?"rgba(254,44,85,.35)":"#1e1e2e"}`,marginBottom:6}}>
+              <span style={{fontSize:22}}>🎁</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#fff"}}>Cualquier regalo</div>
+                <div style={{fontSize:9,color:"#555"}}>Se activa con cualquier regalo recibido</div>
+              </div>
+              {f.giftName==="Cualquier regalo" && <span style={{color:"#fe2c55",fontSize:14}}>✓</span>}
             </div>
+            {/* Grid visual de regalos */}
+            <div style={{background:"#0a0a0f",border:"1px solid #1e1e2e",borderRadius:10,overflow:"hidden"}}>
+              <div style={{maxHeight:200,overflowY:"auto",padding:"6px",display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:4}}>
+                {TIKTOK_GIFTS_LIST.map(g=>{
+                  const sel = f.giftName === g.name;
+                  return (
+                    <div key={g.id} onClick={()=>set("giftName",g.name)}
+                      style={{display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 4px",borderRadius:8,cursor:"pointer",
+                        background:sel?"rgba(254,44,85,.15)":"rgba(255,255,255,.02)",
+                        border:`1px solid ${sel?"rgba(254,44,85,.4)":"transparent"}`,
+                        transition:"all .12s",gap:3}}
+                      onMouseEnter={e=>{ if(!sel){e.currentTarget.style.background="rgba(255,255,255,.05)"; e.currentTarget.style.borderColor="#252535"; }}}
+                      onMouseLeave={e=>{ if(!sel){e.currentTarget.style.background="rgba(255,255,255,.02)"; e.currentTarget.style.borderColor="transparent"; }}}>
+                      <span style={{fontSize:24}}>{g.emoji}</span>
+                      <div style={{fontSize:8,color:sel?"#fff":"#aaa",fontWeight:600,textAlign:"center",lineHeight:1.2,maxWidth:"100%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.name}</div>
+                      <div style={{fontSize:8,color:"#fbbf24",background:"rgba(251,191,36,.08)",padding:"1px 5px",borderRadius:20}}>🪙{g.coins}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div style={{color:"#444",fontSize:9,marginTop:4"}}>💡 Selecciona el regalo del grid · Puedes filtrar el tipo y cantidad mínima</div>
           </div>
         )}
         <div style={{marginBottom:12}}>
@@ -528,14 +671,26 @@ function App() {
   const [delConfirm,setDelConfirm] = useState(null);
 
   // Refs
-  const ttsOnR     = useRef(ttsOn);
-  const ttsVolR    = useRef(ttsVol);
-  const ttsModeR   = useRef(ttsMode);
-  const ttsVoiceR  = useRef(ttsVoice);
+  const ttsOnR       = useRef(ttsOn);
+  const ttsVolR      = useRef(ttsVol);
+  const ttsModeR     = useRef(ttsMode);
+  const ttsVoiceR    = useRef(ttsVoice);
   const nativeVoiceR = useRef(nativeVoice);
-  const actsR      = useRef([]);
-  const alertsOnR  = useRef(true);
+  const actsR        = useRef([]);
+  const alertsOnR    = useRef(true);
   const likeUserMapR = useRef({});
+  // Refs para flags de TTS (necesarios dentro de socket closure)
+  const ttsChatR       = useRef(ttsChat);
+  const ttsGiftsR      = useRef(ttsGifts);
+  const ttsFollowsR    = useRef(ttsFollows);
+  const ttsSharesR     = useRef(ttsShares);
+  const tplChatR       = useRef(tplChat);
+  const tplGiftR       = useRef(tplGift);
+  const tplFollowR     = useRef(tplFollow);
+  const tplShareR      = useRef(tplShare);
+  const queueSkipEmojiR = useRef(queueSkipEmoji);
+  const queueSkipAtR   = useRef(queueSkipAt);
+  const queueSkipCmdR  = useRef(queueSkipCmd);
 
   const showT = (msg) => { setToast(msg); setTimeout(()=>setToast(""),2500); };
 
@@ -547,6 +702,18 @@ function App() {
   useEffect(()=>{ nativeVoiceR.current=nativeVoice;sv("nativeVoice",nativeVoice); },[nativeVoice]);
   useEffect(()=>{ actsR.current=actions;     sv("actions4",actions);  },[actions]);
   useEffect(()=>{ alertsOnR.current=alertsOn;sv("alertsOn",alertsOn); },[alertsOn]);
+  // Sync nuevas refs
+  useEffect(()=>{ ttsChatR.current=ttsChat; },[ttsChat]);
+  useEffect(()=>{ ttsGiftsR.current=ttsGifts; },[ttsGifts]);
+  useEffect(()=>{ ttsFollowsR.current=ttsFollows; },[ttsFollows]);
+  useEffect(()=>{ ttsSharesR.current=ttsShares; },[ttsShares]);
+  useEffect(()=>{ tplChatR.current=tplChat; },[tplChat]);
+  useEffect(()=>{ tplGiftR.current=tplGift; },[tplGift]);
+  useEffect(()=>{ tplFollowR.current=tplFollow; },[tplFollow]);
+  useEffect(()=>{ tplShareR.current=tplShare; },[tplShare]);
+  useEffect(()=>{ queueSkipEmojiR.current=queueSkipEmoji; },[queueSkipEmoji]);
+  useEffect(()=>{ queueSkipAtR.current=queueSkipAt; },[queueSkipAt]);
+  useEffect(()=>{ queueSkipCmdR.current=queueSkipCmd; },[queueSkipCmd]);
   useEffect(()=>{ sv("tab",tab); },[tab]);
   useEffect(()=>{ sv("tuser",tUser); },[tUser]);
   useEffect(()=>{ sv("sessid",sessId); },[sessId]);
@@ -673,10 +840,19 @@ function App() {
       if(d.type==="chat"){
         setLog(p=>[{t:"msg",tx:`💬 @${d.nickname||d.user}: ${d.comment}`},...p].slice(0,50));
         setStats(p=>({...p,messages:p.messages+1}));
-        if(ttsOnR.current){
-          const text=`${d.nickname||d.user} dice: ${d.comment}`;
-          if(ttsModeR.current==="elevenlabs") enqueueTTS(text,ttsVoiceR.current,ttsVolR.current/100,"elevenlabs");
-          else enqueueTTS(text,nativeVoiceR.current,ttsVolR.current/100,"native");
+        if(ttsOnR.current && ttsChatR.current){
+          let text=(tplChatR.current||"{nickname} dice {message}")
+            .replace(/{nickname}/gi, d.nickname||d.user)
+            .replace(/{username}/gi, d.user||d.nickname)
+            .replace(/{message}/gi, d.comment||"");
+          // Filtros de cola
+          if(queueSkipEmojiR.current && /^[\u{1F300}-\u{1FAFF}\s]+$/u.test(text.trim())) { /* omitir solo emojis */ }
+          else if(queueSkipAtR.current && text.includes("@")) { /* omitir menciones */ }
+          else if(queueSkipCmdR.current && text.startsWith("!")) { /* omitir comandos */ }
+          else {
+            if(ttsModeR.current==="elevenlabs") enqueueTTS(text,ttsVoiceR.current,ttsVolR.current/100,"elevenlabs");
+            else enqueueTTS(text,nativeVoiceR.current,ttsVolR.current/100,"native");
+          }
         }
       } else if(d.type==="gift"){
         setLog(p=>[{t:"gift",tx:`🎁 @${d.nickname||d.user} → ${d.giftCount}× ${d.giftName}`},...p].slice(0,50));
@@ -766,7 +942,6 @@ function App() {
     {id:"dashboard",icon:"⚡",l:"Dashboard"},
     {id:"acciones", icon:"🎬",l:"Acciones"},
     {id:"tts",      icon:"🔊",l:"Voz & Audio"},
-    {id:"regalos",  icon:"🎁",l:"Regalos"},
     {id:"musica",   icon:"🎵",l:"Música"},
     {id:"ranking",  icon:"🏆",l:"Ranking"},
     {id:"chat",     icon:"💬",l:"Chat"},
@@ -892,14 +1067,7 @@ function App() {
                 ))}
               </div>
 
-              {/* Alertas toggle */}
-              <div style={{...C,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div>
-                  <div style={{fontSize:11,fontWeight:700,color:"#fff"}}>🔔 Alertas de sonido</div>
-                  <div style={{fontSize:10,color:"#555",marginTop:2}}>{alertsOn?"Activadas — reproduciendo sonidos y TTS":"Silenciadas — sin reproducción"}</div>
-                </div>
-                <Toggle on={alertsOn} onChange={()=>setAlertsOn(!alertsOn)}/>
-              </div>
+              {/* Alertas toggle — movido a la topbar, quitado del dashboard */}
 
               {/* Log */}
               <div style={C}>
@@ -1251,28 +1419,80 @@ function App() {
                 </div>
 
                 {!spotifyEnabled && (
-                  <div style={{background:"rgba(37,244,238,.05)",border:"1px solid rgba(37,244,238,.12)",borderRadius:10,padding:"12px 14px",color:"#aaa",fontSize:11,lineHeight:1.6,marginTop:12}}>
-                    💡 Similar a Tikfinity: conecta tu Spotify y tus espectadores escriben <strong style={{color:"#1DB954"}}>{spotifyCmd} nombre de canción</strong> en el chat para añadir canciones a la cola. Puedes elegir quién puede usar el comando.
+                  <div style={{background:"rgba(29,185,84,.05)",border:"1px solid rgba(29,185,84,.12)",borderRadius:10,padding:"12px 14px",color:"#aaa",fontSize:11,lineHeight:1.7,marginTop:12}}>
+                    💡 Activa el módulo y conecta tu Spotify. Tus espectadores escriben{" "}<strong style={{color:"#1DB954"}}>{spotifyCmd} nombre de canción</strong> en el chat para añadir canciones a la cola.<br/><br/>
+                    <span style={{color:"#555",fontSize:10"}}>⚠️ Nota: Spotify requiere que la app esté reproduciendo música en tu dispositivo para que el SDK funcione correctamente.</span>
                   </div>
                 )}
 
                 {spotifyEnabled && (
                   <>
-                    <button style={{width:"100%",background:spotifyConnected?"rgba(29,185,84,.15)":"linear-gradient(135deg,#1DB954,#17a349)",border:spotifyConnected?"1px solid rgba(29,185,84,.4)":"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:12}} onClick={()=>setSpotifyConnected(!spotifyConnected)}>
-                      {spotifyConnected?"✓ Spotify conectado — clic para desconectar":"🎵 Conectar cuenta de Spotify"}
-                    </button>
-                    {spotifyConnected && (
-                      <div style={{background:"rgba(29,185,84,.06)",border:"1px solid rgba(29,185,84,.2)",borderRadius:10,padding:"12px 14px"}}>
-                        <div style={{color:"#1DB954",fontWeight:700,fontSize:9,letterSpacing:1.5,marginBottom:5}}>▶ REPRODUCIENDO AHORA</div>
-                        {spotifyNowPlaying ? (
-                          <div style={{display:"flex",alignItems:"center",gap:10}}>
-                            <div style={{width:36,height:36,borderRadius:6,background:"rgba(29,185,84,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🎵</div>
-                            <div>
-                              <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{spotifyNowPlaying.title}</div>
-                              <div style={{fontSize:10,color:"#1DB954"}}>{spotifyNowPlaying.artist}</div>
-                            </div>
+                    {/* Botón de conexión OAuth real */}
+                    {!spotifyConnected ? (
+                      <div>
+                        <div style={{background:"rgba(29,185,84,.06)",border:"1px solid rgba(29,185,84,.15)",borderRadius:10,padding:"12px 14px",marginBottom:12,fontSize:11,color:"#aaa",lineHeight:1.6}}>
+                          <div style={{color:"#1DB954",fontWeight:700,marginBottom:6}}>Cómo conectar Spotify:</div>
+                          1. Asegúrate de tener <strong style={{color:"#fff"}}>Spotify abierto</strong> en tu teléfono o PC<br/>
+                          2. Presiona el botón verde abajo<br/>
+                          3. Autoriza TikPanel en la página de Spotify<br/>
+                          4. Vuelve aquí — la conexión se detectará automáticamente
+                        </div>
+                        <button
+                          style={{width:"100%",background:"linear-gradient(135deg,#1DB954,#17a349)",border:"none",borderRadius:10,padding:"13px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}
+                          onClick={()=>{
+                            // Spotify OAuth PKCE flow — abre en nueva ventana
+                            const clientId = "TU_SPOTIFY_CLIENT_ID"; // Reemplazar con tu Client ID
+                            const redirectUri = encodeURIComponent(window.location.href.split("?")[0]);
+                            const scopes = encodeURIComponent("streaming user-read-playback-state user-modify-playback-state user-read-currently-playing");
+                            const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${redirectUri}&scope=${scopes}&show_dialog=true`;
+                            const popup = window.open(authUrl, "spotify-auth", "width=500,height=700");
+                            // Escuchar el token cuando regrese
+                            const check = setInterval(()=>{
+                              try {
+                                const hash = popup?.location?.hash || "";
+                                if (hash.includes("access_token")) {
+                                  const token = hash.match(/access_token=([^&]+)/)?.[1];
+                                  if (token) { clearInterval(check); popup.close(); setSpotifyConnected(true); showT("✅ Spotify conectado"); }
+                                }
+                                if (popup?.closed) clearInterval(check);
+                              } catch(e) {}
+                            }, 500);
+                          }}>
+                          🎵 Conectar con Spotify
+                        </button>
+                        <div style={{color:"#444",fontSize:10,textAlign:"center",marginTop:6}}>
+                          Necesitas crear una app en <a href="https://developer.spotify.com/dashboard" target="_blank" style={{color:"#1DB954"}}>developer.spotify.com</a> y poner tu Client ID arriba
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{background:"rgba(29,185,84,.06)",border:"1px solid rgba(29,185,84,.2)",borderRadius:10,padding:"12px 14px",marginBottom:12}}>
+                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                            <div style={{color:"#1DB954",fontWeight:700,fontSize:9,letterSpacing:1.5}}>▶ REPRODUCIENDO AHORA</div>
+                            <button onClick={()=>setSpotifyConnected(false)} style={{background:"transparent",border:"1px solid rgba(254,44,85,.3)",borderRadius:20,padding:"2px 8px",color:"#fe2c55",fontSize:9,cursor:"pointer"}}>Desconectar</button>
                           </div>
-                        ) : <div style={{color:"#444",fontSize:12}}>Sin canción en reproducción</div>}
+                          {spotifyNowPlaying ? (
+                            <div style={{display:"flex",alignItems:"center",gap:10}}>
+                              <div style={{width:40,height:40,borderRadius:6,background:"rgba(29,185,84,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🎵</div>
+                              <div>
+                                <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{spotifyNowPlaying.title}</div>
+                                <div style={{fontSize:10,color:"#1DB954"}}>{spotifyNowPlaying.artist}</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{color:"#555",fontSize:11"}}>
+                              Sin reproducción activa · Abre Spotify y reproduce algo
+                            </div>
+                          )}
+                        </div>
+                        {/* Controles de reproducción */}
+                        <div style={{display:"flex",gap:8,marginBottom:12}}>
+                          {[{l:"⏮",t:"Anterior"},{l:"⏸",t:"Pausar"},{l:"⏭",t:"Siguiente"}].map(btn=>(
+                            <button key={btn.l} title={btn.t} style={{flex:1,background:"rgba(29,185,84,.1)",border:"1px solid rgba(29,185,84,.2)",borderRadius:8,padding:"10px",color:"#1DB954",fontSize:16,cursor:"pointer",fontWeight:700}} onClick={()=>showT(`${btn.t} (requiere Client ID configurado)`)}>
+                              {btn.l}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </>
@@ -1435,31 +1655,87 @@ function App() {
                   <div style={{fontSize:13,fontWeight:700,color:"#fff",marginBottom:6}}>Sin batalla activa</div>
                   <div style={{fontSize:11,color:"#555"}}>Los datos de batalla aparecerán aquí cuando estés en un VS LIVE</div>
                 </div>
-              ) : (
-                <div style={C}>
-                  <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:12}}>⚔️ Batalla activa</div>
-                  {battle.teams?.map((team,i)=>{
-                    const total = battle.teams.reduce((s,t)=>s+t.points,0)||1;
-                    const pct = Math.round((team.points/total)*100);
-                    const isOwner = team.hostName?.toLowerCase()===battle.ownerUsername;
-                    return (
-                      <div key={i} style={{marginBottom:12,padding:"10px 12px",background:isOwner?"rgba(254,44,85,.06)":"rgba(37,244,238,.04)",borderRadius:10,border:`1px solid ${isOwner?"rgba(254,44,85,.2)":"rgba(37,244,238,.15)"}`}}>
-                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-                          <div>
-                            <span style={{fontSize:12,fontWeight:700,color:isOwner?"#fe2c55":"#25f4ee"}}>@{team.hostNickname}</span>
-                            {isOwner&&<span style={{fontSize:9,color:"#fe2c55",marginLeft:6,background:"rgba(254,44,85,.12)",padding:"1px 6px",borderRadius:20}}>TÚ</span>}
-                          </div>
-                          <span style={{fontSize:13,fontWeight:800,color:"#fff"}}>💎 {team.points.toLocaleString()}</span>
+              ) : (() => {
+                const teams = battle.teams || [];
+                const is2v2 = teams.length >= 4;
+                // Agrupar por teamIdx para 2v2 (grupo A: teamIdx=0, grupo B: teamIdx=1)
+                const teamA = teams.filter(t => (t.teamIdx ?? 0) === 0);
+                const teamB = teams.filter(t => (t.teamIdx ?? 1) === 1);
+                const totalA = teamA.reduce((s,t)=>s+t.points,0);
+                const totalB = teamB.reduce((s,t)=>s+t.points,0);
+                const grandTotal = (totalA + totalB) || 1;
+                const pctA = Math.round((totalA/grandTotal)*100);
+                const pctB = 100 - pctA;
+
+                // Render de un participante individual
+                const renderPlayer = (team, idx, accentColor) => {
+                  const isOwner = team.hostName?.toLowerCase() === battle.ownerUsername;
+                  const totalAll = teams.reduce((s,t)=>s+t.points,0)||1;
+                  const pct = Math.round((team.points/totalAll)*100);
+                  return (
+                    <div key={idx} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:9,background:isOwner?"rgba(254,44,85,.07)":"rgba(255,255,255,.02)",border:`1px solid ${isOwner?"rgba(254,44,85,.2)":"#1a1a28"}`,marginBottom:6}}>
+                      <div style={{fontSize:20}}>🎙️</div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",alignItems:"center",gap:5}}>
+                          <span style={{fontSize:11,fontWeight:700,color:accentColor,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{team.hostNickname||team.hostName}</span>
+                          {isOwner && <span style={{fontSize:8,color:"#fe2c55",background:"rgba(254,44,85,.12)",padding:"1px 5px",borderRadius:20,flexShrink:0}}>TÚ</span>}
                         </div>
-                        <div style={{height:6,background:"#1e1e2e",borderRadius:3,overflow:"hidden"}}>
-                          <div style={{height:"100%",width:`${pct}%`,background:isOwner?"linear-gradient(90deg,#fe2c55,#ff6b81)":"linear-gradient(90deg,#25f4ee,#1DB954)",borderRadius:3,transition:"width .5s ease"}}/>
+                        <div style={{height:4,background:"#1e1e2e",borderRadius:2,overflow:"hidden",marginTop:4}}>
+                          <div style={{height:"100%",width:`${pct}%`,background:isOwner?"linear-gradient(90deg,#fe2c55,#ff6b81)":`linear-gradient(90deg,${accentColor},${accentColor}88)`,borderRadius:2,transition:"width .6s ease"}}/>
                         </div>
-                        <div style={{fontSize:9,color:"#555",marginTop:3,textAlign:"right"}}>{pct}%</div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{fontSize:13,fontWeight:900,color:"#fff"}}>💎 {team.points.toLocaleString()}</div>
+                        <div style={{fontSize:9,color:"#555"}}>{pct}%</div>
+                      </div>
+                    </div>
+                  );
+                };
+
+                return (
+                  <div>
+                    {/* Barra global de equipo si es 2v2 */}
+                    {is2v2 && (
+                      <div style={{...C,marginBottom:10}}>
+                        <div style={{fontSize:10,fontWeight:700,color:"#aaa",marginBottom:8,textAlign:"center",letterSpacing:1}}>PUNTOS POR EQUIPO</div>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+                          <span style={{fontSize:12,fontWeight:800,color:"#fe2c55"}}>🔴 Equipo A · {totalA.toLocaleString()} 💎</span>
+                          <span style={{fontSize:12,fontWeight:800,color:"#25f4ee"}}>💙 Equipo B · {totalB.toLocaleString()} 💎</span>
+                        </div>
+                        <div style={{height:10,background:"#1e1e2e",borderRadius:5,overflow:"hidden",display:"flex"}}>
+                          <div style={{height:"100%",width:`${pctA}%`,background:"linear-gradient(90deg,#fe2c55,#ff6b81)",borderRadius:"5px 0 0 5px",transition:"width .6s ease"}}/>
+                          <div style={{height:"100%",flex:1,background:"linear-gradient(90deg,#1a9ba0,#25f4ee)",borderRadius:"0 5px 5px 0"}}/>
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
+                          <span style={{fontSize:9,color:"#fe2c55"}}>{pctA}%</span>
+                          <span style={{fontSize:9,color:"#25f4ee"}}>{pctB}%</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Puntos individuales */}
+                    {is2v2 ? (
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                        {/* Columna Equipo A */}
+                        <div>
+                          <div style={{fontSize:9,fontWeight:800,color:"#fe2c55",letterSpacing:1,marginBottom:8,textAlign:"center"}}>🔴 EQUIPO A</div>
+                          {teamA.map((t,i)=>renderPlayer(t,i,"#fe2c55"))}
+                        </div>
+                        {/* Columna Equipo B */}
+                        <div>
+                          <div style={{fontSize:9,fontWeight:800,color:"#25f4ee",letterSpacing:1,marginBottom:8,textAlign:"center"}}>💙 EQUIPO B</div>
+                          {teamB.map((t,i)=>renderPlayer(t,i,"#25f4ee"))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={C}>
+                        <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:10}}>⚔️ Puntos individuales</div>
+                        {teams.map((t,i)=>renderPlayer(t,i,i===0?"#fe2c55":"#25f4ee"))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
