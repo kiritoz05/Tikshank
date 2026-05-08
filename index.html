@@ -7,7 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.5/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -846,7 +846,7 @@ function App() {
             .replace(/{username}/gi, d.user||d.nickname)
             .replace(/{message}/gi, d.comment||"");
           // Filtros de cola
-          if(queueSkipEmojiR.current && /^[\u{1F300}-\u{1FAFF}\s]+$/u.test(text.trim())) { /* omitir solo emojis */ }
+          if(queueSkipEmojiR.current && [...text.trim()].every(c => c.trim()==='' || c.codePointAt(0) > 0x1F000)) { /* omitir solo emojis */ }
           else if(queueSkipAtR.current && text.includes("@")) { /* omitir menciones */ }
           else if(queueSkipCmdR.current && text.startsWith("!")) { /* omitir comandos */ }
           else {
