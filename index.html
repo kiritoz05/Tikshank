@@ -52,9 +52,22 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}
 .ua input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f2010;border:1px solid #2a5a2a;border-radius:10px;padding:9px 18px;color:#4ade80;font-size:12px;font-weight:700;z-index:999;white-space:nowrap;animation:popIn .2s ease}
 .spinner{width:14px;height:14px;border:2px solid #333;border-top-color:#fe2c55;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
-/* TTS mode tabs */
 .mode-btn{flex:1;padding:7px;border:1px solid #252535;background:transparent;color:#555;border-radius:7px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s}
 .mode-btn.act{background:rgba(254,44,85,.12);border-color:rgba(254,44,85,.3);color:#fe2c55}
+/* ── Gift card hover ── */
+.gift-card{transition:border-color .2s}
+.gift-card:hover{border-color:rgba(254,44,85,.35)!important}
+/* ── Spotify queue item ── */
+.sq-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #0f0f1a;transition:background .1s}
+.sq-item:last-child{border-bottom:none}
+.sq-item:hover{background:rgba(29,185,84,.04)}
+/* ── Perm chip ── */
+.perm-chip{padding:5px 12px;border-radius:20px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;border:1px solid #252535;background:transparent;color:#555}
+.perm-chip.sel{background:rgba(29,185,84,.15);border-color:rgba(29,185,84,.4);color:#1DB954}
+/* ── Sec header ── */
+.sec-hdr{display:flex;align-items:center;gap:7px;margin-bottom:9px;margin-top:4px}
+.sec-dot{width:7px;height:7px;border-radius:50%;background:linear-gradient(135deg,#fe2c55,#25f4ee);flex-shrink:0}
+.sec-lbl{color:#fe2c55;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
 </style>
 </head>
 <body><div id="root"></div>
@@ -64,98 +77,105 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const SERVER = "https://tikshank-production.up.railway.app";
 const EL_KEY  = "sk_c59a0c3dddc47a866083fc9b58a7dbd92b722fb2fb12da11";
 
-/* ─── Storage helpers ───────────────────────────────── */
-const sv  = (k,v)=>{ try{ localStorage.setItem("tp_"+k, JSON.stringify(v)); }catch(e){} };
-const ld  = (k,d)=>{ try{ const v=localStorage.getItem("tp_"+k); return v!==null?JSON.parse(v):d; }catch(e){ return d; } };
+/* ─── Storage helpers ─────────────────────────────── */
+const sv = (k,v)=>{ try{ localStorage.setItem("tp_"+k, JSON.stringify(v)); }catch(e){} };
+const ld = (k,d)=>{ try{ const v=localStorage.getItem("tp_"+k); return v!==null?JSON.parse(v):d; }catch(e){ return d; } };
 
-/* ─── TTS ENGINE ────────────────────────────────────────
-   Prioridad: ElevenLabs → Web Speech API (gratis, nativo)
-   Cola única — nunca se traba aunque falle EL              */
-const ttsQueue  = [];
-let   ttsActive = false;
-
+/* ─── TTS ENGINE ────────────────────────────────────
+   Prioridad: ElevenLabs → Web Speech API             */
+const ttsQueue = [];
+let ttsActive = false;
 function enqueueTTS(text, voiceId, vol, mode) {
   if (!text || !text.trim()) return;
   ttsQueue.push({ text: text.trim(), voiceId, vol, mode });
   if (!ttsActive) drainQueue();
 }
-
 async function drainQueue() {
   if (ttsQueue.length === 0) { ttsActive = false; return; }
   ttsActive = true;
   const item = ttsQueue.shift();
   try {
-    if (item.mode === "elevenlabs") {
-      await speakElevenLabs(item.text, item.voiceId, item.vol);
-    } else {
-      await speakNative(item.text, item.voiceId, item.vol);
-    }
-  } catch(e) {
-    console.warn("TTS falló, siguiente:", e.message);
-  }
-  // Siempre continuar la cola
+    if (item.mode === "elevenlabs") await speakElevenLabs(item.text, item.voiceId, item.vol);
+    else await speakNative(item.text, item.voiceId, item.vol);
+  } catch(e) { console.warn("TTS falló:", e.message); }
   setTimeout(drainQueue, 50);
 }
-
 async function speakElevenLabs(text, voiceId, vol) {
   const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-    method: "POST",
-    headers: { "xi-api-key": EL_KEY, "Content-Type": "application/json", "Accept": "audio/mpeg" },
-    body: JSON.stringify({ text, model_id: "eleven_multilingual_v2", voice_settings:{ stability:0.5, similarity_boost:0.75 } }),
-    signal: AbortSignal.timeout(10000),
+    method:"POST",
+    headers:{"xi-api-key":EL_KEY,"Content-Type":"application/json","Accept":"audio/mpeg"},
+    body:JSON.stringify({text, model_id:"eleven_multilingual_v2", voice_settings:{stability:0.5, similarity_boost:0.75}}),
+    signal:AbortSignal.timeout(10000),
   });
-  if (!r.ok) throw new Error("EL HTTP " + r.status);
+  if (!r.ok) throw new Error("EL HTTP "+r.status);
   const blob = await r.blob();
   const url  = URL.createObjectURL(blob);
   await playAudio(url, vol);
   URL.revokeObjectURL(url);
 }
-
 function speakNative(text, voiceId, vol) {
   return new Promise((res) => {
     if (!window.speechSynthesis) { res(); return; }
     window.speechSynthesis.cancel();
-    const utt   = new SpeechSynthesisUtterance(text);
-    utt.volume  = Math.min(1, Math.max(0, vol));
-    utt.rate    = 1.05;
-    utt.pitch   = 1;
-    utt.lang    = "es-MX";
-    // intentar usar la voz del sistema por nombre si se guardó
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.volume = Math.min(1, Math.max(0, vol));
+    utt.rate = 1.05; utt.pitch = 1; utt.lang = "es-MX";
     const voices = window.speechSynthesis.getVoices();
-    const match  = voices.find(v => v.name === voiceId || v.lang.startsWith("es"));
+    const match = voices.find(v => v.name === voiceId || v.lang.startsWith("es"));
     if (match) utt.voice = match;
-    utt.onend   = res;
-    utt.onerror = res;
+    utt.onend = res; utt.onerror = res;
     window.speechSynthesis.speak(utt);
-    // timeout de seguridad: 15s max por utterance
     setTimeout(res, 15000);
   });
 }
-
 function playAudio(src, vol) {
   return new Promise((res) => {
-    const a    = new Audio(src);
-    a.volume   = Math.min(1, Math.max(0, vol));
-    a.onended  = res;
-    a.onerror  = res;
+    const a = new Audio(src);
+    a.volume = Math.min(1, Math.max(0, vol));
+    a.onended = res; a.onerror = res;
     a.play().catch(res);
-    setTimeout(res, 30000); // max 30s
+    setTimeout(res, 30000);
   });
 }
-
-/* ─── Conversión base64 para persistir audio ──────── */
 function fileToBase64(file) {
   return new Promise((res, rej) => {
     const r = new FileReader();
-    r.onload  = e => res(e.target.result);
+    r.onload = e => res(e.target.result);
     r.onerror = rej;
     r.readAsDataURL(file);
   });
 }
 
-/* ─── Datos de TikTok ───────────────────────────────── */
+/* ─── Datos ─────────────────────────────────────────── */
 const EV_TYPES = ["Follow Alert","Gift Alert","Like Alert","Sub Alert","Share Alert"];
 
+const TIKTOK_GIFTS_LIST = [
+  {id:"rose",      name:"Rose",          emoji:"🌹", coins:1},
+  {id:"icecream",  name:"Ice Cream Cone",emoji:"🍦", coins:1},
+  {id:"tiktok",    name:"TikTok",        emoji:"📱", coins:1},
+  {id:"thumb",     name:"Thumbs Up",     emoji:"👍", coins:1},
+  {id:"heart",     name:"Heart",         emoji:"❤️",  coins:1},
+  {id:"finger",    name:"Finger Heart",  emoji:"🤞", coins:5},
+  {id:"hat",       name:"Hat",           emoji:"🎩", coins:10},
+  {id:"sunglasses",name:"Sunglasses",    emoji:"😎", coins:30},
+  {id:"tulip",     name:"Tulip",         emoji:"🌷", coins:99},
+  {id:"perfume",   name:"Perfume",       emoji:"🌸", coins:99},
+  {id:"butterfly", name:"Let Butterfly", emoji:"🦋", coins:399},
+  {id:"alien",     name:"Alien Buddy",   emoji:"👾", coins:399},
+  {id:"dancer",    name:"Air Dancer",    emoji:"💃", coins:300},
+  {id:"panda",     name:"Panda",         emoji:"🐼", coins:300},
+  {id:"babychicks",name:"Baby Chicks",   emoji:"🐥", coins:500},
+  {id:"owl",       name:"Owl",           emoji:"🦉", coins:500},
+  {id:"leon",      name:"Lion",          emoji:"🦁", coins:1000},
+  {id:"astrobear", name:"Astrobear",     emoji:"🐻", coins:1500},
+  {id:"animalband",name:"Animal Band",   emoji:"🎷", coins:2500},
+  {id:"drama",     name:"Drama Queen",   emoji:"👑", coins:5000},
+  {id:"park",      name:"Amusement Park",emoji:"🎡", coins:17000},
+  {id:"adream",    name:"Adam's Dream",  emoji:"🌌", coins:25999},
+  {id:"universe",  name:"Universe",      emoji:"🌍", coins:34999},
+];
+
+// Lista plana para selects del modal de acciones
 const TIKTOK_GIFTS = [
   "Cualquier regalo","Rose","You're awesome","GG","TikTok","Ice Cream Cone","Pop",
   "Love you so much","Wink wink","Glow Stick","Cake Slice","Heart Me","Thumbs Up",
@@ -184,24 +204,27 @@ const DEF_VOICES_EL = [
   {id:"yoZ06aMxZJJ28mfd3POQ", name:"Sam - Cálida"},
 ];
 
+const SPOTIFY_PERMS = ["Todos","Solo seguidores","Solo moderadores","Usuarios personalizados"];
+
 const DEF_ACTIONS = [
-  {id:1, enabled:true,  name:"Follow Alert", event:"Follow Alert", giftName:"",          minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por seguirme!"},
-  {id:2, enabled:true,  name:"Rosa Gift",    event:"Gift Alert",   giftName:"Rose",       minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por la rosa!"},
-  {id:3, enabled:true,  name:"Like Alert",   event:"Like Alert",   giftName:"",          minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:""},
-  {id:4, enabled:false, name:"Sub Alert",    event:"Sub Alert",    giftName:"",          minCount:1, duration:10, soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por suscribirte!"},
-  {id:5, enabled:false, name:"León Gift",    event:"Gift Alert",   giftName:"Lion",       minCount:1, duration:8,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡WOW! @usuario mandó un LEÓN! 🦁"},
+  {id:1, enabled:true,  name:"Follow Alert", event:"Follow Alert", giftName:"", minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por seguirme!"},
+  {id:2, enabled:true,  name:"Rosa Gift",    event:"Gift Alert",   giftName:"Rose", minCount:1, duration:5, soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por la rosa!"},
+  {id:3, enabled:true,  name:"Like Alert",   event:"Like Alert",   giftName:"", minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:""},
+  {id:4, enabled:false, name:"Sub Alert",    event:"Sub Alert",    giftName:"", minCount:1, duration:10, soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por suscribirte!"},
+  {id:5, enabled:false, name:"León Gift",    event:"Gift Alert",   giftName:"Lion", minCount:1, duration:8, soundName:"", soundData:"", ttsOn:false, ttsText:"¡WOW! @usuario mandó un LEÓN! 🦁"},
 ];
 
-/* ─── Users (demo) ──────────────────────────────────── */
+const defGiftCfg = () => ({enabled:false, sound:"", soundData:"", soundName:"", volume:80, duration:5, tts:false, ttsTemplate:"{username} envió {giftName} x{repeatCount}"});
+
 const USERS = {
-  "admin@tikpanel.com":   {password:"admin123", name:"Admin",    plan:"Pro",  avatar:"A"},
-  "luzalva@tikpanel.com": {password:"luz2024",  name:"Luz Álva", plan:"Pro",  avatar:"L"},
-  "usuario@tikpanel.com": {password:"pass123",  name:"Streamer", plan:"Free", avatar:"S"},
+  "admin@tikpanel.com":   {password:"admin123", name:"Admin",      plan:"Pro",  avatar:"A"},
+  "luzalva@tikpanel.com": {password:"luz2024",  name:"Luz Álva",   plan:"Pro",  avatar:"L"},
+  "usuario@tikpanel.com": {password:"pass123",  name:"Streamer",   plan:"Free", avatar:"S"},
 };
 
-/* ─── Pequeños componentes ──────────────────────────── */
+/* ─── Componentes pequeños ──────────────────────────── */
 function Toggle({on, onChange, color="#fe2c55", size="md"}) {
-  const w = size==="sm" ? 28 : 42, h = size==="sm" ? 16 : 23, r = size==="sm" ? 12 : 10, dot = size==="sm" ? 12 : 19;
+  const w = size==="sm"?28:42, h=size==="sm"?16:23, dot=size==="sm"?12:19;
   return (
     <div onClick={onChange} style={{width:w,height:h,borderRadius:w,cursor:"pointer",position:"relative",
       background:on?color:"#1e1e2e",transition:"background .2s",flexShrink:0,border:"1px solid rgba(255,255,255,.05)"}}>
@@ -224,66 +247,47 @@ function IBtn({ico, onClick, color="#aaa", title=""}) {
   );
 }
 
+function SecHdr({title}) {
+  return (
+    <div className="sec-hdr">
+      <div className="sec-dot"/>
+      <span className="sec-lbl">{title}</span>
+    </div>
+  );
+}
+
 /* ─── Modal Acción ──────────────────────────────────── */
 function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, onClose }) {
-  const def = {
-    id: Date.now(), enabled:true, name:"", event:"Gift Alert",
-    giftName:"Cualquier regalo", minCount:1, duration:5,
-    soundName:"", soundData:"", ttsOn:false, ttsText:"",
-  };
-  const [f,     setF]   = useState(action ? {...action} : def);
-  const [busy,  setBusy] = useState(false);
-
-  const set = (k, v) => setF(p => ({...p, [k]:v}));
-
+  const def = {id:Date.now(), enabled:true, name:"", event:"Gift Alert",
+    giftName:"Cualquier regalo", minCount:1, duration:5, soundName:"", soundData:"", ttsOn:false, ttsText:""};
+  const [f, setF] = useState(action ? {...action} : def);
+  const [busy, setBusy] = useState(false);
+  const set = (k,v) => setF(p=>({...p,[k]:v}));
   const lbl = {display:"block",color:"#556",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:5};
   const inp = {width:"100%",background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,padding:"9px 12px",color:"#fff",fontSize:12,outline:"none"};
-
   const handleFile = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     setBusy(true);
-    try {
-      const data = await fileToBase64(file);
-      set("soundData", data);
-      set("soundName", file.name);
-    } catch(err) { alert("Error al leer el archivo"); }
+    try { const data = await fileToBase64(file); set("soundData",data); set("soundName",file.name); }
+    catch(err) { alert("Error al leer el archivo"); }
     setBusy(false);
   };
-
-  const testSound = () => {
-    if (!f.soundData) return;
-    playAudio(f.soundData, (vol||80)/100);
-  };
-
+  const testSound = () => { if (!f.soundData) return; playAudio(f.soundData, (vol||80)/100); };
   const testTTS = () => {
-    const text = (f.ttsText||"Hola, esto es una prueba").replace(/@usuario/gi, "UsuarioPrueba");
-    if (ttsMode === "elevenlabs") {
-      enqueueTTS(text, ttsVoiceId, (vol||80)/100, "elevenlabs");
-    } else {
-      enqueueTTS(text, ttsNativeVoice, (vol||80)/100, "native");
-    }
+    const text = (f.ttsText||"Hola, esto es una prueba").replace(/@usuario/gi,"UsuarioPrueba");
+    enqueueTTS(text, ttsMode==="elevenlabs"?ttsVoiceId:ttsNativeVoice, (vol||80)/100, ttsMode);
   };
-
   return (
-    <div className="mo" onClick={e => e.target.classList.contains("mo") && onClose()}>
+    <div className="mo" onClick={e=>e.target.classList.contains("mo")&&onClose()}>
       <div className="mb">
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
-          <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16}}>
-            {action ? "✏️ Editar Acción" : "➕ Nueva Acción"}
-          </div>
-          <button onClick={onClose} style={{background:"#1a1a28",border:"none",borderRadius:6,width:26,height:26,
-            cursor:"pointer",color:"#555",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16}}>{action?"✏️ Editar Acción":"➕ Nueva Acción"}</div>
+          <button onClick={onClose} style={{background:"#1a1a28",border:"none",borderRadius:6,width:26,height:26,cursor:"pointer",color:"#555",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
-
-        {/* Nombre */}
         <div style={{marginBottom:12}}>
           <label style={lbl}>Nombre de la acción</label>
-          <input value={f.name} onChange={e=>set("name",e.target.value)}
-            placeholder="Ej: Rosa Sound" style={inp}/>
+          <input value={f.name} onChange={e=>set("name",e.target.value)} placeholder="Ej: Rosa Sound" style={inp}/>
         </div>
-
-        {/* Evento + Duración */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:12}}>
           <div>
             <label style={lbl}>Evento</label>
@@ -293,13 +297,10 @@ function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, on
           </div>
           <div>
             <label style={lbl}>Duración (seg)</label>
-            <input type="number" min="1" max="120" value={f.duration}
-              onChange={e=>set("duration",Number(e.target.value))} style={inp}/>
+            <input type="number" min="1" max="120" value={f.duration} onChange={e=>set("duration",Number(e.target.value))} style={inp}/>
           </div>
         </div>
-
-        {/* Regalo específico */}
-        {f.event === "Gift Alert" && (
+        {f.event==="Gift Alert" && (
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:12}}>
             <div>
               <label style={lbl}>Regalo de TikTok</label>
@@ -309,95 +310,52 @@ function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, on
             </div>
             <div>
               <label style={lbl}>Cantidad mínima</label>
-              <input type="number" min="1" value={f.minCount}
-                onChange={e=>set("minCount",Number(e.target.value))} style={inp}/>
+              <input type="number" min="1" value={f.minCount} onChange={e=>set("minCount",Number(e.target.value))} style={inp}/>
             </div>
           </div>
         )}
-
-        {/* Sonido MP3 — persistido en base64 */}
         <div style={{marginBottom:12}}>
           <label style={lbl}>Sonido de alerta (MP3/WAV/OGG)</label>
-          <div className={`ua ${f.soundName ? "has" : ""}`}>
+          <div className={`ua ${f.soundName?"has":""}`}>
             <input type="file" accept="audio/*" onChange={handleFile} disabled={busy}/>
-            <div style={{width:32,height:32,borderRadius:8,background:"rgba(37,244,238,.08)",
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
-              {busy ? <span className="spinner"/> : "🎵"}
+            <div style={{width:32,height:32,borderRadius:8,background:"rgba(37,244,238,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+              {busy?<span className="spinner"/>:"🎵"}
             </div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:12,fontWeight:600,color:f.soundName?"#25f4ee":"#aaa",
-                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {busy ? "Cargando..." : f.soundName || "Toca para subir audio"}
+              <div style={{fontSize:12,fontWeight:600,color:f.soundName?"#25f4ee":"#aaa",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {busy?"Cargando...":f.soundName||"Toca para subir audio"}
               </div>
               <div style={{fontSize:9,color:f.soundName?"rgba(37,244,238,.6)":"#444",marginTop:2}}>
-                {f.soundName ? "✓ Guardado — no se pierde al recargar" : "MP3, WAV, OGG"}
+                {f.soundName?"✓ Guardado — no se pierde al recargar":"MP3, WAV, OGG"}
               </div>
             </div>
-            {f.soundData && (
-              <button onClick={e=>{e.preventDefault();e.stopPropagation();testSound();}}
-                style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.3)",
-                  borderRadius:7,padding:"5px 10px",color:"#25f4ee",fontSize:10,fontWeight:700,
-                  cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>▶ Probar</button>
-            )}
-            {f.soundName && (
-              <button onClick={e=>{e.preventDefault();e.stopPropagation();set("soundData","");set("soundName","");}}
-                style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",
-                  borderRadius:7,padding:"5px 9px",color:"#fe2c55",fontSize:10,fontWeight:700,
-                  cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>✕</button>
-            )}
+            {f.soundData && <button onClick={e=>{e.preventDefault();e.stopPropagation();testSound();}} style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.3)",borderRadius:7,padding:"5px 10px",color:"#25f4ee",fontSize:10,fontWeight:700,cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>▶ Probar</button>}
+            {f.soundName && <button onClick={e=>{e.preventDefault();e.stopPropagation();set("soundData","");set("soundName","");}} style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",borderRadius:7,padding:"5px 9px",color:"#fe2c55",fontSize:10,fontWeight:700,cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>✕</button>}
           </div>
         </div>
-
-        {/* TTS */}
         <div style={{marginBottom:18}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
             <label style={{...lbl,marginBottom:0}}>Mensaje TTS al activarse</label>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <Toggle on={f.ttsOn} onChange={()=>set("ttsOn",!f.ttsOn)} color="#25f4ee" size="sm"/>
-              <span style={{fontSize:9,color:f.ttsOn?"#25f4ee":"#444",fontWeight:700}}>
-                {f.ttsOn ? "ACTIVO" : "APAGADO"}
-              </span>
+              <span style={{fontSize:9,color:f.ttsOn?"#25f4ee":"#444",fontWeight:700}}>{f.ttsOn?"ACTIVO":"APAGADO"}</span>
             </div>
           </div>
-          <div style={{background:"#0a0a0f",border:`1px solid ${f.ttsOn?"rgba(37,244,238,.25)":"#252535"}`,
-            borderRadius:9,overflow:"hidden",transition:"border-color .2s"}}>
-            <textarea value={f.ttsText} onChange={e=>set("ttsText",e.target.value)} disabled={!f.ttsOn}
-              placeholder="Ej: ¡Gracias @usuario por la rosa!"
-              style={{width:"100%",background:"transparent",border:"none",padding:"9px 12px",
-                color:f.ttsOn?"#fff":"#333",fontSize:12,outline:"none",resize:"vertical",
-                minHeight:55,lineHeight:1.6}}/>
+          <div style={{background:"#0a0a0f",border:`1px solid ${f.ttsOn?"rgba(37,244,238,.25)":"#252535"}`,borderRadius:9,overflow:"hidden",transition:"border-color .2s"}}>
+            <textarea value={f.ttsText} onChange={e=>set("ttsText",e.target.value)} disabled={!f.ttsOn} placeholder="Ej: ¡Gracias @usuario por la rosa!"
+              style={{width:"100%",background:"transparent",border:"none",padding:"9px 12px",color:f.ttsOn?"#fff":"#333",fontSize:12,outline:"none",resize:"vertical",minHeight:55,lineHeight:1.6}}/>
             {f.ttsOn && f.ttsText && (
               <div style={{borderTop:"1px solid #1a1a28",padding:"6px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:9,color:"#444"}}>
-                  Motor: <span style={{color:"#fe2c55"}}>{ttsMode==="elevenlabs"?"ElevenLabs":"Voz del navegador (gratis)"}</span>
-                </span>
-                <button onClick={testTTS}
-                  style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",
-                    borderRadius:6,padding:"4px 10px",color:"#fe2c55",fontSize:9,fontWeight:700,cursor:"pointer"}}>
-                  🔊 Probar
-                </button>
+                <span style={{fontSize:9,color:"#444"}}>Motor: <span style={{color:"#fe2c55"}}>{ttsMode==="elevenlabs"?"ElevenLabs":"Voz del navegador (gratis)"}</span></span>
+                <button onClick={testTTS} style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",borderRadius:6,padding:"4px 10px",color:"#fe2c55",fontSize:9,fontWeight:700,cursor:"pointer"}}>🔊 Probar</button>
               </div>
             )}
           </div>
-          <div style={{color:"#444",fontSize:9,marginTop:4}}>
-            💡 <span style={{color:"#25f4ee",fontFamily:"monospace"}}>@usuario</span> se reemplaza con el nombre
-          </div>
+          <div style={{color:"#444",fontSize:9,marginTop:4}}>💡 <span style={{color:"#25f4ee",fontFamily:"monospace"}}>@usuario</span> se reemplaza con el nombre</div>
         </div>
-
         <div style={{display:"flex",gap:8}}>
-          <button onClick={onClose}
-            style={{flex:1,background:"transparent",border:"1px solid #252535",borderRadius:9,
-              padding:"10px",color:"#555",fontWeight:600,cursor:"pointer",fontSize:12}}>
-            Cancelar
-          </button>
-          <button onClick={()=>{
-              if(!f.name.trim()) { alert("Ponle un nombre a la acción"); return; }
-              onSave({...f});
-            }}
-            style={{flex:2,background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",
-              borderRadius:9,padding:"10px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:12}}>
-            💾 Guardar Acción
-          </button>
+          <button onClick={onClose} style={{flex:1,background:"transparent",border:"1px solid #252535",borderRadius:9,padding:"10px",color:"#555",fontWeight:600,cursor:"pointer",fontSize:12}}>Cancelar</button>
+          <button onClick={()=>{if(!f.name.trim()){alert("Ponle un nombre a la acción");return;}onSave({...f});}} style={{flex:2,background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:9,padding:"10px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:12}}>💾 Guardar Acción</button>
         </div>
       </div>
     </div>
@@ -406,519 +364,442 @@ function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, on
 
 /* ─── Login ─────────────────────────────────────────── */
 function Login({ onLogin }) {
-  const [email,   setEmail]   = useState("");
-  const [pass,    setPass]    = useState("");
-  const [err,     setErr]     = useState("");
-  const [loading, setLoading] = useState(false);
-
+  const [email,setEmail]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
   const go = () => {
     setErr(""); setLoading(true);
-    setTimeout(() => {
-      const u = USERS[email.toLowerCase()];
-      if (u && u.password === pass) { onLogin({...u, email}); }
-      else { setErr("Correo o contraseña incorrectos."); setLoading(false); }
-    }, 600);
+    setTimeout(()=>{ const u=USERS[email.toLowerCase()]; if(u&&u.password===pass){onLogin({...u,email});}else{setErr("Correo o contraseña incorrectos.");setLoading(false);} },600);
   };
-
-  const inp = {width:"100%",background:"#0d0d18",border:"1px solid #1e1e2e",borderRadius:10,
-    padding:"11px 14px",color:"#fff",fontSize:13,outline:"none"};
-
+  const inp = {width:"100%",background:"#0d0d18",border:"1px solid #1e1e2e",borderRadius:10,padding:"11px 14px",color:"#fff",fontSize:13,outline:"none"};
   return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",
-      background:"#0a0a0f",padding:20}}>
-      <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:22,padding:"40px 32px",
-        width:"100%",maxWidth:380,boxShadow:"0 40px 80px rgba(0,0,0,.7)"}}>
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0a0f",padding:20}}>
+      <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:22,padding:"40px 32px",width:"100%",maxWidth:380,boxShadow:"0 40px 80px rgba(0,0,0,.7)"}}>
         <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:6}}>
-          <div style={{width:36,height:36,borderRadius:9,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:17}}>T</div>
-          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:21,letterSpacing:-.5}}>
-            ik<span style={{color:"#fe2c55"}}>Panel</span>
-          </span>
+          <div style={{width:36,height:36,borderRadius:9,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:17}}>T</div>
+          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:21,letterSpacing:-.5}}>ik<span style={{color:"#fe2c55"}}>Panel</span></span>
         </div>
         <p style={{color:"#555",fontSize:12,marginBottom:22}}>Panel de control para TikTok LIVE</p>
         <div style={{marginBottom:12}}>
-          <label style={{display:"block",color:"#555",fontSize:9,fontWeight:700,letterSpacing:.8,
-            textTransform:"uppercase",marginBottom:6}}>Correo</label>
-          <input value={email} onChange={e=>setEmail(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&go()} type="email" placeholder="tu@correo.com" style={inp}/>
+          <label style={{display:"block",color:"#555",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:6}}>Correo</label>
+          <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} type="email" placeholder="tu@correo.com" style={inp}/>
         </div>
         <div style={{marginBottom:16}}>
-          <label style={{display:"block",color:"#555",fontSize:9,fontWeight:700,letterSpacing:.8,
-            textTransform:"uppercase",marginBottom:6}}>Contraseña</label>
-          <input value={pass} onChange={e=>setPass(e.target.value)}
-            onKeyDown={e=>e.key==="Enter"&&go()} type="password" placeholder="••••••••" style={inp}/>
+          <label style={{display:"block",color:"#555",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:6}}>Contraseña</label>
+          <input value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} type="password" placeholder="••••••••" style={inp}/>
         </div>
-        {err && (
-          <div style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",
-            borderRadius:8,padding:"8px 12px",color:"#fe2c55",fontSize:12,marginBottom:12}}>{err}</div>
-        )}
-        <button onClick={go} disabled={loading}
-          style={{width:"100%",background:loading?"#1e1e2e":"linear-gradient(135deg,#fe2c55,#ff6b81)",
-            border:"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>
-          {loading ? "Verificando..." : "Ingresar →"}
+        {err && <div style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",borderRadius:8,padding:"8px 12px",color:"#fe2c55",fontSize:12,marginBottom:12}}>{err}</div>}
+        <button onClick={go} disabled={loading} style={{width:"100%",background:loading?"#1e1e2e":"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+          {loading?"Verificando...":"Ingresar →"}
         </button>
       </div>
     </div>
   );
 }
 
-/* ─── Pantalla principal ────────────────────────────── */
+/* ─── APP principal ─────────────────────────────────── */
 function App() {
-  const [user,   setUser]   = useState(() => ld("session", null));
-  const [tab,    setTab]    = useState(() => ld("tab", "dashboard"));
-  const [sb,     setSb]     = useState(false);
+  const [user,setUser]   = useState(()=>ld("session",null));
+  const [tab,setTab]     = useState(()=>ld("tab","dashboard"));
+  const [sb,setSb]       = useState(false);
 
-  // Batalla / Versus
-  const [battle, setBattle] = useState(null);
-  const [battleRaw, setBattleRaw] = useState(null); // debug raw
+  // Batalla
+  const [battle,setBattle] = useState(null);
 
   // Conexión TikTok
-  const [tUser,  setTUser]  = useState(() => ld("tuser", ""));
-  const [sessId, setSessId] = useState(() => ld("sessid", ""));
-  const [conn,   setConn]   = useState(false);
-  const [conn2,  setConn2]  = useState(false);
-  const wakeLockRef = React.useRef(null);
-  const [wakeLockOn, setWakeLockOn] = React.useState(false);
-
-  // ── Wake Lock: mantener pantalla encendida ──────────────────────────────
-  const requestWakeLock = React.useCallback(async () => {
-    if (!('wakeLock' in navigator)) return; // no soportado
-    try {
-      if (wakeLockRef.current) return; // ya activo
-      wakeLockRef.current = await navigator.wakeLock.request('screen');
-      setWakeLockOn(true);
-      console.log('🔆 Wake Lock activo — pantalla no se apagará');
-      wakeLockRef.current.addEventListener('release', () => {
-        wakeLockRef.current = null;
-        setWakeLockOn(false);
-        console.log('Wake Lock liberado');
-      });
-    } catch(e) { console.warn('Wake Lock error:', e.message); }
-  }, []);
-
-  const releaseWakeLock = React.useCallback(async () => {
-    if (wakeLockRef.current) {
-      await wakeLockRef.current.release();
-      wakeLockRef.current = null;
-      setWakeLockOn(false);
-    }
-  }, []);
-
-  // Activar Wake Lock cuando la página vuelve a ser visible (ej: cambiar app y volver)
-  React.useEffect(() => {
-    const onVisible = () => { if (document.visibilityState === 'visible') requestWakeLock(); };
-    document.addEventListener('visibilitychange', onVisible);
-    requestWakeLock(); // activar al cargar
-    return () => { document.removeEventListener('visibilitychange', onVisible); releaseWakeLock(); };
-  }, [requestWakeLock, releaseWakeLock]);
-  const [dots,   setDots]   = useState("");
+  const [tUser,setTUser]   = useState(()=>ld("tuser",""));
+  const [sessId,setSessId] = useState(()=>ld("sessid",""));
+  const [conn,setConn]     = useState(false);
+  const [conn2,setConn2]   = useState(false);
+  const [dots,setDots]     = useState("");
   const [connErr,setConnErr]= useState("");
 
+  // Wake Lock
+  const wakeLockRef = useRef(null);
+  const [wakeLockOn,setWakeLockOn] = useState(false);
+  const requestWakeLock = useCallback(async()=>{
+    if(!('wakeLock' in navigator))return;
+    try{ if(wakeLockRef.current)return; wakeLockRef.current=await navigator.wakeLock.request('screen'); setWakeLockOn(true);
+      wakeLockRef.current.addEventListener('release',()=>{wakeLockRef.current=null;setWakeLockOn(false);}); }
+    catch(e){}
+  },[]);
+  const releaseWakeLock = useCallback(async()=>{
+    if(wakeLockRef.current){await wakeLockRef.current.release();wakeLockRef.current=null;setWakeLockOn(false);}
+  },[]);
+  useEffect(()=>{
+    const onV=()=>{ if(document.visibilityState==='visible')requestWakeLock(); };
+    document.addEventListener('visibilitychange',onV); requestWakeLock();
+    return()=>{document.removeEventListener('visibilitychange',onV);releaseWakeLock();};
+  },[requestWakeLock,releaseWakeLock]);
+
   // Stats
-  const [stats,  setStats]  = useState({viewers:0, gifts:0, follows:0, messages:0, likes:0});
-  const [log,    setLog]    = useState([]);
-  const [lAnim,  setLAnim]  = useState(false);
-  const [fh,     setFh]     = useState([]);
-  const [totDia, setTotDia] = useState(() => ld("totDia", 0));
-  const [totLike,setTotLike]= useState(() => ld("totLike", 0));
-  const [tapR,   setTapR]   = useState(() => ld("tapR", []));
-  const [likeR,  setLikeR]  = useState(() => ld("likeR", []));
-  const [viewR,  setViewR]  = useState(() => ld("viewR", [])); // historial de entradas
-  const [topViewers, setTopViewers] = useState([]); // espectadores activos ahora
-  const [vTab, setVTab] = useState("historial"); // sub-tab espectadores
+  const [stats,setStats]       = useState({viewers:0,gifts:0,follows:0,messages:0,likes:0});
+  const [log,setLog]           = useState([]);
+  const [lAnim,setLAnim]       = useState(false);
+  const [fh,setFh]             = useState([]);
+  const [totDia,setTotDia]     = useState(()=>ld("totDia",0));
+  const [totLike,setTotLike]   = useState(()=>ld("totLike",0));
+  const [tapR,setTapR]         = useState(()=>ld("tapR",[]));
+  const [likeR,setLikeR]       = useState(()=>ld("likeR",[]));
+  const [viewR,setViewR]       = useState(()=>ld("viewR",[]));
+  const [topViewers,setTopViewers] = useState([]);
+  const [vTab,setVTab]         = useState("historial");
 
   // TTS settings
-  const [ttsMode,  setTtsMode]  = useState(() => ld("ttsMode", "native"));   // "native" | "elevenlabs"
-  const [ttsOn,    setTtsOn]    = useState(() => ld("ttsOn", true));
-  const [ttsVol,   setTtsVol]   = useState(() => ld("ttsVol", 80));
-  const [ttsVoice, setTtsVoice] = useState(() => ld("ttsVoice", "cgSgspJ2msm6clMCkdW9")); // EL voice ID
-  const [nativeVoices, setNativeVoices] = useState([]);
-  const [nativeVoice,  setNativeVoice]  = useState(() => ld("nativeVoice", ""));
-  const [elVoices, setElVoices] = useState(DEF_VOICES_EL);
-  const [elOk,     setElOk]     = useState(null); // null=sin probar, true=ok, false=error
+  const [ttsMode,setTtsMode]     = useState(()=>ld("ttsMode","native"));
+  const [ttsOn,setTtsOn]         = useState(()=>ld("ttsOn",true));
+  const [ttsVol,setTtsVol]       = useState(()=>ld("ttsVol",80));
+  const [ttsVoice,setTtsVoice]   = useState(()=>ld("ttsVoice","cgSgspJ2msm6clMCkdW9"));
+  const [nativeVoices,setNativeVoices] = useState([]);
+  const [nativeVoice,setNativeVoice]   = useState(()=>ld("nativeVoice",""));
+  const [elVoices,setElVoices]   = useState(DEF_VOICES_EL);
+  const [elOk,setElOk]           = useState(null);
+  // TTS extras (del jsx)
+  const [ttsSpeed,setTtsSpeed]   = useState(()=>ld("ttsSpeed",1.0));
+  const [ttsPitch,setTtsPitch]   = useState(()=>ld("ttsPitch",1.0));
+  const [ttsTestText,setTtsTestText] = useState("Hola, soy el TTS de tu live!");
+  const [ttsChat,setTtsChat]     = useState(()=>ld("ttsChat",true));
+  const [ttsGifts,setTtsGifts]   = useState(()=>ld("ttsGifts",false));
+  const [ttsFollows,setTtsFollows]   = useState(()=>ld("ttsFollows",false));
+  const [ttsShares,setTtsShares]     = useState(()=>ld("ttsShares",false));
+  const [ttsSuperFan,setTtsSuperFan] = useState(()=>ld("ttsSuperFan",false));
+  const [ttsJoin,setTtsJoin]         = useState(()=>ld("ttsJoin",false));
+  // Plantillas TTS
+  const [tplChat,setTplChat]     = useState(()=>ld("tplChat","{nickname} dice {message}"));
+  const [tplGift,setTplGift]     = useState(()=>ld("tplGift","{username} envió {giftName} x{repeatCount}"));
+  const [tplFollow,setTplFollow] = useState(()=>ld("tplFollow","{username} te siguió"));
+  const [tplShare,setTplShare]   = useState(()=>ld("tplShare","{username} compartió el live"));
+  const [tplJoin,setTplJoin]     = useState(()=>ld("tplJoin","{username} se unió al live"));
+  const [tplSuperFan,setTplSuperFan] = useState(()=>ld("tplSuperFan","{username} se hizo super fan"));
+  // Filtros TTS
+  const [filterAll,setFilterAll]           = useState(()=>ld("filterAll",false));
+  const [filterFollowers,setFilterFollowers] = useState(()=>ld("filterFollowers",true));
+  const [filterMods,setFilterMods]         = useState(()=>ld("filterMods",false));
+  const [filterSuperFans,setFilterSuperFans] = useState(()=>ld("filterSuperFans",false));
+  const [filterFanClub,setFilterFanClub]   = useState(()=>ld("filterFanClub",false));
+  const [filterFanLevel,setFilterFanLevel] = useState(()=>ld("filterFanLevel",1));
+  const [filterCustomUsers,setFilterCustomUsers] = useState(()=>ld("filterCustomUsers",[]));
+  const [filterCustomInput,setFilterCustomInput] = useState("");
+  // Cola TTS
+  const [queueInfinite,setQueueInfinite]   = useState(()=>ld("queueInfinite",true));
+  const [queueReadOld,setQueueReadOld]     = useState(()=>ld("queueReadOld",false));
+  const [queueSkipEmoji,setQueueSkipEmoji] = useState(()=>ld("queueSkipEmoji",true));
+  const [queueSkipAt,setQueueSkipAt]       = useState(()=>ld("queueSkipAt",false));
+  const [queueSkipCmd,setQueueSkipCmd]     = useState(()=>ld("queueSkipCmd",false));
+  const [queueAntiSpam,setQueueAntiSpam]   = useState(()=>ld("queueAntiSpam",false));
+  const [queueIgnoreRep,setQueueIgnoreRep] = useState(()=>ld("queueIgnoreRep",false));
+  const [queueMaxRep,setQueueMaxRep]       = useState(()=>ld("queueMaxRep",2));
+  const [queueWindow,setQueueWindow]       = useState(()=>ld("queueWindow",30));
 
-  // Refs (para callbacks que no re-renderizan)
-  const ttsOnR    = useRef(ttsOn);
-  const ttsVolR   = useRef(ttsVol);
-  const ttsModeR  = useRef(ttsMode);
-  const ttsVoiceR = useRef(ttsVoice);
-  const nativeVoiceR = useRef(nativeVoice);
-  const actsR     = useRef([]);
-  const likeUserMapR = useRef({}); // user -> last known totalLikeCount
-  const alertsOnR = useRef(true);
+  // Regalos por regalo
+  const [addedGifts,setAddedGifts]   = useState(()=>ld("addedGifts",[]));
+  const [giftConfigs,setGiftConfigs] = useState(()=>ld("giftConfigs",{}));
+  const [giftSearch,setGiftSearch]   = useState("");
+  const [addingGift,setAddingGift]   = useState(false);
+  const [defaultGiftVol,setDefaultGiftVol] = useState(()=>ld("defaultGiftVol",80));
+  const setGiftCfg = (id,k,v) => setGiftConfigs(p=>({...p,[id]:{...(p[id]||defGiftCfg()),[k]:v}}));
+  const addGift = (g) => {
+    if(!addedGifts.find(x=>x.id===g.id)){
+      setAddedGifts(p=>[...p,g]);
+      setGiftConfigs(p=>({...p,[g.id]:defGiftCfg()}));
+    }
+    setAddingGift(false); setGiftSearch("");
+  };
+
+  // Spotify
+  const [spotifyEnabled,setSpotifyEnabled]     = useState(()=>ld("spotifyEnabled",false));
+  const [spotifyCmd,setSpotifyCmd]             = useState(()=>ld("spotifyCmd","!song"));
+  const [spotifyPerm,setSpotifyPerm]           = useState(()=>ld("spotifyPerm","Solo seguidores"));
+  const [spotifyCooldown,setSpotifyCooldown]   = useState(()=>ld("spotifyCooldown",30));
+  const [spotifyMaxQueue,setSpotifyMaxQueue]   = useState(()=>ld("spotifyMaxQueue",5));
+  const [spotifyAllowSkip,setSpotifyAllowSkip] = useState(()=>ld("spotifyAllowSkip",false));
+  const [spotifySkipPerm,setSpotifySkipPerm]   = useState(()=>ld("spotifySkipPerm","Solo moderadores"));
+  const [spotifyCustomUsers,setSpotifyCustomUsers] = useState(()=>ld("spotifyCustomUsers",[]));
+  const [spotifyCustomInput,setSpotifyCustomInput] = useState("");
+  const [spotifyQueue,setSpotifyQueue]         = useState(()=>ld("spotifyQueue",[]));
+  const [spotifyConnected,setSpotifyConnected] = useState(false);
+  const [spotifyNowPlaying,setSpotifyNowPlaying] = useState(null);
 
   // Acciones
-  const [actions,   setActions]   = useState(() => ld("actions4", DEF_ACTIONS));
-  const [alertsOn,  setAlertsOn]  = useState(() => ld("alertsOn", true));
-  const [showM,     setShowM]     = useState(false);
-  const [editA,     setEditA]     = useState(null);
-  const [searchQ,   setSearchQ]   = useState("");
-  const [toast,     setToast]     = useState("");
-  const [delConfirm,setDelConfirm]= useState(null); // id acción a confirmar delete
+  const [actions,setActions]     = useState(()=>ld("actions4",DEF_ACTIONS));
+  const [alertsOn,setAlertsOn]   = useState(()=>ld("alertsOn",true));
+  const [showM,setShowM]         = useState(false);
+  const [editA,setEditA]         = useState(null);
+  const [searchQ,setSearchQ]     = useState("");
+  const [toast,setToast]         = useState("");
+  const [delConfirm,setDelConfirm] = useState(null);
 
-  // UI
-  const showT = (msg) => { setToast(msg); setTimeout(()=>setToast(""), 2500); };
+  // Refs
+  const ttsOnR     = useRef(ttsOn);
+  const ttsVolR    = useRef(ttsVol);
+  const ttsModeR   = useRef(ttsMode);
+  const ttsVoiceR  = useRef(ttsVoice);
+  const nativeVoiceR = useRef(nativeVoice);
+  const actsR      = useRef([]);
+  const alertsOnR  = useRef(true);
+  const likeUserMapR = useRef({});
 
-  // Sync refs
-  useEffect(()=>{ ttsOnR.current=ttsOn;    sv("ttsOn",    ttsOn);    }, [ttsOn]);
-  useEffect(()=>{ ttsVolR.current=ttsVol;  sv("ttsVol",   ttsVol);   }, [ttsVol]);
-  useEffect(()=>{ ttsModeR.current=ttsMode;sv("ttsMode",  ttsMode);  }, [ttsMode]);
-  useEffect(()=>{ ttsVoiceR.current=ttsVoice; sv("ttsVoice",ttsVoice);}, [ttsVoice]);
-  useEffect(()=>{ nativeVoiceR.current=nativeVoice; sv("nativeVoice",nativeVoice);}, [nativeVoice]);
-  useEffect(()=>{ actsR.current=actions;   sv("actions4", actions);  }, [actions]);
-  useEffect(()=>{ alertsOnR.current=alertsOn; sv("alertsOn",alertsOn);}, [alertsOn]);
-  useEffect(()=>{ sv("tab",   tab);   }, [tab]);
-  useEffect(()=>{ sv("tuser", tUser); }, [tUser]);
-  useEffect(()=>{ sv("sessid", sessId); }, [sessId]);
-  useEffect(()=>{ sv("totDia",  totDia);  }, [totDia]);
-  useEffect(()=>{ sv("totLike", totLike); }, [totLike]);
-  useEffect(()=>{ sv("tapR",    tapR);    }, [tapR]);
-  useEffect(()=>{ sv("likeR",   likeR);   }, [likeR]);
-  useEffect(()=>{ sv("viewR",   viewR);   }, [viewR]);
+  const showT = (msg) => { setToast(msg); setTimeout(()=>setToast(""),2500); };
 
-  // Cargar voces nativas del navegador
-  useEffect(() => {
-    const load = () => {
-      const vs = window.speechSynthesis?.getVoices() || [];
-      const esList = vs.filter(v => v.lang.startsWith("es") || v.lang.startsWith("en"));
-      setNativeVoices(esList.length ? esList : vs);
-      if (!nativeVoice && esList.length) {
-        const def = esList.find(v=>v.lang.startsWith("es-MX")) || esList[0];
-        if (def) { setNativeVoice(def.name); nativeVoiceR.current=def.name; }
+  // Persist + sync refs
+  useEffect(()=>{ ttsOnR.current=ttsOn;      sv("ttsOn",ttsOn);       },[ttsOn]);
+  useEffect(()=>{ ttsVolR.current=ttsVol;    sv("ttsVol",ttsVol);     },[ttsVol]);
+  useEffect(()=>{ ttsModeR.current=ttsMode;  sv("ttsMode",ttsMode);   },[ttsMode]);
+  useEffect(()=>{ ttsVoiceR.current=ttsVoice;sv("ttsVoice",ttsVoice); },[ttsVoice]);
+  useEffect(()=>{ nativeVoiceR.current=nativeVoice;sv("nativeVoice",nativeVoice); },[nativeVoice]);
+  useEffect(()=>{ actsR.current=actions;     sv("actions4",actions);  },[actions]);
+  useEffect(()=>{ alertsOnR.current=alertsOn;sv("alertsOn",alertsOn); },[alertsOn]);
+  useEffect(()=>{ sv("tab",tab); },[tab]);
+  useEffect(()=>{ sv("tuser",tUser); },[tUser]);
+  useEffect(()=>{ sv("sessid",sessId); },[sessId]);
+  useEffect(()=>{ sv("totDia",totDia); },[totDia]);
+  useEffect(()=>{ sv("totLike",totLike); },[totLike]);
+  useEffect(()=>{ sv("tapR",tapR); },[tapR]);
+  useEffect(()=>{ sv("likeR",likeR); },[likeR]);
+  useEffect(()=>{ sv("viewR",viewR); },[viewR]);
+  useEffect(()=>{ sv("addedGifts",addedGifts); },[addedGifts]);
+  useEffect(()=>{ sv("giftConfigs",giftConfigs); },[giftConfigs]);
+  useEffect(()=>{ sv("defaultGiftVol",defaultGiftVol); },[defaultGiftVol]);
+  useEffect(()=>{ sv("spotifyEnabled",spotifyEnabled); },[spotifyEnabled]);
+  useEffect(()=>{ sv("spotifyCmd",spotifyCmd); },[spotifyCmd]);
+  useEffect(()=>{ sv("spotifyPerm",spotifyPerm); },[spotifyPerm]);
+  useEffect(()=>{ sv("spotifyCooldown",spotifyCooldown); },[spotifyCooldown]);
+  useEffect(()=>{ sv("spotifyMaxQueue",spotifyMaxQueue); },[spotifyMaxQueue]);
+  useEffect(()=>{ sv("spotifyAllowSkip",spotifyAllowSkip); },[spotifyAllowSkip]);
+  useEffect(()=>{ sv("spotifySkipPerm",spotifySkipPerm); },[spotifySkipPerm]);
+  useEffect(()=>{ sv("spotifyCustomUsers",spotifyCustomUsers); },[spotifyCustomUsers]);
+  useEffect(()=>{ sv("spotifyQueue",spotifyQueue); },[spotifyQueue]);
+  useEffect(()=>{ sv("ttsSpeed",ttsSpeed); },[ttsSpeed]);
+  useEffect(()=>{ sv("ttsPitch",ttsPitch); },[ttsPitch]);
+  useEffect(()=>{ sv("ttsChat",ttsChat); },[ttsChat]);
+  useEffect(()=>{ sv("ttsGifts",ttsGifts); },[ttsGifts]);
+  useEffect(()=>{ sv("ttsFollows",ttsFollows); },[ttsFollows]);
+  useEffect(()=>{ sv("ttsShares",ttsShares); },[ttsShares]);
+  useEffect(()=>{ sv("ttsSuperFan",ttsSuperFan); },[ttsSuperFan]);
+  useEffect(()=>{ sv("ttsJoin",ttsJoin); },[ttsJoin]);
+  useEffect(()=>{ sv("tplChat",tplChat); },[tplChat]);
+  useEffect(()=>{ sv("tplGift",tplGift); },[tplGift]);
+  useEffect(()=>{ sv("tplFollow",tplFollow); },[tplFollow]);
+  useEffect(()=>{ sv("tplShare",tplShare); },[tplShare]);
+  useEffect(()=>{ sv("tplJoin",tplJoin); },[tplJoin]);
+  useEffect(()=>{ sv("tplSuperFan",tplSuperFan); },[tplSuperFan]);
+  useEffect(()=>{ sv("filterAll",filterAll); },[filterAll]);
+  useEffect(()=>{ sv("filterFollowers",filterFollowers); },[filterFollowers]);
+  useEffect(()=>{ sv("filterMods",filterMods); },[filterMods]);
+  useEffect(()=>{ sv("filterSuperFans",filterSuperFans); },[filterSuperFans]);
+  useEffect(()=>{ sv("filterFanClub",filterFanClub); },[filterFanClub]);
+  useEffect(()=>{ sv("filterFanLevel",filterFanLevel); },[filterFanLevel]);
+  useEffect(()=>{ sv("filterCustomUsers",filterCustomUsers); },[filterCustomUsers]);
+  useEffect(()=>{ sv("queueInfinite",queueInfinite); },[queueInfinite]);
+  useEffect(()=>{ sv("queueReadOld",queueReadOld); },[queueReadOld]);
+  useEffect(()=>{ sv("queueSkipEmoji",queueSkipEmoji); },[queueSkipEmoji]);
+  useEffect(()=>{ sv("queueSkipAt",queueSkipAt); },[queueSkipAt]);
+  useEffect(()=>{ sv("queueSkipCmd",queueSkipCmd); },[queueSkipCmd]);
+  useEffect(()=>{ sv("queueAntiSpam",queueAntiSpam); },[queueAntiSpam]);
+  useEffect(()=>{ sv("queueIgnoreRep",queueIgnoreRep); },[queueIgnoreRep]);
+  useEffect(()=>{ sv("queueMaxRep",queueMaxRep); },[queueMaxRep]);
+  useEffect(()=>{ sv("queueWindow",queueWindow); },[queueWindow]);
+
+  // Cargar voces nativas
+  useEffect(()=>{
+    const load=()=>{
+      const vs=window.speechSynthesis?.getVoices()||[];
+      const esList=vs.filter(v=>v.lang.startsWith("es")||v.lang.startsWith("en"));
+      setNativeVoices(esList.length?esList:vs);
+      if(!nativeVoice&&esList.length){
+        const def=esList.find(v=>v.lang.startsWith("es-MX"))||esList[0];
+        if(def){setNativeVoice(def.name);nativeVoiceR.current=def.name;}
       }
     };
-    load();
-    window.speechSynthesis?.addEventListener("voiceschanged", load);
-    return () => window.speechSynthesis?.removeEventListener("voiceschanged", load);
-  }, []);
+    load(); window.speechSynthesis?.addEventListener("voiceschanged",load);
+    return()=>window.speechSynthesis?.removeEventListener("voiceschanged",load);
+  },[]);
 
   // Cargar voces ElevenLabs
-  useEffect(() => {
-    if (ttsMode !== "elevenlabs") return;
-    fetch("https://api.elevenlabs.io/v1/voices", {headers:{"xi-api-key":EL_KEY}})
-      .then(r=>r.json())
-      .then(d => {
-        if (d.voices?.length) {
-          const m = d.voices.map(v=>({id:v.voice_id, name:v.name}));
-          setElVoices([...DEF_VOICES_EL, ...m.filter(v=>!DEF_VOICES_EL.find(x=>x.id===v.id))]);
+  useEffect(()=>{
+    if(ttsMode!=="elevenlabs")return;
+    fetch("https://api.elevenlabs.io/v1/voices",{headers:{"xi-api-key":EL_KEY}})
+      .then(r=>r.json()).then(d=>{
+        if(d.voices?.length){
+          const m=d.voices.map(v=>({id:v.voice_id,name:v.name}));
+          setElVoices([...DEF_VOICES_EL,...m.filter(v=>!DEF_VOICES_EL.find(x=>x.id===v.id))]);
           setElOk(true);
         }
-      })
-      .catch(() => setElOk(false));
-  }, [ttsMode]);
+      }).catch(()=>setElOk(false));
+  },[ttsMode]);
 
-  // Dots animación conectando
-  useEffect(() => {
-    if (!conn2) return;
-    const t = setInterval(()=>setDots(d=>d.length>=3?"":d+"."), 400);
-    return () => clearInterval(t);
-  }, [conn2]);
+  useEffect(()=>{ if(!conn2)return; const t=setInterval(()=>setDots(d=>d.length>=3?"":d+"."),400); return()=>clearInterval(t); },[conn2]);
 
-  /* ─── Disparar acción ──────────────────────────── */
-  const fireAction = useCallback((eventType, giftName="", nickname="", giftCount=1) => {
-    if (!alertsOnR.current) return;
-    const acts = actsR.current.filter(a => a.enabled && a.event===eventType);
-    for (const act of acts) {
-      if (act.event==="Gift Alert") {
-        const gn=(giftName||"").toLowerCase();
-        const an=(act.giftName||"").toLowerCase();
-        if (an!=="cualquier regalo" && !gn.includes(an) && !an.includes(gn)) continue;
-        if (giftCount < act.minCount) continue;
+  /* ─── fireAction ─────────────────────────────── */
+  const fireAction = useCallback((eventType, giftName="", nickname="", giftCount=1)=>{
+    if(!alertsOnR.current)return;
+    const acts=actsR.current.filter(a=>a.enabled&&a.event===eventType);
+    for(const act of acts){
+      if(act.event==="Gift Alert"){
+        const gn=(giftName||"").toLowerCase(), an=(act.giftName||"").toLowerCase();
+        if(an!=="cualquier regalo"&&!gn.includes(an)&&!an.includes(gn))continue;
+        if(giftCount<act.minCount)continue;
       }
-      // Sonido MP3 (base64 persistido)
-      if (act.soundData) {
-        playAudio(act.soundData, ttsVolR.current/100);
+      if(act.soundData) playAudio(act.soundData, ttsVolR.current/100);
+      if(act.ttsOn&&act.ttsText&&ttsOnR.current){
+        const text=act.ttsText.replace(/@usuario/gi,nickname);
+        if(ttsModeR.current==="elevenlabs") enqueueTTS(text,ttsVoiceR.current,ttsVolR.current/100,"elevenlabs");
+        else enqueueTTS(text,nativeVoiceR.current,ttsVolR.current/100,"native");
       }
-      // TTS
-      if (act.ttsOn && act.ttsText && ttsOnR.current) {
-        const text = act.ttsText.replace(/@usuario/gi, nickname);
-        if (ttsModeR.current === "elevenlabs") {
-          enqueueTTS(text, ttsVoiceR.current, ttsVolR.current/100, "elevenlabs");
-        } else {
-          enqueueTTS(text, nativeVoiceR.current, ttsVolR.current/100, "native");
+    }
+    // También disparar configs de regalo individualmente
+    const giftCfgsSnap = JSON.parse(localStorage.getItem("tp_giftConfigs")||"{}");
+    const addedGiftsSnap = JSON.parse(localStorage.getItem("tp_addedGifts")||"[]");
+    if(eventType==="Gift Alert"){
+      for(const ag of addedGiftsSnap){
+        const cfg = giftCfgsSnap[ag.id]||defGiftCfg();
+        if(!cfg.enabled) continue;
+        const gn=(giftName||"").toLowerCase(), an=(ag.name||"").toLowerCase();
+        if(!gn.includes(an)&&!an.includes(gn)) continue;
+        if(cfg.soundData) playAudio(cfg.soundData, cfg.volume/100);
+        if(cfg.tts&&cfg.ttsTemplate&&ttsOnR.current){
+          const text=cfg.ttsTemplate.replace(/{username}/gi,nickname).replace(/{giftName}/gi,giftName).replace(/{repeatCount}/gi,giftCount);
+          if(ttsModeR.current==="elevenlabs") enqueueTTS(text,ttsVoiceR.current,cfg.volume/100,"elevenlabs");
+          else enqueueTTS(text,nativeVoiceR.current,cfg.volume/100,"native");
         }
       }
     }
-  }, []);
+  },[]);
 
-  /* ─── Socket.IO ────────────────────────────────── */
-  useEffect(() => {
-    const sock = io(SERVER, {
-      transports: ["websocket"],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1500,
-      reconnectionDelayMax: 8000,
-      timeout: 12000,
-    });
-
-    sock.on("connect", () => {
-      console.log("Socket conectado:", sock.id);
-    });
-
-    sock.on("connect_error", (e) => {
-      console.warn("Socket error:", e.message);
-    });
-
-    sock.on("event", d => {
-      if (d.type==="chat") {
+  /* ─── Socket.IO ──────────────────────────────── */
+  useEffect(()=>{
+    const sock=io(SERVER,{transports:["websocket"],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:1500,reconnectionDelayMax:8000,timeout:12000});
+    sock.on("connect",()=>console.log("Socket conectado:",sock.id));
+    sock.on("connect_error",e=>console.warn("Socket error:",e.message));
+    sock.on("event",d=>{
+      if(d.type==="chat"){
         setLog(p=>[{t:"msg",tx:`💬 @${d.nickname||d.user}: ${d.comment}`},...p].slice(0,50));
-        setStats(p=>({...p, messages:p.messages+1}));
-        if (ttsOnR.current) {
-          const text = `${d.nickname||d.user} dice: ${d.comment}`;
-          if (ttsModeR.current==="elevenlabs") {
-            enqueueTTS(text, ttsVoiceR.current, ttsVolR.current/100, "elevenlabs");
-          } else {
-            enqueueTTS(text, nativeVoiceR.current, ttsVolR.current/100, "native");
-          }
+        setStats(p=>({...p,messages:p.messages+1}));
+        if(ttsOnR.current){
+          const text=`${d.nickname||d.user} dice: ${d.comment}`;
+          if(ttsModeR.current==="elevenlabs") enqueueTTS(text,ttsVoiceR.current,ttsVolR.current/100,"elevenlabs");
+          else enqueueTTS(text,nativeVoiceR.current,ttsVolR.current/100,"native");
         }
-      } else if (d.type==="gift") {
+      } else if(d.type==="gift"){
         setLog(p=>[{t:"gift",tx:`🎁 @${d.nickname||d.user} → ${d.giftCount}× ${d.giftName}`},...p].slice(0,50));
-        setStats(p=>({...p, gifts:p.gifts+1}));
-        const dm = d.diamondCount||0;
-        setTotDia(p=>p+dm);
-        setTapR(prev=>{
-          const ex=prev.find(u=>u.user===d.user);
-          const upd=ex?prev.map(u=>u.user===d.user?{...u,diamonds:u.diamonds+dm,gifts:u.gifts+1}:u)
-            :[...prev,{user:d.user,nickname:d.nickname||d.user,diamonds:dm,gifts:1}];
-          return upd.sort((a,b)=>b.diamonds-a.diamonds).slice(0,10);
-        });
-        fireAction("Gift Alert", d.giftName, d.nickname||d.user, d.giftCount);
-      } else if (d.type==="follow") {
+        setStats(p=>({...p,gifts:p.gifts+1}));
+        const dm=d.diamondCount||0; setTotDia(p=>p+dm);
+        setTapR(prev=>{const ex=prev.find(u=>u.user===d.user);const upd=ex?prev.map(u=>u.user===d.user?{...u,diamonds:u.diamonds+dm,gifts:u.gifts+1}:u):[...prev,{user:d.user,nickname:d.nickname||d.user,diamonds:dm,gifts:1}];return upd.sort((a,b)=>b.diamonds-a.diamonds).slice(0,10);});
+        fireAction("Gift Alert",d.giftName,d.nickname||d.user,d.giftCount);
+      } else if(d.type==="follow"){
         setLog(p=>[{t:"follow",tx:`➕ @${d.nickname||d.user} te siguió`},...p].slice(0,50));
-        setStats(p=>({...p, follows:p.follows+1}));
-        fireAction("Follow Alert","", d.nickname||d.user);
-      } else if (d.type==="like") {
-        // likeCount = cantidad de likes enviados en este batch por el usuario
-        // NO acumular por usuario — cada evento ya representa likes nuevos
-        const lc = d.likeCount || 1;
+        setStats(p=>({...p,follows:p.follows+1}));
+        fireAction("Follow Alert","",d.nickname||d.user);
+      } else if(d.type==="like"){
+        const lc=d.likeCount||1;
         setLog(p=>[{t:"like",tx:`❤️ ×${lc} likes de @${d.nickname||d.user}`},...p].slice(0,50));
-        setStats(p=>({...p, likes:p.likes+lc}));
-        setTotLike(p=>p+lc);
-        setLAnim(true); setTimeout(()=>setLAnim(false),300);
-        const hid=Date.now();
-        setFh(p=>[...p,{id:hid,x:Math.random()*60+20}]);
-        setTimeout(()=>setFh(p=>p.filter(h=>h.id!==hid)),1200);
-        setLikeR(prev=>{
-          const ex=prev.find(u=>u.user===d.user);
-          const nickname = d.nickname || d.user;
-          const upd=ex?prev.map(u=>u.user===d.user?{...u,count:u.count+lc,nickname}:u)
-            :[...prev,{user:d.user,nickname,count:lc}];
-          return upd.sort((a,b)=>b.count-a.count).slice(0,10);
-        });
-        fireAction("Like Alert","", d.nickname||d.user);
-      } else if (d.type==="sub") {
+        setStats(p=>({...p,likes:p.likes+lc})); setTotLike(p=>p+lc);
+        setLAnim(true);setTimeout(()=>setLAnim(false),300);
+        const hid=Date.now(); setFh(p=>[...p,{id:hid,x:Math.random()*60+20}]); setTimeout(()=>setFh(p=>p.filter(h=>h.id!==hid)),1200);
+        setLikeR(prev=>{const ex=prev.find(u=>u.user===d.user);const nickname=d.nickname||d.user;const upd=ex?prev.map(u=>u.user===d.user?{...u,count:u.count+lc,nickname}:u):[...prev,{user:d.user,nickname,count:lc}];return upd.sort((a,b)=>b.count-a.count).slice(0,10);});
+        fireAction("Like Alert","",d.nickname||d.user);
+      } else if(d.type==="sub"){
         setLog(p=>[{t:"sub",tx:`⭐ @${d.nickname||d.user} se suscribió`},...p].slice(0,50));
-        fireAction("Sub Alert","", d.nickname||d.user);
-      } else if (d.type==="share") {
+        fireAction("Sub Alert","",d.nickname||d.user);
+      } else if(d.type==="share"){
         setLog(p=>[{t:"share",tx:`📤 @${d.nickname||d.user} compartió`},...p].slice(0,50));
-        fireAction("Share Alert","", d.nickname||d.user);
+        fireAction("Share Alert","",d.nickname||d.user);
       }
     });
-
-    sock.on("viewers", d => {
-      setStats(p=>({...p, viewers:d.count||0}));
-      // topViewers = server ya manda acumulado; simplemente reemplazar
-      if (Array.isArray(d.topViewers) && d.topViewers.length > 0) {
-        setTopViewers(d.topViewers.filter(v => v.user && v.user !== "?"));
-      }
+    sock.on("viewers",d=>{
+      setStats(p=>({...p,viewers:d.count||0}));
+      if(Array.isArray(d.topViewers)&&d.topViewers.length>0) setTopViewers(d.topViewers.filter(v=>v.user&&v.user!=="?"));
     });
-    sock.on("member", d => {
-      if (!d.user) return;
-      // Agregar al historial de quienes entraron
-      setViewR(prev => {
-        const ex = prev.find(u => u.user === d.user);
-        if (ex) {
-          // actualizar timestamp
-          return prev.map(u => u.user===d.user ? {...u, joinTime:d.timestamp||Date.now()} : u);
-        }
-        const upd = [{user:d.user, nickname:d.nickname||d.user, joinTime:d.timestamp||Date.now()}, ...prev];
-        return upd.slice(0, 300);
-      });
+    sock.on("member",d=>{
+      if(!d.user)return;
+      setViewR(prev=>{const ex=prev.find(u=>u.user===d.user);if(ex)return prev.map(u=>u.user===d.user?{...u,joinTime:d.timestamp||Date.now()}:u);return [{user:d.user,nickname:d.nickname||d.user,joinTime:d.timestamp||Date.now()},...prev].slice(0,300);});
     });
-    sock.on("battle", d => {
-      if (d && d.teams) {
-        const normalized = {
-          ...d,
-          // ownerUsername: usar el que manda el servidor o el usuario conectado como fallback
-          ownerUsername: (d.ownerUsername || tUser || "").toLowerCase().replace(/^@/,""),
-          teams: d.teams.map(t => ({
-            hostName:     t.hostName     || t.uniqueId  || t.displayId  || "?",
-            hostNickname: t.hostNickname || t.nickname  || t.hostName   || "?",
-            points:       Number(t.points || t.battleScore || t.score || 0),
-          })).filter(t => t.hostName !== "?"),
-        };
-        setBattle(normalized);
-      } else {
-        setBattle(d);
-      }
+    sock.on("battle",d=>{
+      if(d&&d.teams){
+        setBattle({...d,ownerUsername:(d.ownerUsername||tUser||"").toLowerCase().replace(/^@/,""),teams:d.teams.map(t=>({hostName:t.hostName||t.uniqueId||t.displayId||"?",hostNickname:t.hostNickname||t.nickname||t.hostName||"?",points:Number(t.points||t.battleScore||t.score||0)})).filter(t=>t.hostName!=="?")});
+      } else setBattle(d);
     });
+    sock.on("tiktok_disconnected",d=>{ setConn(false); setLog(p=>[{t:"sys",tx:`⚠️ TikTok desconectado (@${d?.username||"?"}). Reconecta.`},...p].slice(0,50)); });
+    sock.on("tiktok_error",d=>{ setLog(p=>[{t:"sys",tx:`⚠️ Error: ${d.message}`},...p].slice(0,50)); });
+    return()=>sock.disconnect();
+  },[fireAction]);
 
-    sock.on("tiktok_disconnected", d => {
-      setConn(false);
-      setLog(p=>[{t:"sys",tx:`⚠️ TikTok desconectado (@${d?.username||"?"}). Reconecta.`},...p].slice(0,50));
-    });
-    sock.on("tiktok_error", d => {
-      setLog(p=>[{t:"sys",tx:`⚠️ Error: ${d.message}`},...p].slice(0,50));
-    });
+  useEffect(()=>{
+    const savedUser=ld("tuser",""); if(!savedUser)return;
+    fetch(`${SERVER}/status/${encodeURIComponent(savedUser)}`).then(r=>r.json()).then(d=>{ if(d.connected){setConn(true);setLog([{t:"sys",tx:`✅ Sesión restaurada @${savedUser}`}]);} }).catch(()=>{});
+  },[]);
 
-    return () => sock.disconnect();
-  }, [fireAction]);
-
-  /* ─── Restaurar estado conexión al recargar ─────── */
-  useEffect(() => {
-    const savedUser = ld("tuser", "");
-    if (!savedUser) return;
-    // Verificar si el servidor aún tiene la sesión activa
-    fetch(`${SERVER}/status/${encodeURIComponent(savedUser)}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.connected) {
-          setConn(true);
-          setLog([{t:"sys",tx:`✅ Sesión restaurada @${savedUser}`}]);
-        }
-      })
-      .catch(() => {});
-  }, []); // eslint-disable-line
-
-  /* ─── Reset likeUserMap al conectar ─────────────── */
-  // (se hace en connect() limpiando el ref)
-
-  /* ─── Conectar/Desconectar TikTok ──────────────── */
-  const connect = async () => {
-    if (!tUser.trim()) return;
-    setConn2(true); setConnErr("");
-    try {
-      const r = await fetch(`${SERVER}/connect`, {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({username: tUser.trim(), sessionId: sessId.trim()||undefined}),
-      });
-      const d = await r.json();
-      if (d.success) {
-        setConn2(false); setConn(true);
-        setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0});
-        setTopViewers([]);
-        setTotDia(0); setTotLike(0); setTapR([]); setLikeR([]);
-        setBattle(null);
-        likeUserMapR.current = {}; // reset delta tracker
-        setViewR([]); sv("viewR",[]);
-        setLog([{t:"sys",tx:`✅ Conectado a @${tUser}`}]);
-      } else {
-        setConn2(false);
-        setConnErr(d.error||"¿Estás en LIVE?");
-        setLog(p=>[{t:"sys",tx:`⚠️ ${d.error||"¿Estás en LIVE?"}`},...p]);
-      }
-    } catch(e) {
-      setConn2(false);
-      setConnErr("Sin respuesta del servidor");
-      setLog(p=>[{t:"sys",tx:"⚠️ Sin respuesta del servidor"},...p]);
-    }
+  const connect = async()=>{
+    if(!tUser.trim())return; setConn2(true); setConnErr("");
+    try{
+      const r=await fetch(`${SERVER}/connect`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:tUser.trim(),sessionId:sessId.trim()||undefined})});
+      const d=await r.json();
+      if(d.success){setConn2(false);setConn(true);setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0});setTopViewers([]);setTotDia(0);setTotLike(0);setTapR([]);setLikeR([]);setBattle(null);likeUserMapR.current={};setViewR([]);sv("viewR",[]);setLog([{t:"sys",tx:`✅ Conectado a @${tUser}`}]);}
+      else{setConn2(false);setConnErr(d.error||"¿Estás en LIVE?");setLog(p=>[{t:"sys",tx:`⚠️ ${d.error||"¿Estás en LIVE?"}`},...p]);}
+    }catch(e){setConn2(false);setConnErr("Sin respuesta del servidor");setLog(p=>[{t:"sys",tx:"⚠️ Sin respuesta del servidor"},...p]);}
   };
 
-  const disconnect = async () => {
-    await fetch(`${SERVER}/disconnect`,{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({username:tUser})}).catch(()=>{});
-    setConn(false);
-    setLog([]); setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0});
-    setTotDia(0); setTotLike(0);
+  const disconnect = async()=>{
+    await fetch(`${SERVER}/disconnect`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:tUser})}).catch(()=>{});
+    setConn(false); setLog([]); setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0}); setTotDia(0); setTotLike(0);
   };
 
-  /* ─── Acciones CRUD ─────────────────────────────── */
-  const saveAction = (form) => {
-    if (form.id && actions.find(a=>a.id===form.id)) {
-      setActions(p=>p.map(a=>a.id===form.id?form:a));
-      showT("✅ Acción actualizada");
-    } else {
-      setActions(p=>[...p, {...form, id:Date.now()}]);
-      showT("✅ Acción creada");
-    }
-    setShowM(false); setEditA(null);
+  const saveAction=(form)=>{
+    if(form.id&&actions.find(a=>a.id===form.id)) setActions(p=>p.map(a=>a.id===form.id?form:a));
+    else setActions(p=>[...p,{...form,id:Date.now()}]);
+    showT("✅ Acción guardada"); setShowM(false); setEditA(null);
   };
-
-  const deleteAction = (id) => {
-    setActions(p=>p.filter(a=>a.id!==id));
-    setDelConfirm(null);
-    showT("🗑️ Acción eliminada");
-  };
-
-  const testAction = (act) => {
-    if (act.soundData) playAudio(act.soundData, ttsVol/100);
-    if (act.ttsOn && act.ttsText) {
-      const text = act.ttsText.replace(/@usuario/gi,"UsuarioPrueba");
-      enqueueTTS(text, ttsMode==="elevenlabs"?ttsVoice:nativeVoice, ttsVol/100, ttsMode);
-    }
+  const deleteAction=(id)=>{ setActions(p=>p.filter(a=>a.id!==id)); setDelConfirm(null); showT("🗑️ Acción eliminada"); };
+  const testAction=(act)=>{
+    if(act.soundData) playAudio(act.soundData,ttsVol/100);
+    if(act.ttsOn&&act.ttsText){ const text=act.ttsText.replace(/@usuario/gi,"UsuarioPrueba"); enqueueTTS(text,ttsMode==="elevenlabs"?ttsVoice:nativeVoice,ttsVol/100,ttsMode); }
     showT(`▶ Probando: ${act.name}`);
   };
 
-  /* ─── Render helpers ────────────────────────────── */
-  if (!user) return <Login onLogin={u=>{sv("session",u);setUser(u);}}/>;
+  const speakTest=()=>{
+    if(ttsMode==="elevenlabs") enqueueTTS(ttsTestText,ttsVoice,ttsVol/100,"elevenlabs");
+    else enqueueTTS(ttsTestText,nativeVoice,ttsVol/100,"native");
+  };
 
-  const TABS = [
-    {id:"dashboard", icon:"⚡", l:"Dashboard"},
-    {id:"acciones",  icon:"🎬", l:"Acciones"},
-    {id:"tts",       icon:"🔊", l:"Voz & Audio"},
-    {id:"ranking",   icon:"🏆", l:"Ranking"},
-    {id:"chat",      icon:"💬", l:"Chat"},
-    {id:"batalla",   icon:"⚔️",  l:"Batalla"},
-    {id:"espect",    icon:"👁️", l:"Espectadores"},
+  /* ─── Render ─────────────────────────────────── */
+  if(!user) return <Login onLogin={u=>{sv("session",u);setUser(u);}}/>;
+
+  const TABS=[
+    {id:"dashboard",icon:"⚡",l:"Dashboard"},
+    {id:"acciones", icon:"🎬",l:"Acciones"},
+    {id:"tts",      icon:"🔊",l:"Voz & Audio"},
+    {id:"regalos",  icon:"🎁",l:"Regalos"},
+    {id:"musica",   icon:"🎵",l:"Música"},
+    {id:"ranking",  icon:"🏆",l:"Ranking"},
+    {id:"chat",     icon:"💬",l:"Chat"},
+    {id:"batalla",  icon:"⚔️", l:"Batalla"},
+    {id:"espect",   icon:"👁️", l:"Espectadores"},
   ];
 
-  const LC = {gift:"rgba(254,44,85,.08)",follow:"rgba(37,244,238,.08)",msg:"rgba(255,255,255,.02)",
-    like:"rgba(254,44,85,.05)",sub:"rgba(139,92,246,.08)",share:"rgba(255,255,255,.04)",sys:"rgba(37,244,238,.06)"};
-  const LB = {gift:"#fe2c55",follow:"#25f4ee",msg:"#2a2a3a",like:"#fe2c55",sub:"#8b5cf6",share:"#666",sys:"#25f4ee"};
-  const bCls = ev=>ev.startsWith("Follow")?"bf":ev.startsWith("Gift")?"bg":ev.startsWith("Like")?"bl":ev.startsWith("Sub")?"bs":"bsh";
-  const bIco = ev=>ev.startsWith("Follow")?"➕":ev.startsWith("Gift")?"🎁":ev.startsWith("Like")?"❤️":ev.startsWith("Sub")?"⭐":"📤";
-
-  const C   = {background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:15,marginBottom:12};
-  const lbl = {display:"block",color:"#556",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:5};
-  const inp = {width:"100%",background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,padding:"9px 12px",color:"#fff",fontSize:12,outline:"none"};
-
-  const fActs = actions.filter(a=>a.name.toLowerCase().includes(searchQ.toLowerCase()));
+  const LC={gift:"rgba(254,44,85,.08)",follow:"rgba(37,244,238,.08)",msg:"rgba(255,255,255,.02)",like:"rgba(254,44,85,.05)",sub:"rgba(139,92,246,.08)",share:"rgba(255,255,255,.04)",sys:"rgba(37,244,238,.06)"};
+  const LB={gift:"#fe2c55",follow:"#25f4ee",msg:"#2a2a3a",like:"#fe2c55",sub:"#8b5cf6",share:"#666",sys:"#25f4ee"};
+  const bCls=ev=>ev.startsWith("Follow")?"bf":ev.startsWith("Gift")?"bg":ev.startsWith("Like")?"bl":ev.startsWith("Sub")?"bs":"bsh";
+  const bIco=ev=>ev.startsWith("Follow")?"➕":ev.startsWith("Gift")?"🎁":ev.startsWith("Like")?"❤️":ev.startsWith("Sub")?"⭐":"📤";
+  const C={background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:15,marginBottom:12};
+  const lbl={display:"block",color:"#556",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:5};
+  const inp={width:"100%",background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,padding:"9px 12px",color:"#fff",fontSize:12,outline:"none"};
+  const fActs=actions.filter(a=>a.name.toLowerCase().includes(searchQ.toLowerCase()));
 
   return (
     <div style={{display:"flex",minHeight:"100vh",background:"#0a0a0f"}}>
 
-      {/* Modales */}
-      {showM && (
-        <ActModal
-          action={editA}
-          ttsMode={ttsMode}
-          ttsVoiceId={ttsVoice}
-          ttsNativeVoice={nativeVoice}
-          vol={ttsVol}
-          onSave={saveAction}
-          onClose={()=>{setShowM(false);setEditA(null);}}
-        />
-      )}
+      {/* ── Modales ── */}
+      {showM && <ActModal action={editA} ttsMode={ttsMode} ttsVoiceId={ttsVoice} ttsNativeVoice={nativeVoice} vol={ttsVol} onSave={saveAction} onClose={()=>{setShowM(false);setEditA(null);}}/>}
 
-      {/* Confirm delete */}
       {delConfirm && (
         <div className="mo" onClick={()=>setDelConfirm(null)}>
           <div className="mb" style={{maxWidth:320}} onClick={e=>e.stopPropagation()}>
             <div style={{textAlign:"center",marginBottom:16}}>
               <div style={{fontSize:32,marginBottom:8}}>🗑️</div>
-              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:15,marginBottom:6}}>
-                Eliminar acción
-              </div>
-              <div style={{color:"#555",fontSize:12}}>
-                ¿Eliminar <span style={{color:"#fff",fontWeight:700}}>
-                  "{actions.find(a=>a.id===delConfirm)?.name}"
-                </span>? No se puede deshacer.
-              </div>
+              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:15,marginBottom:6}}>Eliminar acción</div>
+              <div style={{color:"#555",fontSize:12}}>¿Eliminar <span style={{color:"#fff",fontWeight:700}}>"{actions.find(a=>a.id===delConfirm)?.name}"</span>? No se puede deshacer.</div>
             </div>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setDelConfirm(null)}
-                style={{flex:1,background:"transparent",border:"1px solid #252535",borderRadius:9,
-                  padding:"10px",color:"#555",fontWeight:600,cursor:"pointer",fontSize:12}}>
-                Cancelar
-              </button>
-              <button onClick={()=>deleteAction(delConfirm)}
-                style={{flex:1,background:"rgba(254,44,85,.15)",border:"1px solid rgba(254,44,85,.35)",
-                  borderRadius:9,padding:"10px",color:"#fe2c55",fontWeight:700,cursor:"pointer",fontSize:12}}>
-                Sí, eliminar
-              </button>
+              <button onClick={()=>setDelConfirm(null)} style={{flex:1,background:"transparent",border:"1px solid #252535",borderRadius:9,padding:"10px",color:"#555",fontWeight:600,cursor:"pointer",fontSize:12}}>Cancelar</button>
+              <button onClick={()=>deleteAction(delConfirm)} style={{flex:1,background:"rgba(254,44,85,.15)",border:"1px solid rgba(254,44,85,.35)",borderRadius:9,padding:"10px",color:"#fe2c55",fontWeight:700,cursor:"pointer",fontSize:12}}>Sí, eliminar</button>
             </div>
           </div>
         </div>
@@ -927,967 +808,704 @@ function App() {
       {toast && <div className="toast">{toast}</div>}
       {sb && <div onClick={()=>setSb(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:40}}/>}
 
-      {/* Sidebar */}
-      <div style={{width:215,background:"#0d0d18",borderRight:"1px solid #1a1a28",display:"flex",
-        flexDirection:"column",padding:"13px 10px",position:"fixed",top:0,bottom:0,left:0,zIndex:50,
-        transform:sb?"translateX(0)":"translateX(-100%)",transition:"transform .28s ease"}}>
+      {/* ── Sidebar ── */}
+      <div style={{width:215,background:"#0d0d18",borderRight:"1px solid #1a1a28",display:"flex",flexDirection:"column",padding:"13px 10px",position:"fixed",top:0,bottom:0,left:0,zIndex:50,transform:sb?"translateX(0)":"translateX(-100%)",transition:"transform .28s ease"}}>
         <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:14,paddingLeft:2}}>
-          <div style={{width:27,height:27,borderRadius:7,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:13}}>T</div>
-          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16,letterSpacing:-.5}}>
-            ik<span style={{color:"#fe2c55"}}>Panel</span>
-          </span>
+          <div style={{width:27,height:27,borderRadius:7,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:13}}>T</div>
+          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16,letterSpacing:-.5}}>ik<span style={{color:"#fe2c55"}}>Panel</span></span>
         </div>
-
-        {/* User badge */}
-        <div style={{display:"flex",alignItems:"center",gap:7,background:"#1a1a28",
-          borderRadius:9,padding:"7px 9px",marginBottom:9}}>
-          <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,
-            background:"linear-gradient(135deg,#fe2c55,#25f4ee)",
-            display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:11}}>
-            {user.avatar}
-          </div>
+        <div style={{display:"flex",alignItems:"center",gap:7,background:"#1a1a28",borderRadius:9,padding:"7px 9px",marginBottom:9}}>
+          <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:11}}>{user.avatar}</div>
           <div style={{overflow:"hidden"}}>
             <div style={{fontSize:11,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{user.name}</div>
             <div style={{fontSize:9,color:"#fe2c55",fontWeight:600,marginTop:1}}>{user.plan}</div>
           </div>
         </div>
-
-        {/* Estado conexión */}
-        <div style={{display:"flex",alignItems:"center",gap:6,
-          background:conn?"rgba(37,244,238,.05)":"rgba(255,255,255,.02)",
-          border:`1px solid ${conn?"rgba(37,244,238,.18)":"#1a1a28"}`,
-          borderRadius:20,padding:"4px 9px",fontSize:9,color:conn?"#25f4ee":"#444",marginBottom:12,overflow:"hidden"}}>
-          <div className={conn?"ld":""} style={{width:5,height:5,borderRadius:"50%",flexShrink:0,
-            background:conn?"#25f4ee":"#252535",boxShadow:conn?"0 0 7px #25f4ee":"none"}}/>
-          <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {conn ? `@${tUser}` : "Sin conexión"}
-          </span>
+        <div style={{display:"flex",alignItems:"center",gap:6,background:conn?"rgba(37,244,238,.05)":"rgba(255,255,255,.02)",border:`1px solid ${conn?"rgba(37,244,238,.18)":"#1a1a28"}`,borderRadius:20,padding:"4px 9px",fontSize:9,color:conn?"#25f4ee":"#444",marginBottom:12,overflow:"hidden"}}>
+          <div className={conn?"ld":""} style={{width:5,height:5,borderRadius:"50%",flexShrink:0,background:conn?"#25f4ee":"#252535",boxShadow:conn?"0 0 7px #25f4ee":"none"}}/>
+          <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{conn?`@${tUser}`:"Sin conexión"}</span>
         </div>
-
-        <nav style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
-          {TABS.map(t => (
+        <nav style={{display:"flex",flexDirection:"column",gap:2,flex:1,overflowY:"auto"}}>
+          {TABS.map(t=>(
             <button key={t.id} onClick={()=>{setTab(t.id);setSb(false);}}
-              style={{display:"flex",alignItems:"center",gap:7,
-                background:tab===t.id?"rgba(254,44,85,.1)":"transparent",
-                border:tab===t.id?"1px solid rgba(254,44,85,.18)":"1px solid transparent",
-                borderRadius:8,padding:"8px 8px",color:tab===t.id?"#fff":"#555",
-                cursor:"pointer",fontSize:11,fontWeight:tab===t.id?700:500,textAlign:"left"}}>
+              style={{display:"flex",alignItems:"center",gap:7,background:tab===t.id?"rgba(254,44,85,.1)":"transparent",border:tab===t.id?"1px solid rgba(254,44,85,.18)":"1px solid transparent",borderRadius:8,padding:"8px 8px",color:tab===t.id?"#fff":"#555",cursor:"pointer",fontSize:11,fontWeight:tab===t.id?700:500,textAlign:"left"}}>
               <span style={{fontSize:13}}>{t.icon}</span>{t.l}
             </button>
           ))}
         </nav>
-
-        <button onClick={()=>{localStorage.removeItem("tp_session");setUser(null);}}
-          style={{background:"transparent",border:"1px solid #1a1a28",borderRadius:7,
-            padding:"6px 8px",color:"#444",cursor:"pointer",fontSize:10,marginTop:5}}>
-          Cerrar sesión
-        </button>
+        <button onClick={()=>{localStorage.removeItem("tp_session");setUser(null);}} style={{background:"transparent",border:"1px solid #1a1a28",borderRadius:7,padding:"6px 8px",color:"#444",cursor:"pointer",fontSize:10,marginTop:5}}>Cerrar sesión</button>
       </div>
 
-      {/* Main */}
+      {/* ── Main ── */}
       <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
-
         {/* Topbar */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-          padding:"9px 12px",borderBottom:"1px solid #1a1a28",background:"#0a0a0f",
-          position:"sticky",top:0,zIndex:30}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px",borderBottom:"1px solid #1a1a28",background:"#0a0a0f",position:"sticky",top:0,zIndex:30}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <button onClick={()=>setSb(!sb)}
-              style={{background:"#1a1a28",border:"1px solid #252535",borderRadius:6,
-                width:29,height:29,cursor:"pointer",color:"#fff",fontSize:13,
-                display:"flex",alignItems:"center",justifyContent:"center"}}>☰</button>
-            <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13}}>
-              {TABS.find(t=>t.id===tab)?.icon} {TABS.find(t=>t.id===tab)?.l}
+            <button onClick={()=>setSb(!sb)} style={{background:"#1a1a28",border:"1px solid #252535",borderRadius:6,width:29,height:29,cursor:"pointer",color:"#fff",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>☰</button>
+            <div>
+              <div style={{fontSize:13,fontWeight:700}}>{TABS.find(t=>t.id===tab)?.icon} {TABS.find(t=>t.id===tab)?.l}</div>
             </div>
           </div>
-          {conn && (
-            <div style={{display:"flex",alignItems:"center",gap:6}}>
-              {/* ☀️ Wake Lock indicator */}
-              <span
-                onClick={wakeLockOn ? releaseWakeLock : requestWakeLock}
-                title={wakeLockOn?"Pantalla activa (toca para desactivar)":"Toca para mantener pantalla encendida"}
-                style={{fontSize:13,cursor:"pointer",lineHeight:1,
-                  opacity:wakeLockOn?1:0.3,
-                  filter:wakeLockOn?"drop-shadow(0 0 5px #ffd700)":"none",
-                  transition:"all .4s",userSelect:"none"}}>
-                ☀️
-              </span>
-              <div style={{display:"flex",alignItems:"center",gap:4,
-                background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.2)",
-                borderRadius:20,padding:"3px 9px",color:"#fe2c55",fontWeight:800,fontSize:8,letterSpacing:1}}>
-                <div className="ld" style={{width:4,height:4,borderRadius:"50%",
-                  background:"#fe2c55",boxShadow:"0 0 6px #fe2c55"}}/>EN VIVO
-              </div>
-            </div>
-          )}
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {wakeLockOn && <span style={{fontSize:9,color:"#25f4ee",background:"rgba(37,244,238,.08)",border:"1px solid rgba(37,244,238,.2)",borderRadius:20,padding:"2px 8px"}}>🔆 Pantalla activa</span>}
+            {conn && <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.25)",borderRadius:20,padding:"3px 10px"}}>
+              <div className="ld" style={{width:5,height:5,borderRadius:"50%",background:"#fe2c55",boxShadow:"0 0 6px #fe2c55"}}/>
+              <span style={{fontSize:9,color:"#fe2c55",fontWeight:700}}>LIVE</span>
+            </div>}
+          </div>
         </div>
 
         {/* Contenido */}
-        <div style={{padding:12,flex:1,overflowY:"auto"}}>
+        <div style={{flex:1,padding:12,overflowY:"auto"}}>
 
-          {/* ── DASHBOARD ── */}
+          {/* ══════════════════════════════════════════════════════
+              TAB: DASHBOARD
+          ══════════════════════════════════════════════════════ */}
           {tab==="dashboard" && (
             <div className="ai">
-              {/* Conectar */}
               <div style={C}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:10}}>
-                  🎯 Conectar al LIVE
+                <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:10}}>🎯 Conectar al LIVE</div>
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",flex:1,background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,overflow:"hidden"}}>
+                    <span style={{color:"#fe2c55",fontWeight:800,padding:"0 10px",fontSize:14}}>@</span>
+                    <input style={{flex:1,background:"transparent",border:"none",padding:"10px 10px 10px 0",color:"#fff",fontSize:12,outline:"none"}} placeholder="tu_usuario_tiktok" value={tUser} onChange={e=>setTUser(e.target.value)} disabled={conn||conn2}/>
+                  </div>
+                  {!conn ? <button style={{background:(!conn2&&tUser)?"linear-gradient(135deg,#fe2c55,#ff6b81)":"#2a2a3a",border:"none",borderRadius:8,padding:"10px 18px",color:(!conn2&&tUser)?"#fff":"#555",fontSize:12,fontWeight:700,cursor:(!conn2&&tUser)?"pointer":"not-allowed"}} onClick={connect} disabled={conn2||!tUser}>{conn2?`Conectando${dots}`:"Conectar"}</button>
+                  : <button style={{background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.3)",borderRadius:8,padding:"10px 18px",color:"#fe2c55",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={disconnect}>Desconectar</button>}
                 </div>
-                <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
-                  <div style={{display:"flex",alignItems:"center",flex:1,minWidth:120,
-                    background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,overflow:"hidden"}}>
-                    <span style={{color:"#fe2c55",fontWeight:800,padding:"0 9px",fontSize:13,flexShrink:0}}>@</span>
-                    <input value={tUser} onChange={e=>setTUser(e.target.value.replace("@",""))}
-                      onKeyDown={e=>e.key==="Enter"&&!conn&&!conn2&&connect()}
-                      placeholder="usuario_tiktok" disabled={conn||conn2}
-                      style={{flex:1,background:"transparent",border:"none",padding:"9px 5px 9px 0",
-                        color:"#fff",fontSize:12,outline:"none",minWidth:0}}/>
-                  </div>
-                  {!conn
-                    ? <button onClick={connect} disabled={conn2||!tUser.trim()}
-                        style={{background:(conn2||!tUser.trim())?"#1e1e2e":"linear-gradient(135deg,#fe2c55,#ff6b81)",
-                          border:"none",borderRadius:8,padding:"9px 14px",
-                          color:(conn2||!tUser.trim())?"#444":"#fff",
-                          fontWeight:700,cursor:(conn2||!tUser.trim())?"not-allowed":"pointer",
-                          fontSize:12,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
-                        {conn2 ? <><span className="spinner"/>{`Conectando${dots}`}</> : "Conectar"}
-                      </button>
-                    : <button onClick={disconnect}
-                        style={{background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.3)",
-                          borderRadius:8,padding:"9px 14px",color:"#fe2c55",fontWeight:700,
-                          cursor:"pointer",fontSize:12,whiteSpace:"nowrap"}}>
-                        Desconectar
-                      </button>
-                  }
+                {connErr && <div style={{color:"#fe2c55",fontSize:11,marginTop:4}}>⚠️ {connErr}</div>}
+                {conn2 && <div style={{height:2,background:"#1e1e2e",borderRadius:1,marginTop:8,overflow:"hidden"}}><div className="cf" style={{height:"100%",width:"60%",background:"linear-gradient(90deg,#25f4ee,#fe2c55)"}}/></div>}
+                <div style={{marginTop:10}}>
+                  <label style={lbl}>Session ID (opcional para cuentas privadas)</label>
+                  <input style={inp} placeholder="sessionid=..." value={sessId} onChange={e=>setSessId(e.target.value)} disabled={conn}/>
                 </div>
-                {conn2 && (
-                  <div style={{height:3,background:"#1e1e2e",borderRadius:2,marginTop:8,overflow:"hidden"}}>
-                    <div className="cf" style={{height:"100%",width:"50%",
-                      background:"linear-gradient(90deg,#25f4ee,#fe2c55)",borderRadius:2}}/>
-                  </div>
-                )}
-                {/* Campo sessionId opcional - aparece solo si hay error de websocket */}
-                {(connErr && connErr.toLowerCase().includes("session")) || sessId ? (
-                  <div style={{marginTop:8}}>
-                    <div style={{display:"flex",alignItems:"center",background:"#0a0a0f",
-                      border:"1px solid #252535",borderRadius:8,overflow:"hidden"}}>
-                      <span style={{color:"#f5c518",padding:"0 9px",fontSize:11,flexShrink:0,whiteSpace:"nowrap"}}>
-                        🔑 sessionId
-                      </span>
-                      <input value={sessId} onChange={e=>setSessId(e.target.value.trim())}
-                        placeholder="opcional — pegar si TikTok lo pide" disabled={conn}
-                        style={{flex:1,background:"transparent",border:"none",padding:"9px 5px 9px 0",
-                          color:"#fff",fontSize:11,outline:"none",minWidth:0}}/>
-                      {sessId && <button onClick={()=>setSessId("")}
-                        style={{background:"transparent",border:"none",color:"#555",padding:"0 8px",cursor:"pointer",fontSize:12}}>✕</button>}
-                    </div>
-                    <div style={{fontSize:9,color:"#555",marginTop:4,padding:"0 2px"}}>
-                      Obtén el sessionId de las cookies de tiktok.com (cookie: "sessionid")
-                    </div>
-                  </div>
-                ) : connErr && connErr.toLowerCase().includes("websocket") ? null : null}
-                {!sessId && !conn && connErr && !connErr.toLowerCase().includes("session") && (
-                  <div style={{marginTop:4,fontSize:9,color:"#fe2c55a0",cursor:"pointer"}}
-                    onClick={()=>setSessId(" ")}>
-                    ⚠️ Si el error menciona "sessionId" → <u>agregar sessionId</u>
-                  </div>
-                )}
-                {connErr && (
-                  <div style={{marginTop:8,background:"rgba(254,44,85,.06)",border:"1px solid rgba(254,44,85,.15)",
-                    borderRadius:7,padding:"7px 10px",color:"#fe2c55",fontSize:11}}>
-                    ⚠️ {connErr} — ¿El usuario está en LIVE ahora?
-                  </div>
-                )}
               </div>
 
               {/* Stats */}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:9,marginBottom:12}}>
-                {[
-                  {l:"Espectadores",v:stats.viewers,  ic:"👁️", c:"#25f4ee"},
-                  {l:"Regalos",     v:stats.gifts,    ic:"🎁", c:"#fe2c55"},
-                  {l:"Seguidores",  v:stats.follows,  ic:"➕", c:"#ffd700"},
-                  {l:"Mensajes",    v:stats.messages, ic:"💬", c:"#a78bfa"},
-                ].map(s=>(
-                  <div key={s.l} style={{background:"#12121e",border:"1px solid #1e1e2e",
-                    borderRadius:12,padding:12,textAlign:"center"}}>
-                    <div style={{fontSize:16,marginBottom:3}}>{s.ic}</div>
-                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:19,color:s.c}}>
-                      {s.v.toLocaleString()}
-                    </div>
-                    <div style={{color:"#444",fontSize:9,marginTop:2,fontWeight:600}}>{s.l}</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:12}}>
+                {[{label:"Espectadores",value:stats.viewers,icon:"👁️",c:"#25f4ee"},{label:"Regalos",value:stats.gifts,icon:"🎁",c:"#fe2c55"},{label:"Seguidores",value:stats.follows,icon:"➕",c:"#a78bfa"},{label:"Mensajes",value:stats.messages,icon:"💬",c:"#fbbf24"},{label:"Likes",value:stats.likes,icon:"❤️",c:"#fe2c55"},{label:"Diamantes",value:totDia,icon:"💎",c:"#25f4ee"}].map(s=>(
+                  <div key={s.label} style={{...C,marginBottom:0,textAlign:"center",padding:"12px 8px"}}>
+                    <div style={{fontSize:20}}>{s.icon}</div>
+                    <div style={{fontSize:22,fontWeight:900,color:s.c,fontFamily:"'Syne',sans-serif"}}>{s.value.toLocaleString()}</div>
+                    <div style={{fontSize:9,color:"#555",fontWeight:600,marginTop:2}}>{s.label}</div>
                   </div>
                 ))}
               </div>
 
-              {/* Likes card */}
-              <div style={{...C,display:"flex",alignItems:"center",justifyContent:"space-between",
-                position:"relative",overflow:"hidden"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10}}>
-                  <div className={lAnim?"hpa":""} style={{fontSize:26}}>❤️</div>
-                  <div>
-                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:24,
-                      color:"#fe2c55",lineHeight:1}}>{stats.likes.toLocaleString()}</div>
-                    <div style={{color:"#555",fontSize:8,fontWeight:700,marginTop:2,letterSpacing:.5}}>LIKES EN EL LIVE</div>
-                  </div>
+              {/* Alertas toggle */}
+              <div style={{...C,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#fff"}}>🔔 Alertas de sonido</div>
+                  <div style={{fontSize:10,color:"#555",marginTop:2}}>{alertsOn?"Activadas — reproduciendo sonidos y TTS":"Silenciadas — sin reproducción"}</div>
                 </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{color:"#333",fontSize:9}}>💎 Diamantes</div>
-                  <div style={{color:"#ffd700",fontWeight:800,fontSize:14}}>{totDia.toLocaleString()}</div>
-                </div>
-                {fh.map(h=><span key={h.id} className="fh" style={{left:`${h.x}%`,bottom:4}}>❤️</span>)}
+                <Toggle on={alertsOn} onChange={()=>setAlertsOn(!alertsOn)}/>
               </div>
 
               {/* Log */}
               <div style={C}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:8}}>
-                  📋 Actividad en tiempo real
-                </div>
-                <div style={{background:"#0a0a0f",borderRadius:8,padding:8,height:195,
-                  overflowY:"auto",display:"flex",flexDirection:"column",gap:2}}>
-                  {log.length===0
-                    ? <div style={{color:"#333",fontSize:11,textAlign:"center",marginTop:70}}>
-                        {conn?"Esperando actividad...":"Conecta tu LIVE"}
-                      </div>
-                    : log.map((item,i)=>(
-                        <div key={i} style={{fontSize:12,padding:"5px 8px",borderRadius:5,
-                          background:LC[item.t]||"rgba(255,255,255,.02)",
-                          borderLeft:`2px solid ${LB[item.t]||"#252535"}`,
-                          color:"#ffffff",fontWeight:500}}>
-                          {item.tx}
-                        </div>
-                      ))
-                  }
+                <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:8}}>📋 Actividad reciente</div>
+                <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto",position:"relative"}}>
+                  {fh.map(h=><div key={h.id} className="fh" style={{left:`${h.x}%`,bottom:0}}>❤️</div>)}
+                  {log.length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"20px 0"}}>{conn?"Esperando eventos...":"Conecta tu LIVE para ver actividad"}</div>
+                  : log.map((item,i)=><div key={i} className="ai" style={{fontSize:11,padding:"5px 8px",borderRadius:6,background:LC[item.t]||"rgba(255,255,255,.02)",color:LB[item.t]||"#888",borderLeft:`2px solid ${LB[item.t]||"#333"}`}}>{item.tx}</div>)}
                 </div>
               </div>
             </div>
           )}
 
-          {/* ── ACCIONES ── */}
+          {/* ══════════════════════════════════════════════════════
+              TAB: ACCIONES
+          ══════════════════════════════════════════════════════ */}
           {tab==="acciones" && (
             <div className="ai">
-              {/* Toolbar */}
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,flexWrap:"wrap"}}>
-                <button onClick={()=>{setEditA(null);setShowM(true);}}
-                  style={{background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",
-                    borderRadius:7,padding:"7px 13px",color:"#fff",fontWeight:700,
-                    cursor:"pointer",fontSize:11,whiteSpace:"nowrap"}}>
-                  + Nueva
-                </button>
-                <div style={{display:"flex",alignItems:"center",gap:5,background:"#12121e",
-                  border:"1px solid #1e1e2e",borderRadius:20,padding:"5px 11px",cursor:"pointer"}}
-                  onClick={()=>setAlertsOn(!alertsOn)}>
-                  <div className={alertsOn?"ld":""} style={{width:6,height:6,borderRadius:"50%",
-                    background:alertsOn?"#25f4ee":"#444",boxShadow:alertsOn?"0 0 6px #25f4ee":"none"}}/>
-                  <span style={{fontSize:10,fontWeight:700,color:alertsOn?"#25f4ee":"#555"}}>
-                    {alertsOn?"Alertas ON":"Alertas OFF"}
-                  </span>
-                </div>
-                <input value={searchQ} onChange={e=>setSearchQ(e.target.value)}
-                  placeholder="🔍 Buscar..." style={{flex:1,minWidth:90,background:"#12121e",
-                    border:"1px solid #1e1e2e",borderRadius:7,padding:"6px 10px",
-                    color:"#fff",fontSize:11,outline:"none"}}/>
+              <div style={{display:"flex",gap:8,marginBottom:10}}>
+                <input style={{...inp,flex:1}} placeholder="🔍 Buscar acción..." value={searchQ} onChange={e=>setSearchQ(e.target.value)}/>
+                <button onClick={()=>{setEditA(null);setShowM(true);}} style={{background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:8,padding:"9px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>+ Nueva</button>
               </div>
-
-              {/* Tabla */}
-              <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:13,overflow:"hidden"}}>
-                <div className="tr" style={{background:"#0d0d18",borderBottom:"1px solid #1e1e2e"}}>
-                  {["","Nombre","Evento","Seg","🎵","🔊",""].map((h,i)=>(
-                    <div key={i} className="th">{h}</div>
-                  ))}
-                </div>
-
-                {fActs.length===0 && (
-                  <div style={{textAlign:"center",padding:"30px 16px",color:"#333",fontSize:11}}>
-                    {searchQ ? "Sin resultados" : "Crea tu primera acción ↑"}
-                  </div>
-                )}
-
-                {fActs.map(act => (
-                  <div key={act.id} className={`tr ${act.enabled?"":"dis"}`}>
-                    <button className={`it ${act.enabled?"on":""}`}
-                      onClick={()=>setActions(p=>p.map(a=>a.id===act.id?{...a,enabled:!a.enabled}:a))}/>
-                    <div style={{minWidth:0}}>
-                      <div style={{color:act.enabled?"#fff":"#555",fontSize:11,fontWeight:600,
-                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{act.name}</div>
-                      {act.event==="Gift Alert" && (
-                        <div style={{fontSize:8,color:"#444",marginTop:1,fontFamily:"'JetBrains Mono',monospace"}}>
-                          {act.giftName}×{act.minCount}
-                        </div>
-                      )}
-                    </div>
-                    <div><span className={`badge ${bCls(act.event)}`}>{bIco(act.event)} {act.event.replace(" Alert","")}</span></div>
-                    <div style={{fontSize:9,color:"#555",fontFamily:"'JetBrains Mono',monospace"}}>{act.duration}s</div>
-                    <div style={{textAlign:"center",fontSize:12}}>
-                      {act.soundName ? <span style={{color:"#25f4ee"}}>✓</span> : <span style={{color:"#1e1e2e"}}>—</span>}
-                    </div>
-                    <div style={{textAlign:"center",fontSize:11}}>
-                      {act.ttsOn && act.ttsText ? <span style={{color:"#25f4ee"}}>✓</span> : <span style={{color:"#1e1e2e"}}>—</span>}
-                    </div>
-                    <div style={{display:"flex",gap:3,justifyContent:"flex-end"}}>
-                      <IBtn ico="▶" onClick={()=>testAction(act)} color="#25f4ee" title="Probar"/>
-                      <IBtn ico="✏️" onClick={()=>{setEditA(act);setShowM(true);}} color="#aaa" title="Editar"/>
-                      <IBtn ico="🗑" onClick={()=>setDelConfirm(act.id)} color="#fe2c55" title="Eliminar"/>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{background:"rgba(37,244,238,.03)",border:"1px solid rgba(37,244,238,.08)",
-                borderRadius:8,padding:"9px 12px",color:"#444",fontSize:10,lineHeight:1.7,marginTop:10}}>
-                💾 Los audios ahora se guardan en base64 — <span style={{color:"#25f4ee"}}>no se pierden al recargar</span>.
-                El TTS usa la voz configurada en la pestaña <strong style={{color:"#fe2c55"}}>Voz & Audio</strong>.
-              </div>
-            </div>
-          )}
-
-          {/* ── VOZ & AUDIO ── */}
-          {tab==="tts" && (
-            <div className="ai">
-              {/* Motor TTS */}
-              <div style={C}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:12}}>
-                  🔊 Motor de Texto a Voz
-                </div>
-
-                {/* Toggle global */}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,
-                  background:"#0a0a0f",borderRadius:8,padding:"10px 12px",
-                  border:`1px solid ${ttsOn?"rgba(37,244,238,.2)":"#1e1e2e"}`}}>
-                  <div>
-                    <div style={{fontSize:12,fontWeight:600}}>TTS de comentarios</div>
-                    <div style={{fontSize:9,color:"#555",marginTop:1}}>Lee automáticamente los mensajes del chat</div>
-                  </div>
-                  <Toggle on={ttsOn} onChange={()=>setTtsOn(!ttsOn)}/>
-                </div>
-
-                {/* Selector de motor */}
-                <label style={lbl}>Motor de voz</label>
-                <div style={{display:"flex",gap:7,marginBottom:14}}>
-                  <button className={`mode-btn ${ttsMode==="native"?"act":""}`}
-                    onClick={()=>setTtsMode("native")}>
-                    🌐 Navegador<br/><span style={{fontSize:8,fontWeight:400,opacity:.7}}>Gratis, sin API</span>
-                  </button>
-                  <button className={`mode-btn ${ttsMode==="elevenlabs"?"act":""}`}
-                    onClick={()=>setTtsMode("elevenlabs")}>
-                    ⚡ ElevenLabs<br/><span style={{fontSize:8,fontWeight:400,opacity:.7}}>Alta calidad</span>
-                  </button>
-                </div>
-
-                {/* Voz nativa */}
-                {ttsMode==="native" && (
-                  <div style={{marginBottom:12}}>
-                    <label style={lbl}>Voz del navegador</label>
-                    {nativeVoices.length===0
-                      ? <div style={{color:"#555",fontSize:11,padding:"8px 12px",background:"#0a0a0f",
-                          border:"1px solid #252535",borderRadius:8}}>
-                          Cargando voces del sistema...
-                        </div>
-                      : <select value={nativeVoice} onChange={e=>setNativeVoice(e.target.value)}
-                          style={{...inp,cursor:"pointer"}}>
-                          {nativeVoices.map(v=>(
-                            <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>
-                          ))}
-                        </select>
-                    }
-                    <div style={{color:"#444",fontSize:9,marginTop:5}}>
-                      💡 Funciona sin internet ni configuración. Calidad depende del sistema operativo.
-                    </div>
-                  </div>
-                )}
-
-                {/* ElevenLabs */}
-                {ttsMode==="elevenlabs" && (
-                  <div style={{marginBottom:12}}>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
-                      <label style={{...lbl,marginBottom:0}}>Voz ElevenLabs</label>
-                      {elOk===false && (
-                        <span style={{fontSize:9,color:"#fe2c55",fontWeight:600}}>⚠️ API Error</span>
-                      )}
-                      {elOk===true && (
-                        <span style={{fontSize:9,color:"#25f4ee",fontWeight:600}}>✓ Conectado</span>
-                      )}
-                    </div>
-                    <select value={ttsVoice} onChange={e=>setTtsVoice(e.target.value)}
-                      style={{...inp,cursor:"pointer",marginBottom:8}}>
-                      {elVoices.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
-                    </select>
-                    <div style={{color:"#444",fontSize:9}}>
-                      💡 Requiere créditos en ElevenLabs. Si falla, cambia a motor Navegador.
-                    </div>
-                  </div>
-                )}
-
-                {/* Volumen */}
-                <div style={{marginBottom:12}}>
-                  <label style={lbl}>Volumen global: {ttsVol}%</label>
-                  <input type="range" min="0" max="100" value={ttsVol}
-                    onChange={e=>setTtsVol(Number(e.target.value))}
-                    style={{width:"100%",accentColor:"#fe2c55"}}/>
-                </div>
-              </div>
-
-              {/* Probar TTS */}
-              <div style={C}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:10}}>
-                  🎤 Probar voz
-                </div>
-                <textarea id="ttsT" placeholder="Escribe algo para probar..."
-                  style={{...inp,resize:"vertical",minHeight:55,marginBottom:8}}
-                  defaultValue="Hola, bienvenido al LIVE"/>
-                <button disabled={!ttsOn} onClick={()=>{
-                    const t=(document.getElementById("ttsT")?.value||"Hola").trim();
-                    if (!t) return;
-                    enqueueTTS(t, ttsMode==="elevenlabs"?ttsVoice:nativeVoice, ttsVol/100, ttsMode);
-                  }}
-                  style={{width:"100%",background:ttsOn?"rgba(254,44,85,.1)":"transparent",
-                    border:"1px solid rgba(254,44,85,.2)",borderRadius:8,padding:"9px",
-                    color:ttsOn?"#fe2c55":"#333",fontWeight:700,
-                    cursor:ttsOn?"pointer":"not-allowed",fontSize:12}}>
-                  ▶ Reproducir
-                </button>
-                <button style={{width:"100%",background:"transparent",border:"1px solid #1e1e2e",
-                  borderRadius:8,padding:"7px",color:"#444",cursor:"pointer",fontSize:11,marginTop:6}}
-                  onClick={()=>{window.speechSynthesis?.cancel();ttsQueue.length=0;ttsActive=false;}}>
-                  ⏹ Detener / Limpiar cola
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* ── RANKING ── */}
-          {tab==="ranking" && (
-            <div className="ai">
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:12}}>
-                {[
-                  {ic:"💎",v:totDia, l:"DIAMANTES TOTALES",c:"#ffd700"},
-                  {ic:"❤️",v:totLike,l:"LIKES TOTALES",    c:"#fe2c55"},
-                ].map(s=>(
-                  <div key={s.l} style={{background:"#12121e",border:"1px solid #1e1e2e",
-                    borderRadius:12,padding:12,textAlign:"center"}}>
-                    <div style={{fontSize:16,marginBottom:3}}>{s.ic}</div>
-                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:19,color:s.c}}>
-                      {s.v.toLocaleString()}
-                    </div>
-                    <div style={{color:"#444",fontSize:9,fontWeight:600,marginTop:2}}>{s.l}</div>
-                  </div>
-                ))}
-              </div>
-
-              {[
-                {title:"🎁 Top Tap Tap", data:tapR, key:"diamonds", color:"#ffd700", icon:"💎", empty:"Esperando regalos..."},
-                {title:"❤️ Top Likes",   data:likeR,key:"count",   color:"#fe2c55", icon:"❤️", empty:"Esperando likes..."},
-              ].map(({title,data,key,color,icon,empty})=>(
-                <div key={title} style={C}>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:11}}>
-                    {title}
-                  </div>
-                  {data.length===0
-                    ? <div style={{textAlign:"center",padding:"18px 0",color:"#333",fontSize:11}}>
-                        {conn ? empty : "Conecta tu LIVE"}
+              {fActs.length===0 ? <div style={{...C,textAlign:"center",color:"#444",padding:"30px 0",fontSize:12}}>No hay acciones. Crea una con el botón +</div>
+              : fActs.map(act=>(
+                <div key={act.id} style={{...C,opacity:act.enabled?1:.5}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:act.soundName||act.ttsOn?8:0}}>
+                    <div style={{fontSize:18}}>{bIco(act.event)}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{act.name}</div>
+                      <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
+                        <span className={`badge ${bCls(act.event)}`}>{act.event}</span>
+                        {act.giftName&&act.giftName!=="Cualquier regalo"&&<span className="badge bsh">{act.giftName}</span>}
+                        {act.soundName&&<span className="badge" style={{background:"rgba(37,244,238,.08)",color:"#25f4ee",border:"1px solid rgba(37,244,238,.18)"}}>🎵 {act.soundName.length>15?act.soundName.slice(0,15)+"...":act.soundName}</span>}
+                        {act.ttsOn&&<span className="badge" style={{background:"rgba(139,92,246,.08)",color:"#8b5cf6",border:"1px solid rgba(139,92,246,.18)"}}>🔊 TTS</span>}
                       </div>
-                    : data.map((item,i)=>{
-                        const medals=["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
-                        const max=data[0][key]||1;
-                        const pct=Math.round((item[key]/max)*100);
-                        return (
-                          <div key={item.user} style={{marginBottom:8}}>
-                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
-                              <span style={{fontSize:13,flexShrink:0}}>{medals[i]||"·"}</span>
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                                  <span style={{color:"#fff",fontSize:11,fontWeight:700,
-                                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                    @{item.nickname}
-                                  </span>
-                                  <span style={{color,fontWeight:800,fontSize:11,flexShrink:0,marginLeft:6}}>
-                                    {icon} {item[key].toLocaleString()}
-                                  </span>
-                                </div>
-                                <div style={{height:3,background:"#1a1a28",borderRadius:2,
-                                  marginTop:3,overflow:"hidden"}}>
-                                  <div style={{height:"100%",width:`${pct}%`,borderRadius:2,
-                                    transition:"width .6s",
-                                    background:key==="count"
-                                      ?"linear-gradient(90deg,#fe2c55,#ff6b81)"
-                                      :i===0?"linear-gradient(90deg,#ffd700,#ffaa00)"
-                                      :i===1?"linear-gradient(90deg,#ccc,#888)":"#2a2a3a"}}/>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                  }
+                    </div>
+                    <Toggle on={act.enabled} onChange={()=>setActions(p=>p.map(a=>a.id===act.id?{...a,enabled:!a.enabled}:a))} size="sm"/>
+                    <IBtn ico="▶" onClick={()=>testAction(act)} color="#25f4ee" title="Probar"/>
+                    <IBtn ico="✏️" onClick={()=>{setEditA(act);setShowM(true);}} color="#fbbf24" title="Editar"/>
+                    <IBtn ico="🗑" onClick={()=>setDelConfirm(act.id)} color="#fe2c55" title="Eliminar"/>
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* ── CHAT ── */}
+          {/* ══════════════════════════════════════════════════════
+              TAB: VOZ & AUDIO (TTS mejorado del jsx)
+          ══════════════════════════════════════════════════════ */}
+          {tab==="tts" && (
+            <div className="ai">
+
+              {/* Motor TTS */}
+              <SecHdr title="🎙️ MOTOR DE VOZ"/>
+              <div style={C}>
+                <div style={{display:"flex",gap:6,marginBottom:14}}>
+                  {[{id:"native",label:"🌐 Navegador (Gratis)"},{id:"elevenlabs",label:"⚡ ElevenLabs (IA)"}].map(m=>(
+                    <button key={m.id} className={`mode-btn${ttsMode===m.id?" act":""}`} onClick={()=>setTtsMode(m.id)}>{m.label}</button>
+                  ))}
+                </div>
+
+                {ttsMode==="native" && (
+                  <div style={{marginBottom:12}}>
+                    <label style={lbl}>Voz del sistema</label>
+                    <select style={inp} value={nativeVoice} onChange={e=>setNativeVoice(e.target.value)}>
+                      {nativeVoices.map(v=><option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}
+                    </select>
+                  </div>
+                )}
+                {ttsMode==="elevenlabs" && (
+                  <div style={{marginBottom:12}}>
+                    <label style={lbl}>Voz ElevenLabs {elOk===true&&<span style={{color:"#4ade80"}}>✓ Conectado</span>}{elOk===false&&<span style={{color:"#fe2c55"}}>✗ Error de API</span>}</label>
+                    <select style={inp} value={ttsVoice} onChange={e=>setTtsVoice(e.target.value)}>
+                      {elVoices.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {[{l:"Volumen",v:ttsVol,s:setTtsVol,min:0,max:100,step:1,fmt:v=>`${v}%`},
+                  {l:"Velocidad",v:ttsSpeed,s:setTtsSpeed,min:.5,max:2,step:.1,fmt:v=>v.toFixed(1)+"x"},
+                  {l:"Tono",v:ttsPitch,s:setTtsPitch,min:0,max:2,step:.1,fmt:v=>v.toFixed(1)}].map(r=>(
+                  <div key={r.l} style={{marginBottom:12}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{color:"#aaa",fontSize:11}}>{r.l}</span>
+                      <span style={{color:"#fff",fontSize:11,fontWeight:700}}>{r.fmt(r.v)}</span>
+                    </div>
+                    <input type="range" min={r.min} max={r.max} step={r.step} value={r.v} onChange={e=>r.s(Number(e.target.value))} style={{width:"100%",accentColor:"#fe2c55",cursor:"pointer"}}/>
+                  </div>
+                ))}
+
+                <div>
+                  <label style={lbl}>Texto de prueba</label>
+                  <div style={{display:"flex",gap:8}}>
+                    <input style={{...inp,flex:1}} value={ttsTestText} onChange={e=>setTtsTestText(e.target.value)}/>
+                    <button onClick={speakTest} style={{background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:8,padding:"9px 14px",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>▶ Probar</button>
+                  </div>
+                </div>
+              </div>
+
+              {/* TTS Global */}
+              <SecHdr title="🔊 TTS GLOBAL"/>
+              <div style={{...C,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>TTS activado</div>
+                  <div style={{fontSize:10,color:"#555",marginTop:2}}>Lee los mensajes del chat en voz alta</div>
+                </div>
+                <Toggle on={ttsOn} onChange={()=>setTtsOn(!ttsOn)} color="#25f4ee"/>
+              </div>
+
+              {/* Eventos a leer */}
+              <SecHdr title="📢 EVENTOS A LEER"/>
+              <div style={C}>
+                {[{l:"Chat (mensajes)",v:ttsChat,s:setTtsChat},{l:"Regalos",v:ttsGifts,s:setTtsGifts},{l:"Seguidores",v:ttsFollows,s:setTtsFollows},{l:"Compartidos",v:ttsShares,s:setTtsShares},{l:"Super Fan",v:ttsSuperFan,s:setTtsSuperFan},{l:"Se unió al LIVE",v:ttsJoin,s:setTtsJoin}].map(ev=>(
+                  <div key={ev.l} style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,paddingBottom:10,borderBottom:"1px solid #0f0f1a"}}>
+                    <span style={{color:"#aaa",fontSize:12}}>{ev.l}</span>
+                    <Toggle on={ev.v} onChange={()=>ev.s(!ev.v)} size="sm" color="#25f4ee"/>
+                  </div>
+                ))}
+              </div>
+
+              {/* Plantillas */}
+              <SecHdr title="📝 PLANTILLAS DE LECTURA"/>
+              <div style={C}>
+                {[{l:"Chat",v:tplChat,s:setTplChat,h:"{username} {nickname} {message}"},
+                  {l:"Regalos",v:tplGift,s:setTplGift,h:"{username} {giftName} {repeatCount} {totalValue}"},
+                  {l:"Seguidores",v:tplFollow,s:setTplFollow,h:"{username} {nickname}"},
+                  {l:"Compartidos",v:tplShare,s:setTplShare,h:"{username} {nickname}"},
+                  {l:"Se unió",v:tplJoin,s:setTplJoin,h:"{username} {nickname}"},
+                  {l:"Super Fan",v:tplSuperFan,s:setTplSuperFan,h:"{username} {nickname}"}].map(t=>(
+                  <div key={t.l} style={{marginBottom:14}}>
+                    <label style={{...lbl,color:"#aaa",marginBottom:4,fontWeight:700}}>{t.l}</label>
+                    <input style={inp} value={t.v} onChange={e=>t.s(e.target.value)}/>
+                    <div style={{color:"#444",fontSize:10,marginTop:3}}>Variables: <span style={{color:"#25f4ee",fontFamily:"monospace"}}>{t.h}</span></div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Filtros */}
+              <SecHdr title="👥 FILTROS DE USUARIOS"/>
+              <div style={C}>
+                {[{l:"Leer a todos",sub:"Activa o desactiva todos los filtros",v:filterAll,s:setFilterAll},
+                  {l:"Seguidores",sub:"Lee a usuarios que te siguen",v:filterFollowers,s:setFilterFollowers},
+                  {l:"Moderadores",sub:"Lee a personas asignadas como moderadores",v:filterMods,s:setFilterMods},
+                  {l:"Super Fans",sub:"Usuarios que se hicieron super fan",v:filterSuperFans,s:setFilterSuperFans}].map(f=>(
+                  <div key={f.l} style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,paddingBottom:12,borderBottom:"1px solid #0f0f1a"}}>
+                    <div>
+                      <div style={{fontSize:12,color:"#aaa",fontWeight:600}}>{f.l}</div>
+                      <div style={{fontSize:10,color:"#444",marginTop:2}}>{f.sub}</div>
+                    </div>
+                    <Toggle on={f.v} onChange={()=>f.s(!f.v)} size="sm" color="#25f4ee"/>
+                  </div>
+                ))}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,paddingBottom:12,borderBottom:"1px solid #0f0f1a"}}>
+                  <div>
+                    <div style={{fontSize:12,color:"#aaa",fontWeight:600}}>Fan Club · Nivel mínimo {filterFanLevel}</div>
+                    <div style={{fontSize:10,color:"#444",marginTop:2}}>Lee solo si nivel ≥ {filterFanLevel}</div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <input type="number" min={1} max={50} value={filterFanLevel} onChange={e=>setFilterFanLevel(Number(e.target.value))} style={{...inp,width:50,textAlign:"center",padding:"6px"}}/>
+                    <Toggle on={filterFanClub} onChange={()=>setFilterFanClub(!filterFanClub)} size="sm" color="#25f4ee"/>
+                  </div>
+                </div>
+                <div>
+                  <label style={lbl}>Usuarios personalizados</label>
+                  <div style={{display:"flex",gap:8,marginBottom:8}}>
+                    <input style={{...inp,flex:1}} placeholder="@usuario" value={filterCustomInput} onChange={e=>setFilterCustomInput(e.target.value)}/>
+                    <button style={{background:"rgba(124,58,237,.15)",border:"1px solid rgba(124,58,237,.3)",borderRadius:8,padding:"9px 12px",color:"#a78bfa",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>{if(filterCustomInput.trim()){setFilterCustomUsers(p=>[...p,filterCustomInput.trim()]);setFilterCustomInput("");}}}>+ Agregar</button>
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {filterCustomUsers.map((u,i)=>(
+                      <div key={i} style={{background:"#1a1a28",border:"1px solid #252535",borderRadius:20,padding:"4px 10px",color:"#aaa",fontSize:11,display:"flex",alignItems:"center",gap:6}}>
+                        {u}<span style={{cursor:"pointer",color:"#fe2c55"}} onClick={()=>setFilterCustomUsers(p=>p.filter((_,j)=>j!==i))}>×</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Cola */}
+              <SecHdr title="⚙️ COLA Y OPCIONES"/>
+              <div style={C}>
+                {[{l:"Cola infinita",sub:"Lee todo sin descartar mensajes",v:queueInfinite,s:setQueueInfinite},
+                  {l:"Leer mensajes viejos al activar",sub:"Lee mensajes anteriores al encender TTS",v:queueReadOld,s:setQueueReadOld},
+                  {l:"Omitir emojis",sub:"No lee emojis aislados",v:queueSkipEmoji,s:setQueueSkipEmoji},
+                  {l:"Omitir mensajes con @",sub:"No lee mensajes con menciones",v:queueSkipAt,s:setQueueSkipAt},
+                  {l:"Omitir comandos !",sub:"No lee mensajes que empiezan con !",v:queueSkipCmd,s:setQueueSkipCmd},
+                  {l:"Filtro anti-spam",sub:'Bloquea patrones como "jajaja", "xdxd"',v:queueAntiSpam,s:setQueueAntiSpam},
+                  {l:"Ignorar mensajes repetidos",sub:"No lee el mismo mensaje varias veces seguidas",v:queueIgnoreRep,s:setQueueIgnoreRep}].map(o=>(
+                  <div key={o.l} style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,paddingBottom:10,borderBottom:"1px solid #0f0f1a"}}>
+                    <div>
+                      <div style={{fontSize:12,color:"#aaa",fontWeight:600}}>{o.l}</div>
+                      {o.sub&&<div style={{fontSize:10,color:"#444",marginTop:2}}>{o.sub}</div>}
+                    </div>
+                    <Toggle on={o.v} onChange={()=>o.s(!o.v)} size="sm" color="#25f4ee"/>
+                  </div>
+                ))}
+                {queueIgnoreRep && (
+                  <div style={{opacity:.9}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                      <div style={{fontSize:12,color:"#aaa"}}>Máx. repeticiones permitidas</div>
+                      <input type="number" min={1} max={20} value={queueMaxRep} onChange={e=>setQueueMaxRep(Number(e.target.value))} style={{...inp,width:55,textAlign:"center",padding:"6px"}}/>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <div style={{fontSize:12,color:"#aaa"}}>Ventana de tiempo (segundos)</div>
+                      <input type="number" min={5} max={120} value={queueWindow} onChange={e=>setQueueWindow(Number(e.target.value))} style={{...inp,width:55,textAlign:"center",padding:"6px"}}/>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════
+              TAB: REGALOS (por regalo individual)
+          ══════════════════════════════════════════════════════ */}
+          {tab==="regalos" && (
+            <div className="ai">
+
+              {/* Sonido default */}
+              <SecHdr title="🔔 SONIDO DEFAULT (todos los regalos)"/>
+              <div style={C}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                  <span style={{fontSize:26}}>🎁</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Cualquier regalo</div>
+                    <div style={{fontSize:10,color:"#555",marginTop:2}}>Se activa para regalos sin configuración específica</div>
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <input type="range" min={0} max={100} value={defaultGiftVol} onChange={e=>setDefaultGiftVol(Number(e.target.value))} style={{flex:1,accentColor:"#fe2c55",cursor:"pointer"}}/>
+                  <span style={{color:"#fff",fontSize:11,fontWeight:700,minWidth:35}}>{defaultGiftVol}%</span>
+                </div>
+              </div>
+
+              {/* Agregar regalo */}
+              <SecHdr title="🎀 PERSONALIZAR POR REGALO"/>
+              <div style={{...C,position:"relative"}}>
+                <div style={{display:"flex",gap:8,marginBottom:addingGift?10:0}}>
+                  <input style={{...inp,flex:1}} placeholder="🔍 Buscar regalo para agregar..." value={giftSearch} onChange={e=>{setGiftSearch(e.target.value);setAddingGift(true);}} onFocus={()=>setAddingGift(true)}/>
+                  <button style={{background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:8,padding:"9px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>setAddingGift(!addingGift)}>+ Agregar</button>
+                </div>
+                {addingGift && (
+                  <div style={{background:"#1a1a28",border:"1px solid #252535",borderRadius:12,overflow:"hidden",marginBottom:8}}>
+                    <div style={{maxHeight:240,overflowY:"auto"}}>
+                      {TIKTOK_GIFTS_LIST.filter(g=>g.name.toLowerCase().includes(giftSearch.toLowerCase())).map(g=>(
+                        <div key={g.id} onClick={()=>addGift(g)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",cursor:"pointer",borderBottom:"1px solid #0f0f1a",transition:"background .1s"}}
+                          onMouseEnter={e=>e.currentTarget.style.background="rgba(254,44,85,.06)"}
+                          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          <span style={{fontSize:22,minWidth:32}}>{g.emoji}</span>
+                          <span style={{flex:1,color:"#fff",fontSize:12,fontWeight:600}}>{g.name}</span>
+                          <span style={{color:"#fbbf24",fontSize:10,background:"rgba(251,191,36,.08)",padding:"2px 8px",borderRadius:20}}>🪙 {g.coins}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={()=>setAddingGift(false)} style={{width:"100%",background:"transparent",border:"none",borderTop:"1px solid #252535",padding:"8px",color:"#555",fontSize:11,cursor:"pointer"}}>✕ Cerrar</button>
+                  </div>
+                )}
+
+                {addedGifts.length===0 && (
+                  <div style={{textAlign:"center",color:"#444",padding:"20px 0",fontSize:12}}>
+                    Busca y agrega regalos arriba para configurarlos individualmente
+                  </div>
+                )}
+              </div>
+
+              {/* Cards de regalos */}
+              {addedGifts.map(gift=>{
+                const cfg = giftConfigs[gift.id]||defGiftCfg();
+                return (
+                  <div key={gift.id} className="gift-card" style={{...C,border:"1px solid #1e1e2e"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+                      <div style={{width:50,height:50,borderRadius:12,background:"#0d0d15",border:"1px solid #252535",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontSize:28}}>{gift.emoji}</span>
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{gift.name}</div>
+                        <div style={{color:"#fbbf24",fontSize:10,marginTop:2}}>🪙 {gift.coins} monedas TikTok</div>
+                      </div>
+                      <Toggle on={cfg.enabled} onChange={()=>setGiftCfg(gift.id,"enabled",!cfg.enabled)}/>
+                      <button onClick={()=>setAddedGifts(p=>p.filter(g=>g.id!==gift.id))} style={{background:"transparent",border:"none",color:"#444",cursor:"pointer",fontSize:16,padding:"4px 8px"}}>✕</button>
+                    </div>
+
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,opacity:cfg.enabled?1:.4}}>
+                      {/* Sonido */}
+                      <div style={{gridColumn:"1/-1"}}>
+                        <label style={lbl}>Archivo de sonido</label>
+                        <div className={`ua ${cfg.soundName?"has":""}`}>
+                          <input type="file" accept="audio/*" onChange={async e=>{
+                            const file=e.target.files[0]; if(!file)return;
+                            const data=await fileToBase64(file);
+                            setGiftCfg(gift.id,"soundData",data); setGiftCfg(gift.id,"soundName",file.name);
+                          }}/>
+                          <div style={{width:28,height:28,borderRadius:7,background:"rgba(37,244,238,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>{cfg.soundName?"🎵":"+"}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:11,fontWeight:600,color:cfg.soundName?"#25f4ee":"#555",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cfg.soundName||"Subir sonido (MP3/WAV)"}</div>
+                          </div>
+                          {cfg.soundData && <button onClick={e=>{e.preventDefault();e.stopPropagation();playAudio(cfg.soundData,cfg.volume/100);}} style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.3)",borderRadius:6,padding:"4px 9px",color:"#25f4ee",fontSize:10,fontWeight:700,cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>▶</button>}
+                          {cfg.soundName && <button onClick={e=>{e.preventDefault();e.stopPropagation();setGiftCfg(gift.id,"soundData","");setGiftCfg(gift.id,"soundName","");}} style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",borderRadius:6,padding:"4px 8px",color:"#fe2c55",fontSize:10,fontWeight:700,cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>✕</button>}
+                        </div>
+                      </div>
+
+                      {/* Volumen */}
+                      <div>
+                        <label style={lbl}>Volumen · {cfg.volume}%</label>
+                        <input type="range" min={0} max={100} value={cfg.volume} onChange={e=>setGiftCfg(gift.id,"volume",Number(e.target.value))} style={{width:"100%",accentColor:"#fe2c55",cursor:"pointer"}}/>
+                      </div>
+
+                      {/* Duración */}
+                      <div>
+                        <label style={lbl}>Duración alerta · {cfg.duration}s</label>
+                        <input type="range" min={1} max={60} value={cfg.duration} onChange={e=>setGiftCfg(gift.id,"duration",Number(e.target.value))} style={{width:"100%",accentColor:"#fe2c55",cursor:"pointer"}}/>
+                      </div>
+
+                      {/* TTS toggle */}
+                      <div style={{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:10,paddingTop:4}}>
+                        <Toggle on={cfg.tts} onChange={()=>setGiftCfg(gift.id,"tts",!cfg.tts)} size="sm" color="#25f4ee"/>
+                        <span style={{fontSize:12,color:"#aaa"}}>Leer con TTS al recibir</span>
+                      </div>
+
+                      {/* Plantilla TTS del regalo */}
+                      {cfg.tts && (
+                        <div style={{gridColumn:"1/-1"}}>
+                          <label style={lbl}>Plantilla TTS para este regalo</label>
+                          <input style={inp} value={cfg.ttsTemplate} onChange={e=>setGiftCfg(gift.id,"ttsTemplate",e.target.value)}/>
+                          <div style={{color:"#444",fontSize:10,marginTop:3}}>Variables: <span style={{color:"#25f4ee",fontFamily:"monospace"}}>{"{username} {giftName} {repeatCount} {totalValue}"}</span></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════
+              TAB: MÚSICA (Spotify)
+          ══════════════════════════════════════════════════════ */}
+          {tab==="musica" && (
+            <div className="ai">
+
+              <SecHdr title="🎵 SPOTIFY POR COMANDOS"/>
+              <div style={C}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:spotifyEnabled?14:0}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Activar módulo Spotify</div>
+                    <div style={{fontSize:10,color:"#555",marginTop:2}}>Espectadores piden canciones con un comando en el chat</div>
+                  </div>
+                  <Toggle on={spotifyEnabled} onChange={()=>setSpotifyEnabled(!spotifyEnabled)}/>
+                </div>
+
+                {!spotifyEnabled && (
+                  <div style={{background:"rgba(37,244,238,.05)",border:"1px solid rgba(37,244,238,.12)",borderRadius:10,padding:"12px 14px",color:"#aaa",fontSize:11,lineHeight:1.6,marginTop:12}}>
+                    💡 Similar a Tikfinity: conecta tu Spotify y tus espectadores escriben <strong style={{color:"#1DB954"}}>{spotifyCmd} nombre de canción</strong> en el chat para añadir canciones a la cola. Puedes elegir quién puede usar el comando.
+                  </div>
+                )}
+
+                {spotifyEnabled && (
+                  <>
+                    <button style={{width:"100%",background:spotifyConnected?"rgba(29,185,84,.15)":"linear-gradient(135deg,#1DB954,#17a349)",border:spotifyConnected?"1px solid rgba(29,185,84,.4)":"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:12}} onClick={()=>setSpotifyConnected(!spotifyConnected)}>
+                      {spotifyConnected?"✓ Spotify conectado — clic para desconectar":"🎵 Conectar cuenta de Spotify"}
+                    </button>
+                    {spotifyConnected && (
+                      <div style={{background:"rgba(29,185,84,.06)",border:"1px solid rgba(29,185,84,.2)",borderRadius:10,padding:"12px 14px"}}>
+                        <div style={{color:"#1DB954",fontWeight:700,fontSize:9,letterSpacing:1.5,marginBottom:5}}>▶ REPRODUCIENDO AHORA</div>
+                        {spotifyNowPlaying ? (
+                          <div style={{display:"flex",alignItems:"center",gap:10}}>
+                            <div style={{width:36,height:36,borderRadius:6,background:"rgba(29,185,84,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🎵</div>
+                            <div>
+                              <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{spotifyNowPlaying.title}</div>
+                              <div style={{fontSize:10,color:"#1DB954"}}>{spotifyNowPlaying.artist}</div>
+                            </div>
+                          </div>
+                        ) : <div style={{color:"#444",fontSize:12}}>Sin canción en reproducción</div>}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {spotifyEnabled && (
+                <>
+                  <SecHdr title="⌨️ COMANDO"/>
+                  <div style={C}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                      <div>
+                        <label style={lbl}>Comando para pedir canción</label>
+                        <input style={inp} value={spotifyCmd} onChange={e=>setSpotifyCmd(e.target.value)} placeholder="!song"/>
+                        <div style={{color:"#444",fontSize:10,marginTop:3}}>Uso: <span style={{color:"#1DB954"}}>{spotifyCmd} Never Gonna Give You Up</span></div>
+                      </div>
+                      <div>
+                        <label style={lbl}>Máx. canciones en cola</label>
+                        <input type="number" min={1} max={50} value={spotifyMaxQueue} onChange={e=>setSpotifyMaxQueue(Number(e.target.value))} style={inp}/>
+                      </div>
+                      <div style={{gridColumn:"1/-1"}}>
+                        <label style={lbl}>Cooldown entre peticiones · {spotifyCooldown}s</label>
+                        <input type="range" min={0} max={300} step={5} value={spotifyCooldown} onChange={e=>setSpotifyCooldown(Number(e.target.value))} style={{width:"100%",accentColor:"#1DB954",cursor:"pointer"}}/>
+                        <div style={{color:"#444",fontSize:10,marginTop:3}}>Espera de {spotifyCooldown}s entre comandos del mismo usuario</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <SecHdr title="🔒 PERMISOS"/>
+                  <div style={C}>
+                    <div style={{marginBottom:16}}>
+                      <label style={lbl}>¿Quién puede usar {spotifyCmd}?</label>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:8}}>
+                        {SPOTIFY_PERMS.map(p=>(
+                          <button key={p} className={`perm-chip${spotifyPerm===p?" sel":""}`} onClick={()=>setSpotifyPerm(p)}>{p}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {spotifyPerm==="Usuarios personalizados" && (
+                      <div style={{marginBottom:16}}>
+                        <label style={lbl}>Usuarios autorizados</label>
+                        <div style={{display:"flex",gap:8,marginBottom:8}}>
+                          <input style={{...inp,flex:1}} placeholder="@usuario" value={spotifyCustomInput} onChange={e=>setSpotifyCustomInput(e.target.value)}/>
+                          <button style={{background:"rgba(29,185,84,.15)",border:"1px solid rgba(29,185,84,.3)",borderRadius:8,padding:"9px 12px",color:"#1DB954",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>{if(spotifyCustomInput.trim()){setSpotifyCustomUsers(p=>[...p,spotifyCustomInput.trim()]);setSpotifyCustomInput("");}}}>+ Agregar</button>
+                        </div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                          {spotifyCustomUsers.map((u,i)=>(
+                            <div key={i} style={{background:"#1a1a28",border:"1px solid #252535",borderRadius:20,padding:"4px 10px",color:"#aaa",fontSize:11,display:"flex",alignItems:"center",gap:6}}>
+                              {u}<span style={{cursor:"pointer",color:"#fe2c55"}} onClick={()=>setSpotifyCustomUsers(p=>p.filter((_,j)=>j!==i))}>×</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:8,borderTop:"1px solid #0f0f1a"}}>
+                      <div>
+                        <div style={{fontSize:12,color:"#aaa",fontWeight:600}}>Permitir saltar canción</div>
+                        <div style={{fontSize:10,color:"#444",marginTop:2}}>Habilita un comando para pasar a la siguiente</div>
+                      </div>
+                      <Toggle on={spotifyAllowSkip} onChange={()=>setSpotifyAllowSkip(!spotifyAllowSkip)} size="sm" color="#1DB954"/>
+                    </div>
+
+                    {spotifyAllowSkip && (
+                      <div style={{marginTop:12}}>
+                        <label style={lbl}>¿Quién puede saltar canciones?</label>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:8}}>
+                          {SPOTIFY_PERMS.map(p=>(
+                            <button key={p} className={`perm-chip${spotifySkipPerm===p?" sel":""}`} onClick={()=>setSpotifySkipPerm(p)}>{p}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <SecHdr title="🎶 COLA DE CANCIONES"/>
+                  <div style={C}>
+                    {spotifyQueue.length===0 ? (
+                      <div style={{color:"#444",textAlign:"center",padding:"24px 0",fontSize:12}}>
+                        Cola vacía · Los espectadores usan <span style={{color:"#1DB954"}}>{spotifyCmd} [canción]</span> en el chat
+                      </div>
+                    ) : spotifyQueue.map((s,i)=>(
+                      <div key={i} className="sq-item">
+                        <span style={{color:"#555",minWidth:20,fontSize:11}}>{i+1}.</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.title}</div>
+                          <div style={{fontSize:10,color:"#555",marginTop:1}}>@{s.user}</div>
+                        </div>
+                        <button onClick={()=>setSpotifyQueue(p=>p.filter((_,j)=>j!==i))} style={{background:"transparent",border:"none",color:"#444",cursor:"pointer",fontSize:14}}>✕</button>
+                      </div>
+                    ))}
+                    {/* Demo: agregar canción de prueba */}
+                    <button onClick={()=>setSpotifyQueue(p=>[...p,{title:"Never Gonna Give You Up - Rick Astley",user:"viewer123"}])} style={{width:"100%",background:"rgba(29,185,84,.08)",border:"1px dashed rgba(29,185,84,.2)",borderRadius:8,padding:"8px",color:"#1DB954",fontSize:11,cursor:"pointer",marginTop:8}}>+ Agregar canción de prueba</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════
+              TAB: RANKING
+          ══════════════════════════════════════════════════════ */}
+          {tab==="ranking" && (
+            <div className="ai">
+              <div style={C}>
+                <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:12}}>💎 Top Diamantes</div>
+                {tapR.length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"16px 0"}}>{conn?"Sin datos aún...":"Conecta el LIVE"}</div>
+                : tapR.map((u,i)=>(
+                  <div key={u.user} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid #0f0f1a"}}>
+                    <div style={{width:22,height:22,borderRadius:"50%",background:i===0?"#fbbf24":i===1?"#9ca3af":i===2?"#cd7c2f":"#1e1e2e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,flexShrink:0}}>{i+1}</div>
+                    <div style={{flex:1,fontSize:11,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{u.nickname||u.user}</div>
+                    <div style={{fontSize:11,color:"#25f4ee",fontWeight:700}}>💎 {u.diamonds}</div>
+                    <div style={{fontSize:10,color:"#555"}}>×{u.gifts}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={C}>
+                <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:12}}>❤️ Top Likes</div>
+                {likeR.length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"16px 0"}}>{conn?"Sin datos aún...":"Conecta el LIVE"}</div>
+                : likeR.map((u,i)=>(
+                  <div key={u.user} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid #0f0f1a"}}>
+                    <div style={{width:22,height:22,borderRadius:"50%",background:i===0?"#fbbf24":i===1?"#9ca3af":i===2?"#cd7c2f":"#1e1e2e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,flexShrink:0}}>{i+1}</div>
+                    <div style={{flex:1,fontSize:11,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{u.nickname||u.user}</div>
+                    <div style={{fontSize:11,color:"#fe2c55",fontWeight:700}}>❤️ {u.count}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════
+              TAB: CHAT
+          ══════════════════════════════════════════════════════ */}
           {tab==="chat" && (
             <div className="ai">
               <div style={C}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:10}}>
-                  💬 Chat en vivo
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#fff"}}>💬 Chat en tiempo real</div>
+                  <button onClick={()=>setLog([])} style={{background:"transparent",border:"1px solid #252535",borderRadius:6,padding:"4px 10px",color:"#555",fontSize:10,cursor:"pointer"}}>Limpiar</button>
                 </div>
-                <div style={{background:"#0a0a0f",borderRadius:8,padding:8,
-                  height:400,overflowY:"auto",display:"flex",flexDirection:"column",gap:3}}>
-                  {log.filter(l=>l.t==="msg").length===0
-                    ? <div style={{color:"#333",fontSize:11,textAlign:"center",marginTop:170}}>
-                        {conn ? "Esperando mensajes..." : "Conecta tu LIVE"}
-                      </div>
-                    : log.filter(l=>l.t==="msg").map((item,i)=>(
-                        <div key={i} style={{fontSize:12,padding:"5px 8px",borderRadius:5,
-                          background:"rgba(255,255,255,.02)",borderLeft:"2px solid #252535",color:"#ffffff",fontWeight:500}}>
-                          {item.tx}
-                        </div>
-                      ))
-                  }
+                <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:"60vh",overflowY:"auto"}}>
+                  {log.filter(l=>l.t==="msg").length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"20px 0"}}>{conn?"Sin mensajes aún...":"Conecta el LIVE"}</div>
+                  : log.filter(l=>l.t==="msg").map((item,i)=>(
+                    <div key={i} className="ai" style={{fontSize:12,padding:"7px 10px",borderRadius:8,background:"rgba(255,255,255,.02)",borderLeft:"2px solid #2a2a3a"}}>{item.tx}</div>
+                  ))}
                 </div>
               </div>
             </div>
           )}
 
-
-          {/* ── BATALLA / VERSUS ── */}
+          {/* ══════════════════════════════════════════════════════
+              TAB: BATALLA
+          ══════════════════════════════════════════════════════ */}
           {tab==="batalla" && (
             <div className="ai">
-              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:15,marginBottom:14,
-                display:"flex",alignItems:"center",gap:8}}>
-                ⚔️ Batalla en vivo
-                {battle && battle.status===1 && (
-                  <span className="ld" style={{width:7,height:7,borderRadius:"50%",
-                    background:"#fe2c55",boxShadow:"0 0 8px #fe2c55",display:"inline-block"}}/>
-                )}
-              </div>
-
-              {!conn ? (
-                <div style={{textAlign:"center",padding:"40px 0",color:"#333",fontSize:12}}>
-                  Conecta tu LIVE para ver la batalla
-                </div>
-              ) : !battle ? (
-                <div style={{textAlign:"center",padding:"30px 0",color:"#444",fontSize:12}}>
-                  <div style={{fontSize:36,marginBottom:12}}>⚔️</div>
-                  Esperando batalla...<br/>
-                  <span style={{fontSize:10,color:"#333"}}>
-                    La batalla aparece automáticamente cuando el LIVE inicia un versus
-                  </span>
+              {!battle ? (
+                <div style={{...C,textAlign:"center",padding:"32px 16px"}}>
+                  <div style={{fontSize:32,marginBottom:8}}>⚔️</div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#fff",marginBottom:6}}>Sin batalla activa</div>
+                  <div style={{fontSize:11,color:"#555"}}>Los datos de batalla aparecerán aquí cuando estés en un VS LIVE</div>
                 </div>
               ) : (
-                <div>
-                  {/* Estado */}
-                  <div style={{textAlign:"center",marginBottom:14}}>
-                    <span style={{background:battle.status===1?"rgba(254,44,85,.12)":"rgba(37,244,238,.1)",
-                      border:`1px solid ${battle.status===1?"rgba(254,44,85,.3)":"rgba(37,244,238,.3)"}`,
-                      borderRadius:20,padding:"4px 14px",fontSize:10,fontWeight:800,
-                      color:battle.status===1?"#fe2c55":"#25f4ee",letterSpacing:1}}>
-                      {battle.status===1?"🔴 EN CURSO":"✅ FINALIZADA"}
-                    </span>
-                  </div>
-
-                  {battle.teams && battle.teams.length >= 2 ? (() => {
-                    const owner = (battle.ownerUsername || "").toLowerCase().replace(/^@/,"");
-                    const isNumeric = s => /^\d{8,}$/.test(s||"");
-                    const getName = t => {
-                      const nn = t.hostNickname||""; const hn = t.hostName||"";
-                      if (!isNumeric(nn)) return nn;
-                      if (!isNumeric(hn)) return hn;
-                      return nn || hn;
-                    };
-
-                    const teams = battle.teams;
-                    const totalPts = teams.reduce((s,t) => s + t.points, 0) || 1;
-
-                    // ── Detectar modo:
-                    // 4 teams con teamIdx 0/1 → 2v2 (mostrar por equipos)
-                    // 2 teams → 1v1 clásico
-                    // 3+ teams → ranking individual
-                    const uniqueTeamIdxs = [...new Set(teams.map(t => t.teamIdx))];
-                    const has2v2 = teams.length === 4 ||
-                      (teams.length > 2 && uniqueTeamIdxs.length === 2 &&
-                       teams.filter(t=>t.teamIdx===uniqueTeamIdxs[0]).length > 1);
-
-                    if (has2v2 || teams.length === 4) {
-                      // Agrupar por equipo
-                      const teamGroups = {};
-                      teams.forEach(t => {
-                        const gi = t.teamIdx !== undefined ? t.teamIdx : (teams.indexOf(t) < teams.length/2 ? 0 : 1);
-                        if (!teamGroups[gi]) teamGroups[gi] = [];
-                        teamGroups[gi].push(t);
-                      });
-                      const groupKeys = Object.keys(teamGroups).sort();
-                      const TEAM_COLORS = [["#fe2c55","#ff6b81"], ["#25f4ee","#0ea5e9"]];
-                      const TEAM_LABELS = ["Equipo A", "Equipo B"];
-                      // Puntos totales por equipo
-                      const teamTotals = groupKeys.map(k => teamGroups[k].reduce((s,t)=>s+t.points,0));
-                      const grandTotal = teamTotals.reduce((s,v)=>s+v,0) || 1;
-                      const winnerGroup = teamTotals[0] >= teamTotals[1] ? 0 : 1;
-
-                      return (
-                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                          {/* Barra VS equipos */}
-                          <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:"12px 14px"}}>
-                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-                              {groupKeys.map((k,gi) => (
-                                <React.Fragment key={k}>
-                                  <div style={{flex:1,textAlign:gi===0?"left":"right",minWidth:0}}>
-                                    <div style={{fontSize:10,fontWeight:800,color:TEAM_COLORS[gi%2][0]}}>
-                                      {TEAM_LABELS[gi%2]}
-                                    </div>
-                                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:28,color:TEAM_COLORS[gi%2][0],lineHeight:1}}>
-                                      {teamTotals[gi].toLocaleString()}
-                                    </div>
-                                  </div>
-                                  {gi < groupKeys.length-1 && (
-                                    <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:13,color:"#333",letterSpacing:2,flexShrink:0}}>VS</span>
-                                  )}
-                                </React.Fragment>
-                              ))}
-                            </div>
-                            <div style={{height:10,borderRadius:5,background:"#0d0d18",overflow:"hidden",display:"flex"}}>
-                              {groupKeys.map((k,gi) => {
-                                const pct = Math.round(teamTotals[gi]/grandTotal*100);
-                                const [c1,c2] = TEAM_COLORS[gi%2];
-                                return <div key={k} style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${c1},${c2})`,transition:"width 1s ease"}}/>;
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Cada equipo con sus anfitriones individuales */}
-                          {groupKeys.map((k, gi) => {
-                            const members = teamGroups[k];
-                            const [c1] = TEAM_COLORS[gi%2];
-                            const isWinTeam = gi === winnerGroup;
-                            const maxMemberPts = Math.max(...members.map(m=>m.points)) || 1;
-                            return (
-                              <div key={k} style={{background:"#12121e",
-                                border:`1px solid ${isWinTeam?"rgba(255,215,0,.25)":"#1e1e2e"}`,
-                                borderRadius:13,padding:"12px 13px"}}>
-                                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-                                  {isWinTeam && <span style={{fontSize:15}}>👑</span>}
-                                  <span style={{fontSize:11,fontWeight:800,color:c1}}>{TEAM_LABELS[gi%2]}</span>
-                                  <span style={{fontSize:9,color:"#555",marginLeft:"auto"}}>{teamTotals[gi].toLocaleString()} pts totales</span>
-                                </div>
-                                {/* Anfitriones individuales */}
-                                {members.map((m, mi) => {
-                                  const nm = getName(m);
-                                  const barPct = Math.round(m.points/maxMemberPts*100);
-                                  return (
-                                    <div key={mi} style={{marginBottom: mi<members.length-1?10:0}}>
-                                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                                        <div style={{flex:1,minWidth:0}}>
-                                          <span style={{fontWeight:800,fontSize:12,color:c1,
-                                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block"}}>
-                                            @{nm}
-                                          </span>
-                                        </div>
-                                        <div style={{textAlign:"right",flexShrink:0}}>
-                                          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:c1,lineHeight:1}}>
-                                            {m.points.toLocaleString()}
-                                          </span>
-                                          <span style={{fontSize:9,color:"#555",marginLeft:4}}>pts</span>
-                                        </div>
-                                      </div>
-                                      <div style={{height:4,background:"#0d0d18",borderRadius:2,overflow:"hidden"}}>
-                                        <div style={{height:"100%",width:`${barPct}%`,borderRadius:2,
-                                          transition:"width 1s ease",background:`linear-gradient(90deg,${c1},${c1}55)`}}/>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    }
-
-                    // ── Ranking multi (3+ anfitriones individuales sin equipos) ──
-                    if (teams.length >= 3) {
-                      const sorted = [...teams].sort((a,b) => b.points - a.points);
-                      const COLORS = ["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#34d399","#f97316"];
-                      const maxPts = sorted[0]?.points || 1;
-                      return (
-                        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                          <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:"12px 14px"}}>
-                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                              <span style={{fontSize:11,fontWeight:800,color:"#fff"}}>🏆 {teams.length} participantes</span>
-                              <span style={{fontSize:9,color:"#555"}}>{totalPts.toLocaleString()} puntos totales</span>
-                            </div>
-                            <div style={{height:10,borderRadius:5,background:"#0d0d18",overflow:"hidden",display:"flex"}}>
-                              {sorted.map((t,i) => {
-                                const pct = Math.round(t.points / totalPts * 100);
-                                return <div key={i} style={{height:"100%",width:`${pct}%`,background:COLORS[i%COLORS.length],transition:"width 1s ease"}}/>;
-                              })}
-                            </div>
-                          </div>
-                          {sorted.map((t,i) => {
-                            const nm = getName(t);
-                            const c  = COLORS[i % COLORS.length];
-                            const pct = Math.round(t.points / totalPts * 100);
-                            const barPct = Math.round(t.points / maxPts * 100);
-                            return (
-                              <div key={i} style={{background:"#12121e",
-                                border:`1px solid ${i===0?"rgba(255,215,0,.3)":"#1e1e2e"}`,
-                                borderRadius:13,padding:"11px 13px"}}>
-                                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:7}}>
-                                  <span style={{fontSize:i===0?18:14,flexShrink:0}}>
-                                    {i===0?"👑":i===1?"🥈":i===2?"🥉":(i+1)+"."}
-                                  </span>
-                                  <div style={{flex:1,minWidth:0}}>
-                                    <div style={{fontWeight:800,fontSize:12,color:c,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                      @{nm}
-                                    </div>
-                                  </div>
-                                  <div style={{textAlign:"right",flexShrink:0}}>
-                                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:24,color:c,lineHeight:1}}>
-                                      {t.points.toLocaleString()}
-                                    </div>
-                                    <div style={{fontSize:9,color:"#555"}}>pts · {pct}%</div>
-                                  </div>
-                                </div>
-                                <div style={{height:5,background:"#0d0d18",borderRadius:3,overflow:"hidden"}}>
-                                  <div style={{height:"100%",width:`${barPct}%`,borderRadius:3,
-                                    transition:"width 1s ease",background:`linear-gradient(90deg,${c},${c}55)`}}/>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    }
-
-                    // ── Batalla 1v1 (2 equipos) — lógica original mejorada ──
-                    const ownerTeamIdx = teams.findIndex(t => {
-                      const hn = (t.hostName||"").toLowerCase().replace(/^@/,"");
-                      const nn = (t.hostNickname||"").toLowerCase().replace(/^@/,"");
-                      return owner && (hn===owner || nn===owner || hn.includes(owner) || owner.includes(hn));
-                    });
-                    const idx0 = ownerTeamIdx >= 0 ? ownerTeamIdx : 0;
-                    const idx1 = idx0 === 0 ? 1 : 0;
-                    const t0 = teams[idx0];
-                    const t1 = teams[idx1];
-                    const total2 = (t0.points + t1.points) || 1;
-                    const pct0 = Math.round(t0.points / total2 * 100);
-                    const pct1 = 100 - pct0;
-                    const win0 = t0.points >= t1.points;
-                    const win1 = !win0;
-                    const name0 = getName(t0);
-                    const name1 = getName(t1);
-
+                <div style={C}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:12}}>⚔️ Batalla activa</div>
+                  {battle.teams?.map((team,i)=>{
+                    const total = battle.teams.reduce((s,t)=>s+t.points,0)||1;
+                    const pct = Math.round((team.points/total)*100);
+                    const isOwner = team.hostName?.toLowerCase()===battle.ownerUsername;
                     return (
-                      <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                        <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:16,padding:16}}>
-                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
-                            <div style={{flex:1,textAlign:"left",minWidth:0}}>
-                              <span style={{fontSize:11,fontWeight:800,color:"#fe2c55",wordBreak:"break-all",lineHeight:1.3}}>
-                                @{name0}
-                              </span>
-                            </div>
-                            <div style={{flexShrink:0,padding:"0 5px"}}>
-                              <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:13,color:"#333",letterSpacing:2}}>VS</span>
-                            </div>
-                            <div style={{flex:1,textAlign:"right",minWidth:0}}>
-                              <span style={{fontSize:11,fontWeight:800,color:"#25f4ee",wordBreak:"break-all",lineHeight:1.3}}>
-                                @{name1}
-                              </span>
-                            </div>
+                      <div key={i} style={{marginBottom:12,padding:"10px 12px",background:isOwner?"rgba(254,44,85,.06)":"rgba(37,244,238,.04)",borderRadius:10,border:`1px solid ${isOwner?"rgba(254,44,85,.2)":"rgba(37,244,238,.15)"}`}}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                          <div>
+                            <span style={{fontSize:12,fontWeight:700,color:isOwner?"#fe2c55":"#25f4ee"}}>@{team.hostNickname}</span>
+                            {isOwner&&<span style={{fontSize:9,color:"#fe2c55",marginLeft:6,background:"rgba(254,44,85,.12)",padding:"1px 6px",borderRadius:20}}>TÚ</span>}
                           </div>
-                          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                            <div style={{textAlign:"left"}}>
-                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:40,color:"#fe2c55",lineHeight:1}}>
-                                {t0.points.toLocaleString()}
-                              </div>
-                              <div style={{fontSize:10,color:"#fe2c5570",fontWeight:700}}>{pct0}%</div>
-                            </div>
-                            <div style={{textAlign:"right"}}>
-                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:40,color:"#25f4ee",lineHeight:1}}>
-                                {t1.points.toLocaleString()}
-                              </div>
-                              <div style={{fontSize:10,color:"#25f4ee70",fontWeight:700}}>{pct1}%</div>
-                            </div>
-                          </div>
-                          <div style={{height:12,borderRadius:6,background:"#0d0d18",overflow:"hidden",display:"flex"}}>
-                            <div style={{height:"100%",width:`${pct0}%`,background:"linear-gradient(90deg,#fe2c55,#ff6b81)",transition:"width 1s ease"}}/>
-                            <div style={{height:"100%",width:`${pct1}%`,background:"linear-gradient(90deg,#0ea5e9,#25f4ee)",transition:"width 1s ease"}}/>
-                          </div>
+                          <span style={{fontSize:13,fontWeight:800,color:"#fff"}}>💎 {team.points.toLocaleString()}</span>
                         </div>
-                        {[{team:t0,c:"#fe2c55",pct:pct0,isWin:win0,nm:name0},
-                          {team:t1,c:"#25f4ee",pct:pct1,isWin:win1,nm:name1}].map(({team,c,pct,isWin,nm},i) => (
-                          <div key={i} style={{background:"#12121e",
-                            border:`1px solid ${isWin?"rgba(255,215,0,.25)":"#1e1e2e"}`,
-                            borderRadius:13,padding:13}}>
-                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                              {isWin && <span style={{fontSize:16}}>👑</span>}
-                              <div style={{flex:1,minWidth:0}}>
-                                <div style={{fontWeight:800,fontSize:12,color:c,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                  @{nm}
-                                </div>
-                              </div>
-                              <div style={{textAlign:"right",flexShrink:0}}>
-                                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:28,color:c,lineHeight:1}}>
-                                  {team.points.toLocaleString()}
-                                </div>
-                                <div style={{fontSize:9,color:"#555",fontWeight:600}}>puntos</div>
-                              </div>
-                            </div>
-                            <div style={{height:5,background:"#0d0d18",borderRadius:3,overflow:"hidden"}}>
-                              <div style={{height:"100%",width:`${pct}%`,borderRadius:3,
-                                transition:"width 1s ease",
-                                background:`linear-gradient(90deg,${c},${c}55)`}}/>
-                            </div>
-                            <div style={{fontSize:9,color:"#444",marginTop:3,textAlign:"right"}}>
-                              {pct}% del total
-                            </div>
-                          </div>
-                        ))}
+                        <div style={{height:6,background:"#1e1e2e",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${pct}%`,background:isOwner?"linear-gradient(90deg,#fe2c55,#ff6b81)":"linear-gradient(90deg,#25f4ee,#1DB954)",borderRadius:3,transition:"width .5s ease"}}/>
+                        </div>
+                        <div style={{fontSize:9,color:"#555",marginTop:3,textAlign:"right"}}>{pct}%</div>
                       </div>
                     );
-                  })() : battle.teams && battle.teams.length === 1 ? (
-                    <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:13,padding:14}}>
-                      <div style={{fontWeight:800,fontSize:13,color:"#fe2c55",marginBottom:6}}>
-                        @{battle.teams[0].hostNickname||battle.teams[0].hostName}
-                      </div>
-                      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:32,color:"#fe2c55"}}>
-                        {battle.teams[0].points.toLocaleString()}
-                      </div>
-                      <div style={{fontSize:9,color:"#555",marginTop:4}}>Esperando oponente...</div>
-                    </div>
-                  ) : (
-                    <div style={{textAlign:"center",color:"#444",fontSize:11,padding:"20px 0"}}>
-                      Sin datos de equipos aún...
-                    </div>
-                  )}
-
-                                    {/* Última actualización */}
-                  {battle.timestamp && (
-                    <div style={{textAlign:"center",color:"#333",fontSize:9,marginTop:12}}>
-                      Actualizado: {new Date(battle.timestamp).toLocaleTimeString()}
-                    </div>
-                  )}
+                  })}
                 </div>
               )}
             </div>
           )}
 
-          {/* ── ESPECTADORES ── */}
+          {/* ══════════════════════════════════════════════════════
+              TAB: ESPECTADORES
+          ══════════════════════════════════════════════════════ */}
           {tab==="espect" && (
             <div className="ai">
-              {/* Contador total */}
-              <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,
-                padding:14,marginBottom:12,display:"flex",alignItems:"center",gap:14}}>
-                <div style={{fontSize:28}}>👁️</div>
-                <div>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:32,
-                    color:"#25f4ee",lineHeight:1}}>{stats.viewers.toLocaleString()}</div>
-                  <div style={{color:"#444",fontSize:9,fontWeight:700,marginTop:3,letterSpacing:.5}}>
-                    ESPECTADORES AHORA
-                  </div>
-                </div>
-                <div style={{marginLeft:"auto",textAlign:"right"}}>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:20,color:"#fff"}}>
-                    {viewR.length.toLocaleString()}
-                  </div>
-                  <div style={{color:"#444",fontSize:9,fontWeight:600}}>entraron al live</div>
-                </div>
-              </div>
-
-              {/* Sub-tabs espectadores */}
               <div style={{display:"flex",gap:6,marginBottom:10}}>
-                {[
-                  {id:"historial", label:`📋 Entradas al live (${viewR.length})`},
-                  {id:"activos",   label:`👁 Top activos (${topViewers.length})`},
-                ].map(t => (
-                  <button key={t.id} onClick={()=>setVTab(t.id)}
-                    style={{flex:1,background:vTab===t.id?"rgba(37,244,238,.1)":"transparent",
-                      border:`1px solid ${vTab===t.id?"rgba(37,244,238,.3)":"#1e1e2e"}`,
-                      borderRadius:8,padding:"8px 6px",
-                      color:vTab===t.id?"#25f4ee":"#555",
-                      fontWeight:vTab===t.id?700:500,fontSize:11,cursor:"pointer"}}>
-                    {t.label}
+                {["historial","activos"].map(t=>(
+                  <button key={t} className={`mode-btn${vTab===t?" act":""}`} onClick={()=>setVTab(t)}>
+                    {t==="historial"?"📋 Historial":"👁️ Activos ahora"}
                   </button>
                 ))}
               </div>
-
-              {/* Lista espectadores */}
-              <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,overflow:"hidden"}}>
-                <div style={{background:"#0d0d18",borderBottom:"1px solid #1e1e2e",
-                  padding:"8px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <span style={{color:"#363655",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase"}}>
-                    {vTab==="activos" ? "👁️ Espectadores activos" : "📋 Quienes entraron al live"}
-                  </span>
-                  {vTab==="historial" && viewR.length > 0 && (
-                    <button onClick={()=>{setViewR([]);sv("viewR",[]);}}
-                      style={{background:"transparent",border:"1px solid #252535",borderRadius:5,
-                        padding:"2px 8px",color:"#555",fontSize:9,cursor:"pointer"}}>
-                      Limpiar
-                    </button>
-                  )}
-                </div>
-
-                {!conn ? (
-                  <div style={{textAlign:"center",padding:"30px 16px",color:"#333",fontSize:11}}>
-                    Conecta tu LIVE para ver espectadores
-                  </div>
-                ) : (vTab==="activos" ? topViewers : viewR).length === 0 ? (
-                  <div style={{textAlign:"center",padding:"30px 16px",color:"#444",fontSize:11}}>
-                    <div style={{fontSize:28,marginBottom:8}}>👁️</div>
-                    {vTab==="activos"
-                      ? "Los activos aparecen con el evento roomUser del live..."
-                      : "Esperando que entren espectadores..."}
-                  </div>
-                ) : (
-                  <div style={{maxHeight:460,overflowY:"auto"}}>
-                    {(vTab==="activos" ? topViewers : viewR).map((item, i) => (
-                      <div key={item.user||i} style={{display:"flex",alignItems:"center",gap:10,
-                        padding:"9px 12px",borderBottom:"1px solid #0f0f1a"}}>
-                        {/* Avatar con inicial */}
-                        <div style={{width:32,height:32,borderRadius:"50%",flexShrink:0,
-                          background:i===0?"linear-gradient(135deg,#ffd700,#ffaa00)":
-                                     i===1?"linear-gradient(135deg,#c0c0c0,#888)":
-                                     i===2?"linear-gradient(135deg,#cd7f32,#a05020)":
-                                     "linear-gradient(135deg,#1e1e2e,#2a2a3a)",
-                          display:"flex",alignItems:"center",justifyContent:"center",
-                          fontSize:i<3?15:11,fontWeight:800,
-                          color:i<3?"#000":"#888"}}>
-                          {i===0?"🥇":i===1?"🥈":i===2?"🥉":((item.nickname||"?")[0].toUpperCase())}
-                        </div>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:700,color:"#fff",
-                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                            @{item.nickname}
-                          </div>
-                          {item.joinTime && (
-                            <div style={{fontSize:9,color:"#555",marginTop:1}}>
-                              ⏱ {new Date(item.joinTime).toLocaleTimeString()}
-                            </div>
-                          )}
-                          {(item.viewers||0) > 0 && (
-                            <div style={{fontSize:9,color:"#25f4ee",marginTop:1}}>
-                              👁 {item.viewers.toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                        <div style={{fontSize:10,color:"#444",flexShrink:0,
-                          fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>
-                          #{i+1}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              <div style={C}>
+                {vTab==="historial" && (
+                  viewR.length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"16px 0"}}>{conn?"Sin entradas aún...":"Conecta el LIVE"}</div>
+                  : viewR.map((u,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #0f0f1a"}}>
+                      <div style={{width:22,height:22,borderRadius:"50%",background:"#1e1e2e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:"#555",flexShrink:0}}>{(u.nickname||u.user)[0]?.toUpperCase()}</div>
+                      <div style={{flex:1,fontSize:11,color:"#fff"}}>@{u.nickname||u.user}</div>
+                      <div style={{fontSize:9,color:"#555"}}>{new Date(u.joinTime).toLocaleTimeString()}</div>
+                    </div>
+                  ))
+                )}
+                {vTab==="activos" && (
+                  topViewers.length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"16px 0"}}>{conn?"Sin espectadores activos...":"Conecta el LIVE"}</div>
+                  : topViewers.map((u,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #0f0f1a"}}>
+                      <div style={{width:6,height:6,borderRadius:"50%",background:"#25f4ee",flexShrink:0}}/>
+                      <div style={{flex:1,fontSize:11,color:"#fff"}}>@{u.nickname||u.user}</div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>
           )}
-        </div>{/* /contenido */}
-      </div>{/* /main */}
+
+        </div>{/* fin content */}
+      </div>{/* fin main */}
     </div>
   );
 }
 
-ReactDOM.render(<App/>, document.getElementById("root"));
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
