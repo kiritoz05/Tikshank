@@ -3,86 +3,71 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>TikPanel — Tikshank</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<title>TikPanel</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#080810;color:#fff;font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+body{background:#0a0a0f;color:#fff;font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
 input,select,button,textarea{font-family:'DM Sans',sans-serif}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#080810}::-webkit-scrollbar-thumb{background:#222235;border-radius:2px}
-::-webkit-scrollbar-thumb:hover{background:#333350}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#0a0a0f}::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:2px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(220%)}}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-@keyframes hp{0%{transform:scale(1)}40%{transform:scale(1.9)}100%{transform:scale(1)}}
-@keyframes fu{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-70px)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes hp{0%{transform:scale(1)}40%{transform:scale(1.8)}100%{transform:scale(1)}}
+@keyframes fu{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-60px)}}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
-@keyframes popIn{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
+@keyframes popIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes glow{0%,100%{box-shadow:0 0 8px rgba(254,44,85,.4)}50%{box-shadow:0 0 20px rgba(254,44,85,.7)}}
-@keyframes battlePulse{0%,100%{opacity:1}50%{opacity:.6}}
-.ai{animation:fadeIn .2s ease forwards}
-.ld{animation:pulse 1.1s infinite}
+.ai{animation:fadeIn .25s ease forwards}
+.ld{animation:pulse 1.2s infinite}
 .cf{animation:slide 1.5s ease-in-out infinite}
-.hpa{animation:hp .28s ease}
-.fh{position:absolute;animation:fu .9s ease forwards;pointer-events:none;font-size:20px;z-index:10}
-.mo{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:200;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(8px)}
+.hpa{animation:hp .3s ease}
+.fh{position:absolute;animation:fu 1s ease forwards;pointer-events:none;font-size:18px;z-index:10}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px)}
 @media(min-width:580px){.mo{align-items:center;padding:16px}}
-.mb{background:#0f0f1e;border:1px solid #222235;border-radius:22px 22px 0 0;padding:22px;width:100%;max-width:540px;max-height:94vh;overflow-y:auto;animation:slideUp .22s ease}
-@media(min-width:580px){.mb{border-radius:20px;animation:popIn .18s ease}}
-.it{width:32px;height:18px;border-radius:9px;cursor:pointer;position:relative;border:none;flex-shrink:0;background:#1a1a2e;transition:background .2s;outline:none}
+.mb{background:#12121e;border:1px solid #252535;border-radius:20px 20px 0 0;padding:22px;width:100%;max-width:530px;max-height:94vh;overflow-y:auto;animation:slideUp .25s ease}
+@media(min-width:580px){.mb{border-radius:20px;animation:popIn .2s ease}}
+.th{color:#363655;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.tr{display:grid;grid-template-columns:30px 1fr 85px 44px 40px 40px 86px;padding:9px 12px;gap:5px;align-items:center;border-bottom:1px solid #0f0f1a;transition:background .1s}
+.tr:last-child{border-bottom:none}
+.tr:hover{background:rgba(255,255,255,.013)}
+.tr.dis{opacity:.35}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700;white-space:nowrap}
+.bf{background:rgba(37,244,238,.1);color:#25f4ee;border:1px solid rgba(37,244,238,.2)}
+.bg{background:rgba(254,44,85,.1);color:#fe2c55;border:1px solid rgba(254,44,85,.2)}
+.bl{background:rgba(245,197,24,.1);color:#f5c518;border:1px solid rgba(245,197,24,.2)}
+.bs{background:rgba(139,92,246,.1);color:#8b5cf6;border:1px solid rgba(139,92,246,.2)}
+.bsh{background:rgba(255,255,255,.05);color:#777;border:1px solid rgba(255,255,255,.1)}
+.it{width:28px;height:16px;border-radius:8px;cursor:pointer;position:relative;border:none;flex-shrink:0;background:#1e1e2e;transition:background .2s;outline:none}
 .it.on{background:#fe2c55}
-.it::after{content:'';position:absolute;top:3px;left:3px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
-.it.on::after{left:17px}
-.ua{background:#080810;border:1.5px dashed #222235;border-radius:10px;padding:12px;display:flex;align-items:center;gap:10px;position:relative;overflow:hidden;transition:border-color .2s;cursor:pointer}
+.it::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.it.on::after{left:14px}
+.ua{background:#0a0a0f;border:1.5px dashed #252535;border-radius:10px;padding:11px;display:flex;align-items:center;gap:9px;position:relative;overflow:hidden;transition:border-color .2s;cursor:pointer}
 .ua:hover,.ua.has{border-color:#25f4ee}
 .ua.has{border-style:solid}
 .ua input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#0c1f10;border:1px solid #1e4d1e;border-radius:12px;padding:9px 20px;color:#4ade80;font-size:12px;font-weight:700;z-index:999;white-space:nowrap;animation:popIn .18s ease;letter-spacing:.3px}
-.spinner{width:14px;height:14px;border:2px solid #222;border-top-color:#fe2c55;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
-
-/* Gift Gallery */
-.gift-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;max-height:320px;overflow-y:auto;padding:4px 2px}
-.gift-card{background:#0a0a18;border:1.5px solid #1e1e35;border-radius:12px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;transition:all .15s}
-.gift-card:hover{border-color:#fe2c55;background:rgba(254,44,85,.06);transform:scale(1.04)}
-.gift-card.selected{border-color:#25f4ee;background:rgba(37,244,238,.07)}
-.gift-img{width:44px;height:44px;object-fit:contain;border-radius:8px}
-.gift-emoji-big{font-size:34px;line-height:1;display:block;text-align:center}
-.gift-name{font-size:9px;font-weight:700;color:#aaa;text-align:center;letter-spacing:.2px;line-height:1.3}
-.gift-coins{font-size:9px;color:#fbbf24;font-weight:700;display:flex;align-items:center;gap:2px}
-
-/* Battle bar */
-.battle-bar{height:8px;border-radius:4px;transition:width .6s ease;min-width:3%}
-.battle-score{font-family:'Syne',sans-serif;font-weight:900;font-size:24px;line-height:1}
-
-/* TTS queue indicator */
-.tts-badge{display:inline-flex;align-items:center;gap:4px;background:rgba(37,244,238,.08);border:1px solid rgba(37,244,238,.2);border-radius:20px;padding:3px 9px;font-size:9px;color:#25f4ee;font-weight:700}
-
-/* Responsive nav tabs (mobile bottom bar) */
-@media(max-width:700px){
-  .sidebar-desktop{display:none!important}
-  .bottom-nav{display:flex!important}
-  .main-content{padding-bottom:64px!important}
-}
-@media(min-width:701px){
-  .bottom-nav{display:none!important}
-}
-.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:#0d0d18;border-top:1px solid #1a1a28;display:flex;align-items:center;z-index:40;height:54px}
-.bottom-nav button{flex:1;background:transparent;border:none;color:#444;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:9px;font-weight:600;padding:4px 2px;transition:color .15s}
-.bottom-nav button.act{color:#fe2c55}
-.bottom-nav button span.ico{font-size:16px}
-
-/* Log items */
-.log-item{font-size:11.5px;padding:6px 10px;border-radius:7px;animation:fadeIn .18s ease;border-left:2px solid transparent;line-height:1.5}
-
-/* Ranking podium */
-.rank1{background:linear-gradient(135deg,rgba(251,191,36,.08),rgba(251,191,36,.02));border-color:rgba(251,191,36,.2)!important}
-.rank2{background:linear-gradient(135deg,rgba(156,163,175,.06),rgba(156,163,175,.02));border-color:rgba(156,163,175,.15)!important}
-.rank3{background:linear-gradient(135deg,rgba(180,83,9,.07),rgba(180,83,9,.02));border-color:rgba(180,83,9,.15)!important}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f2010;border:1px solid #2a5a2a;border-radius:10px;padding:9px 18px;color:#4ade80;font-size:12px;font-weight:700;z-index:999;white-space:nowrap;animation:popIn .2s ease}
+.spinner{width:14px;height:14px;border:2px solid #333;border-top-color:#fe2c55;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+.mode-btn{flex:1;padding:7px;border:1px solid #252535;background:transparent;color:#555;border-radius:7px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s}
+.mode-btn.act{background:rgba(254,44,85,.12);border-color:rgba(254,44,85,.3);color:#fe2c55}
+/* ── Gift card hover ── */
+.gift-card{transition:border-color .2s}
+.gift-card:hover{border-color:rgba(254,44,85,.35)!important}
+/* ── Spotify queue item ── */
+.sq-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #0f0f1a;transition:background .1s}
+.sq-item:last-child{border-bottom:none}
+.sq-item:hover{background:rgba(29,185,84,.04)}
+/* ── Perm chip ── */
+.perm-chip{padding:5px 12px;border-radius:20px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;border:1px solid #252535;background:transparent;color:#555}
+.perm-chip.sel{background:rgba(29,185,84,.15);border-color:rgba(29,185,84,.4);color:#1DB954}
+/* ── Sec header ── */
+.sec-hdr{display:flex;align-items:center;gap:7px;margin-bottom:9px;margin-top:4px}
+.sec-dot{width:7px;height:7px;border-radius:50%;background:linear-gradient(135deg,#fe2c55,#25f4ee);flex-shrink:0}
+.sec-lbl{color:#fe2c55;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
 </style>
 </head>
 <body><div id="root"></div>
@@ -92,135 +77,68 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const SERVER = "https://tikshank-production.up.railway.app";
 const EL_KEY  = "sk_c59a0c3dddc47a866083fc9b58a7dbd92b722fb2fb12da11";
 
-/* ─── Storage ─────────────────────────────────── */
+/* ─── Storage helpers ─────────────────────────────── */
 const sv = (k,v)=>{ try{ localStorage.setItem("tp_"+k, JSON.stringify(v)); }catch(e){} };
 const ld = (k,d)=>{ try{ const v=localStorage.getItem("tp_"+k); return v!==null?JSON.parse(v):d; }catch(e){ return d; } };
 
-/* ─── TTS ENGINE — Cola robusta, nunca se traba ─
-   - drainQueue usa recursión segura con setTimeout
-   - speakNative tiene timeout de seguridad
-   - speakElevenLabs tiene AbortSignal
-   - Si falla cualquier elemento, continúa con el siguiente */
-
-const ttsQ = [];
+/* ─── TTS ENGINE ────────────────────────────────────
+   Prioridad: ElevenLabs → Web Speech API             */
+const ttsQueue = [];
 let ttsActive = false;
-
 function enqueueTTS(text, voiceId, vol, mode) {
   if (!text || !text.trim()) return;
-  // Evitar duplicados exactos consecutivos en chat (anti-spam)
-  const last = ttsQ[ttsQ.length-1];
-  if (last && last.text === text.trim()) return;
-  ttsQ.push({ text: text.trim(), voiceId, vol: Math.min(1,Math.max(0,vol||0.8)), mode });
+  ttsQueue.push({ text: text.trim(), voiceId, vol, mode });
   if (!ttsActive) drainQueue();
 }
-
-function clearTTSQueue() {
-  ttsQ.length = 0;
-  ttsActive = false;
-  try { window.speechSynthesis?.cancel(); } catch(e){}
-}
-
 async function drainQueue() {
-  if (ttsQ.length === 0) { ttsActive = false; return; }
+  if (ttsQueue.length === 0) { ttsActive = false; return; }
   ttsActive = true;
-  const item = ttsQ.shift();
+  const item = ttsQueue.shift();
   try {
-    if (item.mode === "elevenlabs") {
-      await speakElevenLabs(item.text, item.voiceId, item.vol);
-    } else {
-      await speakNative(item.text, item.voiceId, item.vol);
-    }
-  } catch(e) {
-    console.warn("[TTS] error, continuando cola:", e.message);
-  }
-  // Pausa mínima entre utterances para evitar que el synth se atasque
-  setTimeout(drainQueue, 120);
+    if (item.mode === "elevenlabs") await speakElevenLabs(item.text, item.voiceId, item.vol);
+    else await speakNative(item.text, item.voiceId, item.vol);
+  } catch(e) { console.warn("TTS falló:", e.message); }
+  setTimeout(drainQueue, 50);
 }
-
 async function speakElevenLabs(text, voiceId, vol) {
-  const ctrl = new AbortController();
-  const timeout = setTimeout(() => ctrl.abort(), 12000);
-  try {
-    const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-      method:"POST",
-      headers:{"xi-api-key":EL_KEY,"Content-Type":"application/json","Accept":"audio/mpeg"},
-      body:JSON.stringify({text,model_id:"eleven_multilingual_v2",voice_settings:{stability:0.5,similarity_boost:0.75}}),
-      signal:ctrl.signal,
-    });
-    clearTimeout(timeout);
-    if (!r.ok) throw new Error("EL HTTP "+r.status);
-    const blob = await r.blob();
-    const url = URL.createObjectURL(blob);
-    await playAudio(url, vol);
-    URL.revokeObjectURL(url);
-  } catch(e) {
-    clearTimeout(timeout);
-    throw e;
-  }
+  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method:"POST",
+    headers:{"xi-api-key":EL_KEY,"Content-Type":"application/json","Accept":"audio/mpeg"},
+    body:JSON.stringify({text, model_id:"eleven_multilingual_v2", voice_settings:{stability:0.5, similarity_boost:0.75}}),
+    signal:AbortSignal.timeout(10000),
+  });
+  if (!r.ok) throw new Error("EL HTTP "+r.status);
+  const blob = await r.blob();
+  const url  = URL.createObjectURL(blob);
+  await playAudio(url, vol);
+  URL.revokeObjectURL(url);
 }
-
 function speakNative(text, voiceId, vol) {
   return new Promise((res) => {
     if (!window.speechSynthesis) { res(); return; }
-    // Cancelar cualquier utterance colgada antes de hablar
     window.speechSynthesis.cancel();
-
-    // FIX Chrome: speechSynthesis se pausa en tabs de fondo.
-    // Re-activar con pausa/resume periódico.
-    const resumeHack = setInterval(() => {
-      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-    }, 5000);
-
     const utt = new SpeechSynthesisUtterance(text);
     utt.volume = Math.min(1, Math.max(0, vol));
-    utt.rate   = 1.05;
-    utt.pitch  = 1;
-    utt.lang   = "es-MX";
-
+    utt.rate = 1.05; utt.pitch = 1; utt.lang = "es-MX";
     const voices = window.speechSynthesis.getVoices();
-    if (voiceId) {
-      const byName = voices.find(v => v.name === voiceId);
-      if (byName) utt.voice = byName;
-      else {
-        const esVoice = voices.find(v => v.lang.startsWith("es"));
-        if (esVoice) utt.voice = esVoice;
-      }
-    } else {
-      const esVoice = voices.find(v => v.lang.startsWith("es"));
-      if (esVoice) utt.voice = esVoice;
-    }
-
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      clearInterval(resumeHack);
-      res();
-    };
-    utt.onend   = finish;
-    utt.onerror = finish;
-    // Timeout de seguridad: máx 18s por utterance
-    setTimeout(finish, 18000);
-
-    try { window.speechSynthesis.speak(utt); } catch(e) { finish(); }
+    const match = voices.find(v => v.name === voiceId || v.lang.startsWith("es"));
+    if (match) utt.voice = match;
+    utt.onend = res; utt.onerror = res;
+    window.speechSynthesis.speak(utt);
+    setTimeout(res, 15000);
   });
 }
-
 function playAudio(src, vol) {
   return new Promise((res) => {
-    try {
-      const a = new Audio(src);
-      a.volume = Math.min(1, Math.max(0, vol));
-      a.onended = res;
-      a.onerror = res;
-      a.play().catch(res);
-      setTimeout(res, 30000);
-    } catch(e) { res(); }
+    const a = new Audio(src);
+    a.volume = Math.min(1, Math.max(0, vol));
+    a.onended = res; a.onerror = res;
+    a.play().catch(res);
+    setTimeout(res, 30000);
   });
 }
-
 function fileToBase64(file) {
-  return new Promise((res,rej) => {
+  return new Promise((res, rej) => {
     const r = new FileReader();
     r.onload = e => res(e.target.result);
     r.onerror = rej;
@@ -228,196 +146,148 @@ function fileToBase64(file) {
   });
 }
 
-/* ─── Base de datos de regalos TikTok ─────────────
-   Con imágenes reales del CDN de TikTok y monedas */
-const TIKTOK_GIFTS_DB = [
-  // Básicos (1-10 monedas)
-  {id:"rose",        name:"Rose",          coins:1,    emoji:"🌹", img:"https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/gift/rose.png"},
-  {id:"icecream",    name:"Ice Cream",     coins:1,    emoji:"🍦", img:"https://p16-webcast.tiktokcdn.com/img/maliva/webcast-va/gift/icecream.png"},
-  {id:"tiktok",      name:"TikTok",        coins:1,    emoji:"📱", img:null},
-  {id:"awesome",     name:"You're Awesome",coins:1,    emoji:"⭐", img:null},
-  {id:"gg",          name:"GG",            coins:1,    emoji:"🎮", img:null},
-  {id:"heart",       name:"Heart",         coins:1,    emoji:"❤️", img:null},
-  {id:"thumbsup",    name:"Thumbs Up",     coins:1,    emoji:"👍", img:null},
-  {id:"finger",      name:"Finger Heart",  coins:5,    emoji:"🤞", img:null},
-  {id:"glowstick",   name:"Glow Stick",    coins:8,    emoji:"🌟", img:null},
-  {id:"chilli",      name:"Chilli Pepper", coins:8,    emoji:"🌶️", img:null},
-  // Medios (10-100 monedas)
-  {id:"hat",         name:"Top Hat",       coins:10,   emoji:"🎩", img:null},
-  {id:"tulip",       name:"Tulip",         coins:10,   emoji:"🌷", img:null},
-  {id:"sunflower",   name:"Sunflower",     coins:18,   emoji:"🌻", img:null},
-  {id:"squirrel",    name:"Squirrel",      coins:20,   emoji:"🐿️", img:null},
-  {id:"sunglasses",  name:"Sunglasses",    coins:30,   emoji:"😎", img:null},
-  {id:"corgi",       name:"Corgi",         coins:50,   emoji:"🐕", img:null},
-  {id:"panda",       name:"Panda",         coins:50,   emoji:"🐼", img:null},
-  {id:"owl",         name:"Owl",           coins:50,   emoji:"🦉", img:null},
-  {id:"perfume",     name:"Perfume",       coins:99,   emoji:"🌸", img:null},
-  // Altos (100-1000 monedas)
-  {id:"birthday",    name:"Birthday Cake", coins:169,  emoji:"🎂", img:null},
-  {id:"dolphin",     name:"Dolphin",       coins:249,  emoji:"🐬", img:null},
-  {id:"dancer",      name:"Air Dancer",    coins:300,  emoji:"💃", img:null},
-  {id:"butterfly",   name:"Butterfly",     coins:399,  emoji:"🦋", img:null},
-  {id:"alien",       name:"Alien Buddy",   coins:399,  emoji:"👾", img:null},
-  {id:"gem",         name:"Gem",           coins:499,  emoji:"💎", img:null},
-  {id:"babychick",   name:"Baby Chick",    coins:500,  emoji:"🐥", img:null},
-  {id:"rocket",      name:"Rocket",        coins:500,  emoji:"🚀", img:null},
-  {id:"leon",        name:"Lion",          coins:1000, emoji:"🦁", img:null},
-  // Premium (1000+ monedas)
-  {id:"drama",       name:"Drama Queen",   coins:5000, emoji:"👑", img:null},
-  {id:"astrobear",   name:"Astrobear",     coins:1500, emoji:"🐻", img:null},
-  {id:"mermaid",     name:"Mermaid",       coins:2000, emoji:"🧜", img:null},
-  {id:"animalband",  name:"Animal Band",   coins:2500, emoji:"🎷", img:null},
-  {id:"castle",      name:"Castle",        coins:3000, emoji:"🏰", img:null},
-  {id:"phoenix",     name:"Phoenix",       coins:5000, emoji:"🔥", img:null},
-  {id:"dragon",      name:"Dragon",        coins:8888, emoji:"🐉", img:null},
-  {id:"park",        name:"Amusement Park",coins:17000,emoji:"🎡", img:null},
-  {id:"adream",      name:"Adam's Dream",  coins:25999,emoji:"🌌", img:null},
-  {id:"universe",    name:"Universe",      coins:34999,emoji:"🌍", img:null},
-];
-
+/* ─── Datos ─────────────────────────────────────────── */
 const EV_TYPES = ["Follow Alert","Gift Alert","Like Alert","Sub Alert","Share Alert"];
 
-const DEF_VOICES_EL = [
-  {id:"cgSgspJ2msm6clMCkdW9", name:"Bella – Natural (Femenina)"},
-  {id:"21m00Tcm4TlvDq8ikWAM", name:"Rachel – Multilingüe"},
-  {id:"AZnzlk1XvdvUeBnXmlld", name:"Domi – Energética"},
-  {id:"EXAVITQu4vr4xnSDxMaL", name:"Elli – Joven"},
-  {id:"ErXwobaYiN019PkySvjV", name:"Antoni – Natural (Masculina)"},
-  {id:"VR6AewLTigWG4xSOukaG", name:"Arnold – Profunda"},
-  {id:"pNInz6obpgDQGcFmaJgB", name:"Adam – Narrador"},
+const TIKTOK_GIFTS_LIST = [
+  {id:"rose",      name:"Rose",          emoji:"🌹", coins:1},
+  {id:"icecream",  name:"Ice Cream Cone",emoji:"🍦", coins:1},
+  {id:"tiktok",    name:"TikTok",        emoji:"📱", coins:1},
+  {id:"thumb",     name:"Thumbs Up",     emoji:"👍", coins:1},
+  {id:"heart",     name:"Heart",         emoji:"❤️",  coins:1},
+  {id:"finger",    name:"Finger Heart",  emoji:"🤞", coins:5},
+  {id:"hat",       name:"Hat",           emoji:"🎩", coins:10},
+  {id:"sunglasses",name:"Sunglasses",    emoji:"😎", coins:30},
+  {id:"tulip",     name:"Tulip",         emoji:"🌷", coins:99},
+  {id:"perfume",   name:"Perfume",       emoji:"🌸", coins:99},
+  {id:"butterfly", name:"Let Butterfly", emoji:"🦋", coins:399},
+  {id:"alien",     name:"Alien Buddy",   emoji:"👾", coins:399},
+  {id:"dancer",    name:"Air Dancer",    emoji:"💃", coins:300},
+  {id:"panda",     name:"Panda",         emoji:"🐼", coins:300},
+  {id:"babychicks",name:"Baby Chicks",   emoji:"🐥", coins:500},
+  {id:"owl",       name:"Owl",           emoji:"🦉", coins:500},
+  {id:"leon",      name:"Lion",          emoji:"🦁", coins:1000},
+  {id:"astrobear", name:"Astrobear",     emoji:"🐻", coins:1500},
+  {id:"animalband",name:"Animal Band",   emoji:"🎷", coins:2500},
+  {id:"drama",     name:"Drama Queen",   emoji:"👑", coins:5000},
+  {id:"park",      name:"Amusement Park",emoji:"🎡", coins:17000},
+  {id:"adream",    name:"Adam's Dream",  emoji:"🌌", coins:25999},
+  {id:"universe",  name:"Universe",      emoji:"🌍", coins:34999},
 ];
+
+// Lista plana para selects del modal de acciones
+const TIKTOK_GIFTS = [
+  "Cualquier regalo","Rose","You're awesome","GG","TikTok","Ice Cream Cone","Pop",
+  "Love you so much","Wink wink","Glow Stick","Cake Slice","Heart Me","Thumbs Up",
+  "Heart","Love you","Heart Puff","Blue Heart","Flame heart","Power hug","Squirrel",
+  "Chilli Pepper","Tulip","Graduation Bouquet","Wink Charm","Team Bracelet","Overreact",
+  "Finger Heart","Name shoutout","Pomegranate","Embroidered Heart","Super Popular",
+  "Cheer You Up","Club Power","Rosa","Friendship Necklace","Panda","Sunflower",
+  "Birthday Cake","Doughnut","Lollipop","Rainbow Puke","Great","LMAO","Perfume",
+  "I Love You","Garfield","Confetti","Sun Cream","Sunglasses","Hashtag","Bunny",
+  "Pixel Heart","Owl","Money Rain","Newspaper","Corgi","Drama Queen","Tiny Diny",
+  "Fashion Brand","Castle","Gem","Mishka","Star Shower","Disco Ball","Lovely",
+  "Interstellar","GG EZ","Dolphin","Elephant","Cap","Ferris Wheel","Mermaid",
+  "Rocket","Galaxy","Airplane","Planet","Diamond Flight","Lion","Universe",
+  "Diamond Tree","Concert","Crown","Big Cat","Boxing Gloves","Super Nova",
+  "UFO","Dragon","Phoenix","Bear",
+];
+
+const DEF_VOICES_EL = [
+  {id:"cgSgspJ2msm6clMCkdW9", name:"Bella - Natural (Femenina)"},
+  {id:"21m00Tcm4TlvDq8ikWAM", name:"Rachel - Multilingüe"},
+  {id:"AZnzlk1XvdvUeBnXmlld", name:"Domi - Energética"},
+  {id:"EXAVITQu4vr4xnSDxMaL", name:"Elli - Joven"},
+  {id:"ErXwobaYiN019PkySvjV", name:"Antoni - Natural (Masculina)"},
+  {id:"VR6AewLTigWG4xSOukaG", name:"Arnold - Profunda"},
+  {id:"pNInz6obpgDQGcFmaJgB", name:"Adam - Narrador"},
+  {id:"yoZ06aMxZJJ28mfd3POQ", name:"Sam - Cálida"},
+];
+
+const SPOTIFY_PERMS = ["Todos","Solo seguidores","Solo moderadores","Usuarios personalizados"];
 
 const DEF_ACTIONS = [
-  {id:1, enabled:true,  name:"Follow Alert",  event:"Follow Alert", giftName:"",         minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por seguirme!"},
-  {id:2, enabled:true,  name:"Rosa Gift",      event:"Gift Alert",   giftName:"Rose",     minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por la rosa!"},
-  {id:3, enabled:true,  name:"Like Alert",     event:"Like Alert",   giftName:"",         minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:""},
-  {id:4, enabled:false, name:"Sub Alert",      event:"Sub Alert",    giftName:"",         minCount:1, duration:10, soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por suscribirte!"},
-  {id:5, enabled:false, name:"León Gift",      event:"Gift Alert",   giftName:"lion",     minCount:1, duration:8,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡WOW! @usuario mandó un LEÓN! 🦁"},
+  {id:1, enabled:true,  name:"Follow Alert", event:"Follow Alert", giftName:"", minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por seguirme!"},
+  {id:2, enabled:true,  name:"Rosa Gift",    event:"Gift Alert",   giftName:"Rose", minCount:1, duration:5, soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por la rosa!"},
+  {id:3, enabled:true,  name:"Like Alert",   event:"Like Alert",   giftName:"", minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:""},
+  {id:4, enabled:false, name:"Sub Alert",    event:"Sub Alert",    giftName:"", minCount:1, duration:10, soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por suscribirte!"},
+  {id:5, enabled:false, name:"León Gift",    event:"Gift Alert",   giftName:"Lion", minCount:1, duration:8, soundName:"", soundData:"", ttsOn:false, ttsText:"¡WOW! @usuario mandó un LEÓN! 🦁"},
 ];
 
+const defGiftCfg = () => ({enabled:false, sound:"", soundData:"", soundName:"", volume:80, duration:5, tts:false, ttsTemplate:"{username} envió {giftName} x{repeatCount}"});
+
 const USERS = {
-  "admin@tikpanel.com":   {password:"admin123",  name:"Admin",    plan:"Pro",  avatar:"A"},
-  "luzalva@tikpanel.com": {password:"luz2024",   name:"Luz Álva", plan:"Pro",  avatar:"L"},
-  "usuario@tikpanel.com": {password:"pass123",   name:"Streamer", plan:"Free", avatar:"S"},
+  "admin@tikpanel.com":   {password:"admin123", name:"Admin",      plan:"Pro",  avatar:"A"},
+  "luzalva@tikpanel.com": {password:"luz2024",  name:"Luz Álva",   plan:"Pro",  avatar:"L"},
+  "usuario@tikpanel.com": {password:"pass123",  name:"Streamer",   plan:"Free", avatar:"S"},
 };
 
-/* ─── Componentes pequeños ──────────────────────── */
+/* ─── Componentes pequeños ──────────────────────────── */
 function Toggle({on, onChange, color="#fe2c55", size="md"}) {
-  const w=size==="sm"?30:44,h=size==="sm"?17:24,dot=size==="sm"?13:20;
+  const w = size==="sm"?28:42, h=size==="sm"?16:23, dot=size==="sm"?12:19;
   return (
     <div onClick={onChange} style={{width:w,height:h,borderRadius:w,cursor:"pointer",position:"relative",
-      background:on?color:"#1a1a2e",transition:"background .2s",flexShrink:0,
-      border:"1px solid rgba(255,255,255,.06)"}}>
+      background:on?color:"#1e1e2e",transition:"background .2s",flexShrink:0,border:"1px solid rgba(255,255,255,.05)"}}>
       <div style={{position:"absolute",top:2,left:on?w-dot-2:2,width:dot,height:dot,borderRadius:"50%",
-        background:"#fff",transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.6)"}}/>
+        background:"#fff",transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.5)"}}/>
     </div>
   );
 }
 
-/* ─── Gift Gallery Component ────────────────────── */
-function GiftGallery({selectedId, onSelect, searchQ, setSearchQ}) {
-  const categories = [
-    {label:"Todos",filter:g=>true},
-    {label:"≤10 🪙", filter:g=>g.coins<=10},
-    {label:"≤100 🪙",filter:g=>g.coins<=100},
-    {label:"Premium",filter:g=>g.coins>1000},
-  ];
-  const [cat,setCat]=useState(0);
-
-  const filtered = TIKTOK_GIFTS_DB.filter(g => {
-    const matchSearch = g.name.toLowerCase().includes(searchQ.toLowerCase());
-    const matchCat = categories[cat].filter(g);
-    return matchSearch && matchCat;
-  });
-
+function IBtn({ico, onClick, color="#aaa", title=""}) {
   return (
-    <div>
-      <input
-        style={{width:"100%",background:"#0a0a18",border:"1px solid #222235",borderRadius:9,
-          padding:"9px 12px",color:"#fff",fontSize:12,outline:"none",marginBottom:10}}
-        placeholder="🔍 Buscar regalo de TikTok..."
-        value={searchQ}
-        onChange={e=>setSearchQ(e.target.value)}
-        autoFocus
-      />
-      {/* Filtro categoría */}
-      <div style={{display:"flex",gap:5,marginBottom:10}}>
-        {categories.map((c,i)=>(
-          <button key={i} onClick={()=>setCat(i)}
-            style={{flex:1,padding:"5px 4px",borderRadius:7,border:`1px solid ${cat===i?"rgba(254,44,85,.4)":"#1e1e35"}`,
-              background:cat===i?"rgba(254,44,85,.1)":"transparent",
-              color:cat===i?"#fe2c55":"#555",fontSize:9,fontWeight:700,cursor:"pointer"}}>
-            {c.label}
-          </button>
-        ))}
-      </div>
-      <div className="gift-grid">
-        {filtered.map(g => (
-          <div key={g.id}
-            className={`gift-card${selectedId===g.id?" selected":""}`}
-            onClick={()=>onSelect(g)}>
-            {g.img
-              ? <img src={g.img} alt={g.name} className="gift-img"
-                  onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
-              : null
-            }
-            <span className="gift-emoji-big" style={{display:g.img?"none":"block"}}>{g.emoji}</span>
-            <span className="gift-name">{g.name}</span>
-            <span className="gift-coins">🪙{g.coins.toLocaleString()}</span>
-          </div>
-        ))}
-        {filtered.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",color:"#444",padding:"20px 0",fontSize:12}}>No se encontraron regalos</div>}
-      </div>
+    <button onClick={onClick} title={title}
+      style={{background:"transparent",border:"1px solid #1e1e2e",borderRadius:5,
+        width:24,height:24,cursor:"pointer",color,display:"flex",alignItems:"center",
+        justifyContent:"center",fontSize:11,flexShrink:0,transition:"border-color .15s"}}
+      onMouseEnter={e=>e.currentTarget.style.borderColor=color}
+      onMouseLeave={e=>e.currentTarget.style.borderColor="#1e1e2e"}>
+      {ico}
+    </button>
+  );
+}
+
+function SecHdr({title}) {
+  return (
+    <div className="sec-hdr">
+      <div className="sec-dot"/>
+      <span className="sec-lbl">{title}</span>
     </div>
   );
 }
 
-/* ─── Modal Acción ──────────────────────────────── */
+/* ─── Modal Acción ──────────────────────────────────── */
 function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, onClose }) {
-  const def = {id:Date.now(),enabled:true,name:"",event:"Gift Alert",giftName:"cualquier regalo",minCount:1,duration:5,soundName:"",soundData:"",ttsOn:false,ttsText:""};
+  const def = {id:Date.now(), enabled:true, name:"", event:"Gift Alert",
+    giftName:"Cualquier regalo", minCount:1, duration:5, soundName:"", soundData:"", ttsOn:false, ttsText:""};
   const [f, setF] = useState(action ? {...action} : def);
   const [busy, setBusy] = useState(false);
-  const [showGallery, setShowGallery] = useState(false);
-  const [giftSearch, setGiftSearch] = useState("");
   const set = (k,v) => setF(p=>({...p,[k]:v}));
-
-  const lbl={display:"block",color:"#445",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:5};
-  const inp={width:"100%",background:"#080810",border:"1px solid #1e1e35",borderRadius:8,padding:"9px 12px",color:"#fff",fontSize:12,outline:"none"};
-
+  const lbl = {display:"block",color:"#556",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:5};
+  const inp = {width:"100%",background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,padding:"9px 12px",color:"#fff",fontSize:12,outline:"none"};
   const handleFile = async (e) => {
-    const file=e.target.files[0]; if(!file) return;
+    const file = e.target.files[0]; if (!file) return;
     setBusy(true);
-    try { const data=await fileToBase64(file); set("soundData",data); set("soundName",file.name); }
-    catch { alert("Error al leer el archivo"); }
+    try { const data = await fileToBase64(file); set("soundData",data); set("soundName",file.name); }
+    catch(err) { alert("Error al leer el archivo"); }
     setBusy(false);
   };
-  const testSound=()=>{ if(f.soundData) playAudio(f.soundData,(vol||80)/100); };
-  const testTTS=()=>{
-    const text=(f.ttsText||"Hola, esto es una prueba TTS").replace(/@usuario/gi,"StreamerPro");
+  const testSound = () => { if (!f.soundData) return; playAudio(f.soundData, (vol||80)/100); };
+  const testTTS = () => {
+    const text = (f.ttsText||"Hola, esto es una prueba").replace(/@usuario/gi,"UsuarioPrueba");
     enqueueTTS(text, ttsMode==="elevenlabs"?ttsVoiceId:ttsNativeVoice, (vol||80)/100, ttsMode);
   };
-
-  // Obtener regalo seleccionado de la DB
-  const selectedGift = TIKTOK_GIFTS_DB.find(g=>g.id===f.giftName||g.name.toLowerCase()===f.giftName?.toLowerCase());
-
   return (
     <div className="mo" onClick={e=>e.target.classList.contains("mo")&&onClose()}>
       <div className="mb">
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
-          <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16}}>
-            {action?"✏️ Editar Acción":"➕ Nueva Acción"}
-          </div>
-          <button onClick={onClose} style={{background:"#151525",border:"none",borderRadius:6,width:26,height:26,
-            cursor:"pointer",color:"#555",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16}}>{action?"✏️ Editar Acción":"➕ Nueva Acción"}</div>
+          <button onClick={onClose} style={{background:"#1a1a28",border:"none",borderRadius:6,width:26,height:26,cursor:"pointer",color:"#555",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
         </div>
-
-        {/* Nombre */}
         <div style={{marginBottom:12}}>
           <label style={lbl}>Nombre de la acción</label>
-          <input value={f.name} onChange={e=>set("name",e.target.value)} placeholder="Ej: Alerta Rosa" style={inp}/>
+          <input value={f.name} onChange={e=>set("name",e.target.value)} placeholder="Ej: Rosa Sound" style={inp}/>
         </div>
-
-        {/* Evento + Duración */}
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:12}}>
           <div>
             <label style={lbl}>Evento</label>
@@ -430,303 +300,305 @@ function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, on
             <input type="number" min="1" max="120" value={f.duration} onChange={e=>set("duration",Number(e.target.value))} style={inp}/>
           </div>
         </div>
-
-        {/* Regalo — con galería visual */}
         {f.event==="Gift Alert" && (
-          <div style={{marginBottom:12}}>
-            <label style={lbl}>Regalo de TikTok</label>
-
-            {/* Preview del regalo seleccionado */}
-            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}>
-              <div onClick={()=>setShowGallery(!showGallery)}
-                style={{flex:1,background:"#080810",border:`1.5px solid ${showGallery?"rgba(254,44,85,.4)":"#1e1e35"}`,
-                  borderRadius:10,padding:"9px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:10}}>
-                <span style={{fontSize:22}}>{selectedGift?selectedGift.emoji:"🎁"}</span>
-                <div>
-                  <div style={{fontSize:12,color:"#fff",fontWeight:600}}>
-                    {selectedGift?selectedGift.name:"Cualquier regalo"}
-                  </div>
-                  {selectedGift&&<div style={{fontSize:10,color:"#fbbf24"}}>🪙 {selectedGift.coins.toLocaleString()} monedas</div>}
-                </div>
-                <span style={{marginLeft:"auto",color:"#555",fontSize:11}}>{showGallery?"▲":"▼"}</span>
-              </div>
-              <div>
-                <label style={{...lbl,marginBottom:3}}>Mínimo</label>
-                <input type="number" min="1" value={f.minCount} onChange={e=>set("minCount",Number(e.target.value))}
-                  style={{...inp,width:70,textAlign:"center",padding:"9px 6px"}}/>
-              </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:12}}>
+            <div>
+              <label style={lbl}>Regalo de TikTok</label>
+              <select value={f.giftName} onChange={e=>set("giftName",e.target.value)} style={{...inp,cursor:"pointer"}}>
+                {TIKTOK_GIFTS.map(g=><option key={g}>{g}</option>)}
+              </select>
             </div>
-
-            {/* Galería desplegable */}
-            {showGallery && (
-              <div style={{background:"#0c0c1c",border:"1px solid #1e1e35",borderRadius:12,padding:12,marginBottom:8}}>
-                {/* Opción "Cualquier regalo" */}
-                <div onClick={()=>{set("giftName","cualquier regalo");setShowGallery(false);}}
-                  style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",borderRadius:8,
-                    cursor:"pointer",border:`1.5px solid ${f.giftName==="cualquier regalo"?"rgba(37,244,238,.4)":"transparent"}`,
-                    background:f.giftName==="cualquier regalo"?"rgba(37,244,238,.07)":"transparent",marginBottom:8}}>
-                  <span style={{fontSize:22}}>🎁</span>
-                  <span style={{fontSize:12,fontWeight:700,color:"#fff"}}>Cualquier regalo</span>
-                  <span style={{fontSize:10,color:"#555",marginLeft:"auto"}}>Se activa con cualquier regalo</span>
-                </div>
-                <GiftGallery
-                  selectedId={selectedGift?.id}
-                  onSelect={(g)=>{set("giftName",g.id);setShowGallery(false);}}
-                  searchQ={giftSearch}
-                  setSearchQ={setGiftSearch}
-                />
-              </div>
-            )}
+            <div>
+              <label style={lbl}>Cantidad mínima</label>
+              <input type="number" min="1" value={f.minCount} onChange={e=>set("minCount",Number(e.target.value))} style={inp}/>
+            </div>
           </div>
         )}
-
-        {/* Sonido */}
         <div style={{marginBottom:12}}>
           <label style={lbl}>Sonido de alerta (MP3/WAV/OGG)</label>
           <div className={`ua ${f.soundName?"has":""}`}>
             <input type="file" accept="audio/*" onChange={handleFile} disabled={busy}/>
-            <div style={{width:32,height:32,borderRadius:8,background:"rgba(37,244,238,.07)",
-              display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+            <div style={{width:32,height:32,borderRadius:8,background:"rgba(37,244,238,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
               {busy?<span className="spinner"/>:"🎵"}
             </div>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:12,fontWeight:600,color:f.soundName?"#25f4ee":"#aaa",
-                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+              <div style={{fontSize:12,fontWeight:600,color:f.soundName?"#25f4ee":"#aaa",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                 {busy?"Cargando...":f.soundName||"Toca para subir audio"}
               </div>
-              <div style={{fontSize:9,color:f.soundName?"rgba(37,244,238,.5)":"#444",marginTop:2}}>
-                {f.soundName?"✓ Guardado · persiste al recargar":"MP3, WAV, OGG"}
+              <div style={{fontSize:9,color:f.soundName?"rgba(37,244,238,.6)":"#444",marginTop:2}}>
+                {f.soundName?"✓ Guardado — no se pierde al recargar":"MP3, WAV, OGG"}
               </div>
             </div>
-            {f.soundData&&(
-              <button onClick={e=>{e.preventDefault();e.stopPropagation();testSound();}}
-                style={{background:"rgba(37,244,238,.09)",border:"1px solid rgba(37,244,238,.25)",
-                  borderRadius:7,padding:"5px 10px",color:"#25f4ee",fontSize:10,fontWeight:700,
-                  cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>▶ Probar</button>
-            )}
-            {f.soundName&&(
-              <button onClick={e=>{e.preventDefault();e.stopPropagation();set("soundData","");set("soundName","");}}
-                style={{background:"rgba(254,44,85,.07)",border:"1px solid rgba(254,44,85,.2)",
-                  borderRadius:7,padding:"5px 9px",color:"#fe2c55",fontSize:10,fontWeight:700,
-                  cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>✕</button>
-            )}
+            {f.soundData && <button onClick={e=>{e.preventDefault();e.stopPropagation();testSound();}} style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.3)",borderRadius:7,padding:"5px 10px",color:"#25f4ee",fontSize:10,fontWeight:700,cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>▶ Probar</button>}
+            {f.soundName && <button onClick={e=>{e.preventDefault();e.stopPropagation();set("soundData","");set("soundName","");}} style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",borderRadius:7,padding:"5px 9px",color:"#fe2c55",fontSize:10,fontWeight:700,cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>✕</button>}
           </div>
         </div>
-
-        {/* TTS */}
         <div style={{marginBottom:18}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
             <label style={{...lbl,marginBottom:0}}>Mensaje TTS al activarse</label>
             <div style={{display:"flex",alignItems:"center",gap:6}}>
               <Toggle on={f.ttsOn} onChange={()=>set("ttsOn",!f.ttsOn)} color="#25f4ee" size="sm"/>
-              <span style={{fontSize:9,color:f.ttsOn?"#25f4ee":"#444",fontWeight:700}}>
-                {f.ttsOn?"ACTIVO":"APAGADO"}
-              </span>
+              <span style={{fontSize:9,color:f.ttsOn?"#25f4ee":"#444",fontWeight:700}}>{f.ttsOn?"ACTIVO":"APAGADO"}</span>
             </div>
           </div>
-          <div style={{background:"#080810",border:`1px solid ${f.ttsOn?"rgba(37,244,238,.2)":"#1e1e35"}`,
-            borderRadius:9,overflow:"hidden",transition:"border-color .2s"}}>
-            <textarea value={f.ttsText} onChange={e=>set("ttsText",e.target.value)} disabled={!f.ttsOn}
-              placeholder="Ej: ¡Gracias @usuario por el regalo!"
-              style={{width:"100%",background:"transparent",border:"none",padding:"9px 12px",
-                color:f.ttsOn?"#fff":"#333",fontSize:12,outline:"none",resize:"vertical",minHeight:55,lineHeight:1.6}}/>
-            {f.ttsOn&&f.ttsText&&(
-              <div style={{borderTop:"1px solid #151525",padding:"6px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:9,color:"#444"}}>
-                  Motor: <span style={{color:"#fe2c55"}}>{ttsMode==="elevenlabs"?"ElevenLabs":"Voz del navegador (gratis)"}</span>
-                </span>
-                <button onClick={testTTS}
-                  style={{background:"rgba(254,44,85,.07)",border:"1px solid rgba(254,44,85,.2)",
-                    borderRadius:6,padding:"4px 10px",color:"#fe2c55",fontSize:9,fontWeight:700,cursor:"pointer"}}>
-                  🔊 Probar TTS
-                </button>
+          <div style={{background:"#0a0a0f",border:`1px solid ${f.ttsOn?"rgba(37,244,238,.25)":"#252535"}`,borderRadius:9,overflow:"hidden",transition:"border-color .2s"}}>
+            <textarea value={f.ttsText} onChange={e=>set("ttsText",e.target.value)} disabled={!f.ttsOn} placeholder="Ej: ¡Gracias @usuario por la rosa!"
+              style={{width:"100%",background:"transparent",border:"none",padding:"9px 12px",color:f.ttsOn?"#fff":"#333",fontSize:12,outline:"none",resize:"vertical",minHeight:55,lineHeight:1.6}}/>
+            {f.ttsOn && f.ttsText && (
+              <div style={{borderTop:"1px solid #1a1a28",padding:"6px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:9,color:"#444"}}>Motor: <span style={{color:"#fe2c55"}}>{ttsMode==="elevenlabs"?"ElevenLabs":"Voz del navegador (gratis)"}</span></span>
+                <button onClick={testTTS} style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",borderRadius:6,padding:"4px 10px",color:"#fe2c55",fontSize:9,fontWeight:700,cursor:"pointer"}}>🔊 Probar</button>
               </div>
             )}
           </div>
-          <div style={{color:"#444",fontSize:9,marginTop:4}}>
-            💡 <span style={{color:"#25f4ee",fontFamily:"monospace"}}>@usuario</span> se reemplaza con el nombre real
-          </div>
+          <div style={{color:"#444",fontSize:9,marginTop:4}}>💡 <span style={{color:"#25f4ee",fontFamily:"monospace"}}>@usuario</span> se reemplaza con el nombre</div>
         </div>
-
         <div style={{display:"flex",gap:8}}>
-          <button onClick={onClose}
-            style={{flex:1,background:"transparent",border:"1px solid #222235",borderRadius:9,
-              padding:"10px",color:"#555",fontWeight:600,cursor:"pointer",fontSize:12}}>
-            Cancelar
-          </button>
-          <button onClick={()=>{
-            if(!f.name.trim()){alert("Ponle un nombre a la acción");return;}
-            onSave({...f});
-          }}
-            style={{flex:2,background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",
-              borderRadius:9,padding:"10px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:12}}>
-            💾 Guardar Acción
-          </button>
+          <button onClick={onClose} style={{flex:1,background:"transparent",border:"1px solid #252535",borderRadius:9,padding:"10px",color:"#555",fontWeight:600,cursor:"pointer",fontSize:12}}>Cancelar</button>
+          <button onClick={()=>{if(!f.name.trim()){alert("Ponle un nombre a la acción");return;}onSave({...f});}} style={{flex:2,background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:9,padding:"10px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:12}}>💾 Guardar Acción</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* ─── Login ─────────────────────────────────────── */
+/* ─── Login ─────────────────────────────────────────── */
 function Login({ onLogin }) {
-  const [email,setEmail]=useState("");
-  const [pass,setPass]=useState("");
-  const [err,setErr]=useState("");
-  const [loading,setLoading]=useState(false);
-  const go=()=>{
-    setErr("");setLoading(true);
-    setTimeout(()=>{
-      const u=USERS[email.toLowerCase()];
-      if(u&&u.password===pass){onLogin({...u,email});}
-      else{setErr("Correo o contraseña incorrectos.");setLoading(false);}
-    },550);
+  const [email,setEmail]=useState(""); const [pass,setPass]=useState(""); const [err,setErr]=useState(""); const [loading,setLoading]=useState(false);
+  const go = () => {
+    setErr(""); setLoading(true);
+    setTimeout(()=>{ const u=USERS[email.toLowerCase()]; if(u&&u.password===pass){onLogin({...u,email});}else{setErr("Correo o contraseña incorrectos.");setLoading(false);} },600);
   };
-  const inp={width:"100%",background:"#0a0a18",border:"1px solid #1a1a2e",borderRadius:10,padding:"11px 14px",color:"#fff",fontSize:13,outline:"none"};
+  const inp = {width:"100%",background:"#0d0d18",border:"1px solid #1e1e2e",borderRadius:10,padding:"11px 14px",color:"#fff",fontSize:13,outline:"none"};
   return (
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",
-      background:"#080810",padding:20,position:"relative",overflow:"hidden"}}>
-      {/* Fondo decorativo */}
-      <div style={{position:"absolute",width:500,height:500,borderRadius:"50%",
-        background:"radial-gradient(circle,rgba(254,44,85,.12) 0%,transparent 70%)",
-        top:"50%",left:"50%",transform:"translate(-50%,-50%)",pointerEvents:"none"}}/>
-      <div style={{background:"#0f0f1e",border:"1px solid #1e1e35",borderRadius:22,padding:"40px 32px",
-        width:"100%",maxWidth:380,boxShadow:"0 40px 100px rgba(0,0,0,.8)",position:"relative",zIndex:1}}>
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#0a0a0f",padding:20}}>
+      <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:22,padding:"40px 32px",width:"100%",maxWidth:380,boxShadow:"0 40px 80px rgba(0,0,0,.7)"}}>
         <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:6}}>
-          <div style={{width:38,height:38,borderRadius:10,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:18}}>T</div>
-          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:22,letterSpacing:-.5}}>
-            ik<span style={{color:"#fe2c55"}}>Panel</span>
-          </span>
+          <div style={{width:36,height:36,borderRadius:9,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:17}}>T</div>
+          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:21,letterSpacing:-.5}}>ik<span style={{color:"#fe2c55"}}>Panel</span></span>
         </div>
-        <p style={{color:"#444",fontSize:12,marginBottom:24}}>Panel de control para TikTok LIVE</p>
+        <p style={{color:"#555",fontSize:12,marginBottom:22}}>Panel de control para TikTok LIVE</p>
         <div style={{marginBottom:12}}>
-          <label style={{display:"block",color:"#446",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:6}}>Correo</label>
+          <label style={{display:"block",color:"#555",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:6}}>Correo</label>
           <input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} type="email" placeholder="tu@correo.com" style={inp}/>
         </div>
         <div style={{marginBottom:16}}>
-          <label style={{display:"block",color:"#446",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:6}}>Contraseña</label>
+          <label style={{display:"block",color:"#555",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:6}}>Contraseña</label>
           <input value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} type="password" placeholder="••••••••" style={inp}/>
         </div>
-        {err&&<div style={{background:"rgba(254,44,85,.07)",border:"1px solid rgba(254,44,85,.2)",
-          borderRadius:8,padding:"8px 12px",color:"#fe2c55",fontSize:12,marginBottom:12}}>{err}</div>}
-        <button onClick={go} disabled={loading}
-          style={{width:"100%",background:loading?"#151525":"linear-gradient(135deg,#fe2c55,#ff6b81)",
-            border:"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",
-            opacity:loading?0.6:1}}>
+        {err && <div style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",borderRadius:8,padding:"8px 12px",color:"#fe2c55",fontSize:12,marginBottom:12}}>{err}</div>}
+        <button onClick={go} disabled={loading} style={{width:"100%",background:loading?"#1e1e2e":"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>
           {loading?"Verificando...":"Ingresar →"}
         </button>
-        <p style={{color:"#2a2a3a",fontSize:10,textAlign:"center",marginTop:18}}>
-          admin@tikpanel.com / admin123
-        </p>
       </div>
     </div>
   );
 }
 
-/* ─── APP PRINCIPAL ─────────────────────────────── */
+/* ─── APP principal ─────────────────────────────────── */
 function App() {
-  const [user,setUser]=useState(()=>ld("session",null));
-  const [tab,setTab]=useState(()=>ld("tab","dashboard"));
+  const [user,setUser]   = useState(()=>ld("session",null));
+  const [tab,setTab]     = useState(()=>ld("tab","dashboard"));
+  const [sb,setSb]       = useState(false);
 
-  // Conexión
-  const [tUser,setTUser]=useState(()=>ld("tuser",""));
-  const [sessId,setSessId]=useState(()=>ld("sessid",""));
-  const [conn,setConn]=useState(false);
-  const [conn2,setConn2]=useState(false);
-  const [dots,setDots]=useState("");
-  const [connErr,setConnErr]=useState("");
+  // Batalla
+  const [battle,setBattle] = useState(null);
+
+  // Conexión TikTok
+  const [tUser,setTUser]   = useState(()=>ld("tuser",""));
+  const [sessId,setSessId] = useState(()=>ld("sessid",""));
+  const [conn,setConn]     = useState(false);
+  const [conn2,setConn2]   = useState(false);
+  const [dots,setDots]     = useState("");
+  const [connErr,setConnErr]= useState("");
 
   // Wake Lock
-  const wakeLockRef=useRef(null);
-  const [wakeLockOn,setWakeLockOn]=useState(false);
-  const requestWakeLock=useCallback(async()=>{
-    if(!('wakeLock'in navigator))return;
-    try{
-      if(wakeLockRef.current)return;
-      wakeLockRef.current=await navigator.wakeLock.request('screen');
-      setWakeLockOn(true);
-      wakeLockRef.current.addEventListener('release',()=>{wakeLockRef.current=null;setWakeLockOn(false);});
-    }catch(e){}
+  const wakeLockRef = useRef(null);
+  const [wakeLockOn,setWakeLockOn] = useState(false);
+  const requestWakeLock = useCallback(async()=>{
+    if(!('wakeLock' in navigator))return;
+    try{ if(wakeLockRef.current)return; wakeLockRef.current=await navigator.wakeLock.request('screen'); setWakeLockOn(true);
+      wakeLockRef.current.addEventListener('release',()=>{wakeLockRef.current=null;setWakeLockOn(false);}); }
+    catch(e){}
   },[]);
-  const releaseWakeLock=useCallback(async()=>{
+  const releaseWakeLock = useCallback(async()=>{
     if(wakeLockRef.current){await wakeLockRef.current.release();wakeLockRef.current=null;setWakeLockOn(false);}
   },[]);
   useEffect(()=>{
-    const onVisible=()=>{if(document.visibilityState==='visible')requestWakeLock();};
-    document.addEventListener('visibilitychange',onVisible);
-    requestWakeLock();
-    return()=>{document.removeEventListener('visibilitychange',onVisible);releaseWakeLock();};
+    const onV=()=>{ if(document.visibilityState==='visible')requestWakeLock(); };
+    document.addEventListener('visibilitychange',onV); requestWakeLock();
+    return()=>{document.removeEventListener('visibilitychange',onV);releaseWakeLock();};
   },[requestWakeLock,releaseWakeLock]);
 
   // Stats
-  const [stats,setStats]=useState({viewers:0,gifts:0,follows:0,messages:0,likes:0});
-  const [log,setLog]=useState([]);
-  const [lAnim,setLAnim]=useState(false);
-  const [fh,setFh]=useState([]);
-  const [totDia,setTotDia]=useState(()=>ld("totDia",0));
-  const [totLike,setTotLike]=useState(()=>ld("totLike",0));
-  const [tapR,setTapR]=useState(()=>ld("tapR",[]));
-  const [likeR,setLikeR]=useState(()=>ld("likeR",[]));
-  const [viewR,setViewR]=useState(()=>ld("viewR",[]));
-  const [topViewers,setTopViewers]=useState([]);
+  const [stats,setStats]       = useState({viewers:0,gifts:0,follows:0,messages:0,likes:0});
+  const [log,setLog]           = useState([]);
+  const [lAnim,setLAnim]       = useState(false);
+  const [fh,setFh]             = useState([]);
+  const [totDia,setTotDia]     = useState(()=>ld("totDia",0));
+  const [totLike,setTotLike]   = useState(()=>ld("totLike",0));
+  const [tapR,setTapR]         = useState(()=>ld("tapR",[]));
+  const [likeR,setLikeR]       = useState(()=>ld("likeR",[]));
+  const [viewR,setViewR]       = useState(()=>ld("viewR",[]));
+  const [topViewers,setTopViewers] = useState([]);
+  const [vTab,setVTab]         = useState("historial");
 
-  // Batalla
-  const [battle,setBattle]=useState(null);
+  // TTS settings
+  const [ttsMode,setTtsMode]     = useState(()=>ld("ttsMode","native"));
+  const [ttsOn,setTtsOn]         = useState(()=>ld("ttsOn",true));
+  const [ttsVol,setTtsVol]       = useState(()=>ld("ttsVol",80));
+  const [ttsVoice,setTtsVoice]   = useState(()=>ld("ttsVoice","cgSgspJ2msm6clMCkdW9"));
+  const [nativeVoices,setNativeVoices] = useState([]);
+  const [nativeVoice,setNativeVoice]   = useState(()=>ld("nativeVoice",""));
+  const [elVoices,setElVoices]   = useState(DEF_VOICES_EL);
+  const [elOk,setElOk]           = useState(null);
+  // TTS extras (del jsx)
+  const [ttsSpeed,setTtsSpeed]   = useState(()=>ld("ttsSpeed",1.0));
+  const [ttsPitch,setTtsPitch]   = useState(()=>ld("ttsPitch",1.0));
+  const [ttsTestText,setTtsTestText] = useState("Hola, soy el TTS de tu live!");
+  const [ttsChat,setTtsChat]     = useState(()=>ld("ttsChat",true));
+  const [ttsGifts,setTtsGifts]   = useState(()=>ld("ttsGifts",false));
+  const [ttsFollows,setTtsFollows]   = useState(()=>ld("ttsFollows",false));
+  const [ttsShares,setTtsShares]     = useState(()=>ld("ttsShares",false));
+  const [ttsSuperFan,setTtsSuperFan] = useState(()=>ld("ttsSuperFan",false));
+  const [ttsJoin,setTtsJoin]         = useState(()=>ld("ttsJoin",false));
+  // Plantillas TTS
+  const [tplChat,setTplChat]     = useState(()=>ld("tplChat","{nickname} dice {message}"));
+  const [tplGift,setTplGift]     = useState(()=>ld("tplGift","{username} envió {giftName} x{repeatCount}"));
+  const [tplFollow,setTplFollow] = useState(()=>ld("tplFollow","{username} te siguió"));
+  const [tplShare,setTplShare]   = useState(()=>ld("tplShare","{username} compartió el live"));
+  const [tplJoin,setTplJoin]     = useState(()=>ld("tplJoin","{username} se unió al live"));
+  const [tplSuperFan,setTplSuperFan] = useState(()=>ld("tplSuperFan","{username} se hizo super fan"));
+  // Filtros TTS
+  const [filterAll,setFilterAll]           = useState(()=>ld("filterAll",false));
+  const [filterFollowers,setFilterFollowers] = useState(()=>ld("filterFollowers",true));
+  const [filterMods,setFilterMods]         = useState(()=>ld("filterMods",false));
+  const [filterSuperFans,setFilterSuperFans] = useState(()=>ld("filterSuperFans",false));
+  const [filterFanClub,setFilterFanClub]   = useState(()=>ld("filterFanClub",false));
+  const [filterFanLevel,setFilterFanLevel] = useState(()=>ld("filterFanLevel",1));
+  const [filterCustomUsers,setFilterCustomUsers] = useState(()=>ld("filterCustomUsers",[]));
+  const [filterCustomInput,setFilterCustomInput] = useState("");
+  // Cola TTS
+  const [queueInfinite,setQueueInfinite]   = useState(()=>ld("queueInfinite",true));
+  const [queueReadOld,setQueueReadOld]     = useState(()=>ld("queueReadOld",false));
+  const [queueSkipEmoji,setQueueSkipEmoji] = useState(()=>ld("queueSkipEmoji",true));
+  const [queueSkipAt,setQueueSkipAt]       = useState(()=>ld("queueSkipAt",false));
+  const [queueSkipCmd,setQueueSkipCmd]     = useState(()=>ld("queueSkipCmd",false));
+  const [queueAntiSpam,setQueueAntiSpam]   = useState(()=>ld("queueAntiSpam",false));
+  const [queueIgnoreRep,setQueueIgnoreRep] = useState(()=>ld("queueIgnoreRep",false));
+  const [queueMaxRep,setQueueMaxRep]       = useState(()=>ld("queueMaxRep",2));
+  const [queueWindow,setQueueWindow]       = useState(()=>ld("queueWindow",30));
 
-  // TTS
-  const [ttsMode,setTtsMode]=useState(()=>ld("ttsMode","native"));
-  const [ttsOn,setTtsOn]=useState(()=>ld("ttsOn",true));
-  const [ttsVol,setTtsVol]=useState(()=>ld("ttsVol",80));
-  const [ttsVoice,setTtsVoice]=useState(()=>ld("ttsVoice","cgSgspJ2msm6clMCkdW9"));
-  const [nativeVoices,setNativeVoices]=useState([]);
-  const [nativeVoice,setNativeVoice]=useState(()=>ld("nativeVoice",""));
-  const [elVoices,setElVoices]=useState(DEF_VOICES_EL);
-  const [elOk,setElOk]=useState(null);
-  const [ttsQueue,setTtsQueue]=useState(0); // contador visual de cola
+  // Regalos por regalo
+  const [addedGifts,setAddedGifts]   = useState(()=>ld("addedGifts",[]));
+  const [giftConfigs,setGiftConfigs] = useState(()=>ld("giftConfigs",{}));
+  const [giftSearch,setGiftSearch]   = useState("");
+  const [addingGift,setAddingGift]   = useState(false);
+  const [defaultGiftVol,setDefaultGiftVol] = useState(()=>ld("defaultGiftVol",80));
+  const setGiftCfg = (id,k,v) => setGiftConfigs(p=>({...p,[id]:{...(p[id]||defGiftCfg()),[k]:v}}));
+  const addGift = (g) => {
+    if(!addedGifts.find(x=>x.id===g.id)){
+      setAddedGifts(p=>[...p,g]);
+      setGiftConfigs(p=>({...p,[g.id]:defGiftCfg()}));
+    }
+    setAddingGift(false); setGiftSearch("");
+  };
+
+  // Spotify
+  const [spotifyEnabled,setSpotifyEnabled]     = useState(()=>ld("spotifyEnabled",false));
+  const [spotifyCmd,setSpotifyCmd]             = useState(()=>ld("spotifyCmd","!song"));
+  const [spotifyPerm,setSpotifyPerm]           = useState(()=>ld("spotifyPerm","Solo seguidores"));
+  const [spotifyCooldown,setSpotifyCooldown]   = useState(()=>ld("spotifyCooldown",30));
+  const [spotifyMaxQueue,setSpotifyMaxQueue]   = useState(()=>ld("spotifyMaxQueue",5));
+  const [spotifyAllowSkip,setSpotifyAllowSkip] = useState(()=>ld("spotifyAllowSkip",false));
+  const [spotifySkipPerm,setSpotifySkipPerm]   = useState(()=>ld("spotifySkipPerm","Solo moderadores"));
+  const [spotifyCustomUsers,setSpotifyCustomUsers] = useState(()=>ld("spotifyCustomUsers",[]));
+  const [spotifyCustomInput,setSpotifyCustomInput] = useState("");
+  const [spotifyQueue,setSpotifyQueue]         = useState(()=>ld("spotifyQueue",[]));
+  const [spotifyConnected,setSpotifyConnected] = useState(false);
+  const [spotifyNowPlaying,setSpotifyNowPlaying] = useState(null);
 
   // Acciones
-  const [actions,setActions]=useState(()=>ld("actions5",DEF_ACTIONS));
-  const [alertsOn,setAlertsOn]=useState(()=>ld("alertsOn",true));
-  const [showM,setShowM]=useState(false);
-  const [editA,setEditA]=useState(null);
-  const [searchQ,setSearchQ]=useState("");
-  const [toast,setToast]=useState("");
-  const [delConfirm,setDelConfirm]=useState(null);
-
-  // Chat
-  const [chatLog,setChatLog]=useState([]);
+  const [actions,setActions]     = useState(()=>ld("actions4",DEF_ACTIONS));
+  const [alertsOn,setAlertsOn]   = useState(()=>ld("alertsOn",true));
+  const [showM,setShowM]         = useState(false);
+  const [editA,setEditA]         = useState(null);
+  const [searchQ,setSearchQ]     = useState("");
+  const [toast,setToast]         = useState("");
+  const [delConfirm,setDelConfirm] = useState(null);
 
   // Refs
-  const ttsOnR=useRef(ttsOn);
-  const ttsVolR=useRef(ttsVol);
-  const ttsModeR=useRef(ttsMode);
-  const ttsVoiceR=useRef(ttsVoice);
-  const nativeVoiceR=useRef(nativeVoice);
-  const actsR=useRef(actions);
-  const alertsOnR=useRef(alertsOn);
+  const ttsOnR     = useRef(ttsOn);
+  const ttsVolR    = useRef(ttsVol);
+  const ttsModeR   = useRef(ttsMode);
+  const ttsVoiceR  = useRef(ttsVoice);
+  const nativeVoiceR = useRef(nativeVoice);
+  const actsR      = useRef([]);
+  const alertsOnR  = useRef(true);
+  const likeUserMapR = useRef({});
 
-  const showT=(msg)=>{setToast(msg);setTimeout(()=>setToast(""),2500);};
+  const showT = (msg) => { setToast(msg); setTimeout(()=>setToast(""),2500); };
 
-  // Sync refs
-  useEffect(()=>{ttsOnR.current=ttsOn;sv("ttsOn",ttsOn);},[ttsOn]);
-  useEffect(()=>{ttsVolR.current=ttsVol;sv("ttsVol",ttsVol);},[ttsVol]);
-  useEffect(()=>{ttsModeR.current=ttsMode;sv("ttsMode",ttsMode);},[ttsMode]);
-  useEffect(()=>{ttsVoiceR.current=ttsVoice;sv("ttsVoice",ttsVoice);},[ttsVoice]);
-  useEffect(()=>{nativeVoiceR.current=nativeVoice;sv("nativeVoice",nativeVoice);},[nativeVoice]);
-  useEffect(()=>{actsR.current=actions;sv("actions5",actions);},[actions]);
-  useEffect(()=>{alertsOnR.current=alertsOn;sv("alertsOn",alertsOn);},[alertsOn]);
-  useEffect(()=>{sv("tab",tab);},[tab]);
-  useEffect(()=>{sv("tuser",tUser);},[tUser]);
-  useEffect(()=>{sv("sessid",sessId);},[sessId]);
-  useEffect(()=>{sv("totDia",totDia);},[totDia]);
-  useEffect(()=>{sv("totLike",totLike);},[totLike]);
-  useEffect(()=>{sv("tapR",tapR);},[tapR]);
-  useEffect(()=>{sv("likeR",likeR);},[likeR]);
-  useEffect(()=>{sv("viewR",viewR);},[viewR]);
+  // Persist + sync refs
+  useEffect(()=>{ ttsOnR.current=ttsOn;      sv("ttsOn",ttsOn);       },[ttsOn]);
+  useEffect(()=>{ ttsVolR.current=ttsVol;    sv("ttsVol",ttsVol);     },[ttsVol]);
+  useEffect(()=>{ ttsModeR.current=ttsMode;  sv("ttsMode",ttsMode);   },[ttsMode]);
+  useEffect(()=>{ ttsVoiceR.current=ttsVoice;sv("ttsVoice",ttsVoice); },[ttsVoice]);
+  useEffect(()=>{ nativeVoiceR.current=nativeVoice;sv("nativeVoice",nativeVoice); },[nativeVoice]);
+  useEffect(()=>{ actsR.current=actions;     sv("actions4",actions);  },[actions]);
+  useEffect(()=>{ alertsOnR.current=alertsOn;sv("alertsOn",alertsOn); },[alertsOn]);
+  useEffect(()=>{ sv("tab",tab); },[tab]);
+  useEffect(()=>{ sv("tuser",tUser); },[tUser]);
+  useEffect(()=>{ sv("sessid",sessId); },[sessId]);
+  useEffect(()=>{ sv("totDia",totDia); },[totDia]);
+  useEffect(()=>{ sv("totLike",totLike); },[totLike]);
+  useEffect(()=>{ sv("tapR",tapR); },[tapR]);
+  useEffect(()=>{ sv("likeR",likeR); },[likeR]);
+  useEffect(()=>{ sv("viewR",viewR); },[viewR]);
+  useEffect(()=>{ sv("addedGifts",addedGifts); },[addedGifts]);
+  useEffect(()=>{ sv("giftConfigs",giftConfigs); },[giftConfigs]);
+  useEffect(()=>{ sv("defaultGiftVol",defaultGiftVol); },[defaultGiftVol]);
+  useEffect(()=>{ sv("spotifyEnabled",spotifyEnabled); },[spotifyEnabled]);
+  useEffect(()=>{ sv("spotifyCmd",spotifyCmd); },[spotifyCmd]);
+  useEffect(()=>{ sv("spotifyPerm",spotifyPerm); },[spotifyPerm]);
+  useEffect(()=>{ sv("spotifyCooldown",spotifyCooldown); },[spotifyCooldown]);
+  useEffect(()=>{ sv("spotifyMaxQueue",spotifyMaxQueue); },[spotifyMaxQueue]);
+  useEffect(()=>{ sv("spotifyAllowSkip",spotifyAllowSkip); },[spotifyAllowSkip]);
+  useEffect(()=>{ sv("spotifySkipPerm",spotifySkipPerm); },[spotifySkipPerm]);
+  useEffect(()=>{ sv("spotifyCustomUsers",spotifyCustomUsers); },[spotifyCustomUsers]);
+  useEffect(()=>{ sv("spotifyQueue",spotifyQueue); },[spotifyQueue]);
+  useEffect(()=>{ sv("ttsSpeed",ttsSpeed); },[ttsSpeed]);
+  useEffect(()=>{ sv("ttsPitch",ttsPitch); },[ttsPitch]);
+  useEffect(()=>{ sv("ttsChat",ttsChat); },[ttsChat]);
+  useEffect(()=>{ sv("ttsGifts",ttsGifts); },[ttsGifts]);
+  useEffect(()=>{ sv("ttsFollows",ttsFollows); },[ttsFollows]);
+  useEffect(()=>{ sv("ttsShares",ttsShares); },[ttsShares]);
+  useEffect(()=>{ sv("ttsSuperFan",ttsSuperFan); },[ttsSuperFan]);
+  useEffect(()=>{ sv("ttsJoin",ttsJoin); },[ttsJoin]);
+  useEffect(()=>{ sv("tplChat",tplChat); },[tplChat]);
+  useEffect(()=>{ sv("tplGift",tplGift); },[tplGift]);
+  useEffect(()=>{ sv("tplFollow",tplFollow); },[tplFollow]);
+  useEffect(()=>{ sv("tplShare",tplShare); },[tplShare]);
+  useEffect(()=>{ sv("tplJoin",tplJoin); },[tplJoin]);
+  useEffect(()=>{ sv("tplSuperFan",tplSuperFan); },[tplSuperFan]);
+  useEffect(()=>{ sv("filterAll",filterAll); },[filterAll]);
+  useEffect(()=>{ sv("filterFollowers",filterFollowers); },[filterFollowers]);
+  useEffect(()=>{ sv("filterMods",filterMods); },[filterMods]);
+  useEffect(()=>{ sv("filterSuperFans",filterSuperFans); },[filterSuperFans]);
+  useEffect(()=>{ sv("filterFanClub",filterFanClub); },[filterFanClub]);
+  useEffect(()=>{ sv("filterFanLevel",filterFanLevel); },[filterFanLevel]);
+  useEffect(()=>{ sv("filterCustomUsers",filterCustomUsers); },[filterCustomUsers]);
+  useEffect(()=>{ sv("queueInfinite",queueInfinite); },[queueInfinite]);
+  useEffect(()=>{ sv("queueReadOld",queueReadOld); },[queueReadOld]);
+  useEffect(()=>{ sv("queueSkipEmoji",queueSkipEmoji); },[queueSkipEmoji]);
+  useEffect(()=>{ sv("queueSkipAt",queueSkipAt); },[queueSkipAt]);
+  useEffect(()=>{ sv("queueSkipCmd",queueSkipCmd); },[queueSkipCmd]);
+  useEffect(()=>{ sv("queueAntiSpam",queueAntiSpam); },[queueAntiSpam]);
+  useEffect(()=>{ sv("queueIgnoreRep",queueIgnoreRep); },[queueIgnoreRep]);
+  useEffect(()=>{ sv("queueMaxRep",queueMaxRep); },[queueMaxRep]);
+  useEffect(()=>{ sv("queueWindow",queueWindow); },[queueWindow]);
 
-  // Voces nativas del navegador
+  // Cargar voces nativas
   useEffect(()=>{
     const load=()=>{
       const vs=window.speechSynthesis?.getVoices()||[];
@@ -737,17 +609,15 @@ function App() {
         if(def){setNativeVoice(def.name);nativeVoiceR.current=def.name;}
       }
     };
-    load();
-    window.speechSynthesis?.addEventListener("voiceschanged",load);
+    load(); window.speechSynthesis?.addEventListener("voiceschanged",load);
     return()=>window.speechSynthesis?.removeEventListener("voiceschanged",load);
   },[]);
 
-  // Voces ElevenLabs
+  // Cargar voces ElevenLabs
   useEffect(()=>{
     if(ttsMode!=="elevenlabs")return;
     fetch("https://api.elevenlabs.io/v1/voices",{headers:{"xi-api-key":EL_KEY}})
-      .then(r=>r.json())
-      .then(d=>{
+      .then(r=>r.json()).then(d=>{
         if(d.voices?.length){
           const m=d.voices.map(v=>({id:v.voice_id,name:v.name}));
           setElVoices([...DEF_VOICES_EL,...m.filter(v=>!DEF_VOICES_EL.find(x=>x.id===v.id))]);
@@ -756,545 +626,607 @@ function App() {
       }).catch(()=>setElOk(false));
   },[ttsMode]);
 
-  // Dots animación
-  useEffect(()=>{
-    if(!conn2)return;
-    const t=setInterval(()=>setDots(d=>d.length>=3?"":d+"."),400);
-    return()=>clearInterval(t);
-  },[conn2]);
+  useEffect(()=>{ if(!conn2)return; const t=setInterval(()=>setDots(d=>d.length>=3?"":d+"."),400); return()=>clearInterval(t); },[conn2]);
 
-  // Actualizar contador de cola TTS (visual)
-  useEffect(()=>{
-    const t=setInterval(()=>setTtsQueue(ttsQ.length),800);
-    return()=>clearInterval(t);
-  },[]);
-
-  /* ─── Disparar acción ──────────────────────── */
-  const fireAction=useCallback((eventType, giftName="", nickname="", giftCount=1)=>{
+  /* ─── fireAction ─────────────────────────────── */
+  const fireAction = useCallback((eventType, giftName="", nickname="", giftCount=1)=>{
     if(!alertsOnR.current)return;
     const acts=actsR.current.filter(a=>a.enabled&&a.event===eventType);
     for(const act of acts){
       if(act.event==="Gift Alert"){
-        const gn=(giftName||"").toLowerCase();
-        const an=(act.giftName||"").toLowerCase();
-        // "cualquier regalo" coincide con todo
-        if(an!=="cualquier regalo"){
-          // Buscar por id o nombre
-          const giftDb=TIKTOK_GIFTS_DB.find(g=>g.id===an||g.name.toLowerCase()===an);
-          const matchName=giftDb?gn.includes(giftDb.name.toLowerCase())||gn===giftDb.id:gn.includes(an);
-          if(!matchName)continue;
-        }
+        const gn=(giftName||"").toLowerCase(), an=(act.giftName||"").toLowerCase();
+        if(an!=="cualquier regalo"&&!gn.includes(an)&&!an.includes(gn))continue;
         if(giftCount<act.minCount)continue;
       }
       if(act.soundData) playAudio(act.soundData, ttsVolR.current/100);
       if(act.ttsOn&&act.ttsText&&ttsOnR.current){
         const text=act.ttsText.replace(/@usuario/gi,nickname);
-        if(ttsModeR.current==="elevenlabs"){
-          enqueueTTS(text,ttsVoiceR.current,ttsVolR.current/100,"elevenlabs");
-        }else{
-          enqueueTTS(text,nativeVoiceR.current,ttsVolR.current/100,"native");
+        if(ttsModeR.current==="elevenlabs") enqueueTTS(text,ttsVoiceR.current,ttsVolR.current/100,"elevenlabs");
+        else enqueueTTS(text,nativeVoiceR.current,ttsVolR.current/100,"native");
+      }
+    }
+    // También disparar configs de regalo individualmente
+    const giftCfgsSnap = JSON.parse(localStorage.getItem("tp_giftConfigs")||"{}");
+    const addedGiftsSnap = JSON.parse(localStorage.getItem("tp_addedGifts")||"[]");
+    if(eventType==="Gift Alert"){
+      for(const ag of addedGiftsSnap){
+        const cfg = giftCfgsSnap[ag.id]||defGiftCfg();
+        if(!cfg.enabled) continue;
+        const gn=(giftName||"").toLowerCase(), an=(ag.name||"").toLowerCase();
+        if(!gn.includes(an)&&!an.includes(gn)) continue;
+        if(cfg.soundData) playAudio(cfg.soundData, cfg.volume/100);
+        if(cfg.tts&&cfg.ttsTemplate&&ttsOnR.current){
+          const text=cfg.ttsTemplate.replace(/{username}/gi,nickname).replace(/{giftName}/gi,giftName).replace(/{repeatCount}/gi,giftCount);
+          if(ttsModeR.current==="elevenlabs") enqueueTTS(text,ttsVoiceR.current,cfg.volume/100,"elevenlabs");
+          else enqueueTTS(text,nativeVoiceR.current,cfg.volume/100,"native");
         }
       }
     }
   },[]);
 
-  /* ─── Socket.IO ─────────────────────────────── */
+  /* ─── Socket.IO ──────────────────────────────── */
   useEffect(()=>{
-    const sock=io(SERVER,{transports:["websocket"],reconnection:true,reconnectionAttempts:Infinity,
-      reconnectionDelay:1500,reconnectionDelayMax:8000,timeout:12000});
+    const sock=io(SERVER,{transports:["websocket"],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:1500,reconnectionDelayMax:8000,timeout:12000});
     sock.on("connect",()=>console.log("Socket conectado:",sock.id));
     sock.on("connect_error",e=>console.warn("Socket error:",e.message));
-
     sock.on("event",d=>{
       if(d.type==="chat"){
-        const msg=`@${d.nickname||d.user}: ${d.comment}`;
-        setLog(p=>[{t:"msg",tx:`💬 ${msg}`},...p].slice(0,50));
-        setChatLog(p=>[{user:d.nickname||d.user,text:d.comment,ts:Date.now()},...p].slice(0,100));
+        setLog(p=>[{t:"msg",tx:`💬 @${d.nickname||d.user}: ${d.comment}`},...p].slice(0,50));
         setStats(p=>({...p,messages:p.messages+1}));
-        // TTS Chat — solo si está activo
         if(ttsOnR.current){
           const text=`${d.nickname||d.user} dice: ${d.comment}`;
-          if(ttsModeR.current==="elevenlabs"){
-            enqueueTTS(text,ttsVoiceR.current,ttsVolR.current/100,"elevenlabs");
-          }else{
-            enqueueTTS(text,nativeVoiceR.current,ttsVolR.current/100,"native");
-          }
+          if(ttsModeR.current==="elevenlabs") enqueueTTS(text,ttsVoiceR.current,ttsVolR.current/100,"elevenlabs");
+          else enqueueTTS(text,nativeVoiceR.current,ttsVolR.current/100,"native");
         }
-      }else if(d.type==="gift"){
+      } else if(d.type==="gift"){
         setLog(p=>[{t:"gift",tx:`🎁 @${d.nickname||d.user} → ${d.giftCount}× ${d.giftName}`},...p].slice(0,50));
         setStats(p=>({...p,gifts:p.gifts+1}));
-        const dm=d.diamondCount||0;
-        setTotDia(p=>p+dm);
-        setTapR(prev=>{
-          const ex=prev.find(u=>u.user===d.user);
-          const upd=ex?prev.map(u=>u.user===d.user?{...u,diamonds:u.diamonds+dm,gifts:u.gifts+1}:u)
-            :[...prev,{user:d.user,nickname:d.nickname||d.user,diamonds:dm,gifts:1}];
-          return upd.sort((a,b)=>b.diamonds-a.diamonds).slice(0,10);
-        });
+        const dm=d.diamondCount||0; setTotDia(p=>p+dm);
+        setTapR(prev=>{const ex=prev.find(u=>u.user===d.user);const upd=ex?prev.map(u=>u.user===d.user?{...u,diamonds:u.diamonds+dm,gifts:u.gifts+1}:u):[...prev,{user:d.user,nickname:d.nickname||d.user,diamonds:dm,gifts:1}];return upd.sort((a,b)=>b.diamonds-a.diamonds).slice(0,10);});
         fireAction("Gift Alert",d.giftName,d.nickname||d.user,d.giftCount);
-      }else if(d.type==="follow"){
+      } else if(d.type==="follow"){
         setLog(p=>[{t:"follow",tx:`➕ @${d.nickname||d.user} te siguió`},...p].slice(0,50));
         setStats(p=>({...p,follows:p.follows+1}));
         fireAction("Follow Alert","",d.nickname||d.user);
-      }else if(d.type==="like"){
+      } else if(d.type==="like"){
         const lc=d.likeCount||1;
         setLog(p=>[{t:"like",tx:`❤️ ×${lc} likes de @${d.nickname||d.user}`},...p].slice(0,50));
-        setStats(p=>({...p,likes:p.likes+lc}));
-        setTotLike(p=>p+lc);
+        setStats(p=>({...p,likes:p.likes+lc})); setTotLike(p=>p+lc);
         setLAnim(true);setTimeout(()=>setLAnim(false),300);
-        const hid=Date.now();
-        setFh(p=>[...p,{id:hid,x:Math.random()*60+20}]);
-        setTimeout(()=>setFh(p=>p.filter(h=>h.id!==hid)),1200);
-        setLikeR(prev=>{
-          const ex=prev.find(u=>u.user===d.user);
-          const nn=d.nickname||d.user;
-          const upd=ex?prev.map(u=>u.user===d.user?{...u,count:u.count+lc,nickname:nn}:u)
-            :[...prev,{user:d.user,nickname:nn,count:lc}];
-          return upd.sort((a,b)=>b.count-a.count).slice(0,10);
-        });
+        const hid=Date.now(); setFh(p=>[...p,{id:hid,x:Math.random()*60+20}]); setTimeout(()=>setFh(p=>p.filter(h=>h.id!==hid)),1200);
+        setLikeR(prev=>{const ex=prev.find(u=>u.user===d.user);const nickname=d.nickname||d.user;const upd=ex?prev.map(u=>u.user===d.user?{...u,count:u.count+lc,nickname}:u):[...prev,{user:d.user,nickname,count:lc}];return upd.sort((a,b)=>b.count-a.count).slice(0,10);});
         fireAction("Like Alert","",d.nickname||d.user);
-      }else if(d.type==="sub"){
+      } else if(d.type==="sub"){
         setLog(p=>[{t:"sub",tx:`⭐ @${d.nickname||d.user} se suscribió`},...p].slice(0,50));
         fireAction("Sub Alert","",d.nickname||d.user);
-      }else if(d.type==="share"){
+      } else if(d.type==="share"){
         setLog(p=>[{t:"share",tx:`📤 @${d.nickname||d.user} compartió`},...p].slice(0,50));
         fireAction("Share Alert","",d.nickname||d.user);
       }
     });
-
     sock.on("viewers",d=>{
       setStats(p=>({...p,viewers:d.count||0}));
-      if(Array.isArray(d.topViewers)&&d.topViewers.length>0){
-        setTopViewers(d.topViewers.filter(v=>v.user&&v.user!=="?"));
-      }
+      if(Array.isArray(d.topViewers)&&d.topViewers.length>0) setTopViewers(d.topViewers.filter(v=>v.user&&v.user!=="?"));
     });
-
     sock.on("member",d=>{
       if(!d.user)return;
-      setViewR(prev=>{
-        const ex=prev.find(u=>u.user===d.user);
-        if(ex)return prev.map(u=>u.user===d.user?{...u,joinTime:d.timestamp||Date.now()}:u);
-        return [{user:d.user,nickname:d.nickname||d.user,joinTime:d.timestamp||Date.now()},...prev].slice(0,300);
-      });
+      setViewR(prev=>{const ex=prev.find(u=>u.user===d.user);if(ex)return prev.map(u=>u.user===d.user?{...u,joinTime:d.timestamp||Date.now()}:u);return [{user:d.user,nickname:d.nickname||d.user,joinTime:d.timestamp||Date.now()},...prev].slice(0,300);});
     });
-
-    /* ─── BATALLA — Puntos INDIVIDUALES ───────────
-       En un 2v2 de TikTok, cada "team" tiene 2 hosts.
-       El servidor manda teams[].points que es el score GRUPAL.
-       Aquí hacemos que si hay datos de miembros individuales los mostramos.
-       Si no hay datos individuales, igualmente mostramos por host (1 per team).
-    */
     sock.on("battle",d=>{
       if(d&&d.teams){
-        const normalized={
-          ...d,
-          ownerUsername:(d.ownerUsername||tUser||"").toLowerCase().replace(/^@/,""),
-          teams:d.teams.map(t=>({
-            hostName:t.hostName||t.uniqueId||t.displayId||"?",
-            hostNickname:t.hostNickname||t.nickname||t.hostName||"?",
-            // Puntos individuales: usar battleScore del host si existe, si no usar points del equipo
-            points:Number(t.battleScore||t.hostPoints||t.hostScore||t.points||t.score||0),
-            // Miembros del equipo para 2v2
-            members:Array.isArray(t.members)?t.members.map(m=>({
-              nickname:m.nickname||m.uniqueId||m.hostName||"?",
-              points:Number(m.battleScore||m.points||m.score||0),
-            })):[],
-          })).filter(t=>t.hostName!=="?"),
-        };
-        setBattle(normalized);
-      }else{
-        setBattle(d);
-      }
+        setBattle({...d,ownerUsername:(d.ownerUsername||tUser||"").toLowerCase().replace(/^@/,""),teams:d.teams.map(t=>({hostName:t.hostName||t.uniqueId||t.displayId||"?",hostNickname:t.hostNickname||t.nickname||t.hostName||"?",points:Number(t.points||t.battleScore||t.score||0)})).filter(t=>t.hostName!=="?")});
+      } else setBattle(d);
     });
-
-    sock.on("tiktok_disconnected",d=>{
-      setConn(false);
-      setLog(p=>[{t:"sys",tx:`⚠️ TikTok desconectado (@${d?.username||"?"}). Reconecta.`},...p].slice(0,50));
-    });
-    sock.on("tiktok_error",d=>{
-      setLog(p=>[{t:"sys",tx:`⚠️ Error: ${d.message}`},...p].slice(0,50));
-    });
-
+    sock.on("tiktok_disconnected",d=>{ setConn(false); setLog(p=>[{t:"sys",tx:`⚠️ TikTok desconectado (@${d?.username||"?"}). Reconecta.`},...p].slice(0,50)); });
+    sock.on("tiktok_error",d=>{ setLog(p=>[{t:"sys",tx:`⚠️ Error: ${d.message}`},...p].slice(0,50)); });
     return()=>sock.disconnect();
   },[fireAction]);
 
-  // Restaurar sesión
   useEffect(()=>{
-    const savedUser=ld("tuser","");
-    if(!savedUser)return;
-    fetch(`${SERVER}/status/${encodeURIComponent(savedUser)}`)
-      .then(r=>r.json()).then(d=>{
-        if(d.connected){setConn(true);setLog([{t:"sys",tx:`✅ Sesión restaurada @${savedUser}`}]);}
-      }).catch(()=>{});
+    const savedUser=ld("tuser",""); if(!savedUser)return;
+    fetch(`${SERVER}/status/${encodeURIComponent(savedUser)}`).then(r=>r.json()).then(d=>{ if(d.connected){setConn(true);setLog([{t:"sys",tx:`✅ Sesión restaurada @${savedUser}`}]);} }).catch(()=>{});
   },[]);
 
-  /* ─── Conectar ──────────────────────────────── */
-  const connect=async()=>{
-    if(!tUser.trim())return;
-    setConn2(true);setConnErr("");
+  const connect = async()=>{
+    if(!tUser.trim())return; setConn2(true); setConnErr("");
     try{
-      const r=await fetch(`${SERVER}/connect`,{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({username:tUser.trim(),sessionId:sessId.trim()||undefined})});
+      const r=await fetch(`${SERVER}/connect`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:tUser.trim(),sessionId:sessId.trim()||undefined})});
       const d=await r.json();
-      if(d.success){
-        setConn2(false);setConn(true);
-        setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0});
-        setTopViewers([]);setTotDia(0);setTotLike(0);setTapR([]);setLikeR([]);
-        setBattle(null);setViewR([]);sv("viewR",[]);
-        setLog([{t:"sys",tx:`✅ Conectado a @${tUser}`}]);
-        setChatLog([]);
-        clearTTSQueue();
-      }else{
-        setConn2(false);setConnErr(d.error||"¿Estás en LIVE?");
-        setLog(p=>[{t:"sys",tx:`⚠️ ${d.error||"¿Estás en LIVE?"}`},...p]);
-      }
-    }catch(e){
-      setConn2(false);setConnErr("Sin respuesta del servidor");
-      setLog(p=>[{t:"sys",tx:"⚠️ Sin respuesta del servidor"},...p]);
-    }
+      if(d.success){setConn2(false);setConn(true);setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0});setTopViewers([]);setTotDia(0);setTotLike(0);setTapR([]);setLikeR([]);setBattle(null);likeUserMapR.current={};setViewR([]);sv("viewR",[]);setLog([{t:"sys",tx:`✅ Conectado a @${tUser}`}]);}
+      else{setConn2(false);setConnErr(d.error||"¿Estás en LIVE?");setLog(p=>[{t:"sys",tx:`⚠️ ${d.error||"¿Estás en LIVE?"}`},...p]);}
+    }catch(e){setConn2(false);setConnErr("Sin respuesta del servidor");setLog(p=>[{t:"sys",tx:"⚠️ Sin respuesta del servidor"},...p]);}
   };
 
-  const disconnect=async()=>{
-    await fetch(`${SERVER}/disconnect`,{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({username:tUser})}).catch(()=>{});
-    setConn(false);setLog([]);
-    setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0});
-    setTotDia(0);setTotLike(0);setBattle(null);
-    clearTTSQueue();
+  const disconnect = async()=>{
+    await fetch(`${SERVER}/disconnect`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:tUser})}).catch(()=>{});
+    setConn(false); setLog([]); setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0}); setTotDia(0); setTotLike(0);
   };
 
-  /* ─── CRUD Acciones ─────────────────────────── */
   const saveAction=(form)=>{
-    if(form.id&&actions.find(a=>a.id===form.id)){
-      setActions(p=>p.map(a=>a.id===form.id?form:a));showT("✅ Acción actualizada");
-    }else{
-      setActions(p=>[...p,{...form,id:Date.now()}]);showT("✅ Acción creada");
-    }
-    setShowM(false);setEditA(null);
+    if(form.id&&actions.find(a=>a.id===form.id)) setActions(p=>p.map(a=>a.id===form.id?form:a));
+    else setActions(p=>[...p,{...form,id:Date.now()}]);
+    showT("✅ Acción guardada"); setShowM(false); setEditA(null);
   };
-  const deleteAction=(id)=>{setActions(p=>p.filter(a=>a.id!==id));setDelConfirm(null);showT("🗑️ Acción eliminada");};
+  const deleteAction=(id)=>{ setActions(p=>p.filter(a=>a.id!==id)); setDelConfirm(null); showT("🗑️ Acción eliminada"); };
   const testAction=(act)=>{
-    if(act.soundData)playAudio(act.soundData,ttsVol/100);
-    if(act.ttsOn&&act.ttsText){
-      const text=act.ttsText.replace(/@usuario/gi,"UsuarioPrueba");
-      enqueueTTS(text,ttsMode==="elevenlabs"?ttsVoice:nativeVoice,ttsVol/100,ttsMode);
-    }
+    if(act.soundData) playAudio(act.soundData,ttsVol/100);
+    if(act.ttsOn&&act.ttsText){ const text=act.ttsText.replace(/@usuario/gi,"UsuarioPrueba"); enqueueTTS(text,ttsMode==="elevenlabs"?ttsVoice:nativeVoice,ttsVol/100,ttsMode); }
     showT(`▶ Probando: ${act.name}`);
   };
 
-  if(!user)return <Login onLogin={u=>{sv("session",u);setUser(u);}}/>;
+  const speakTest=()=>{
+    if(ttsMode==="elevenlabs") enqueueTTS(ttsTestText,ttsVoice,ttsVol/100,"elevenlabs");
+    else enqueueTTS(ttsTestText,nativeVoice,ttsVol/100,"native");
+  };
+
+  /* ─── Render ─────────────────────────────────── */
+  if(!user) return <Login onLogin={u=>{sv("session",u);setUser(u);}}/>;
 
   const TABS=[
     {id:"dashboard",icon:"⚡",l:"Dashboard"},
     {id:"acciones", icon:"🎬",l:"Acciones"},
     {id:"tts",      icon:"🔊",l:"Voz & Audio"},
+    {id:"regalos",  icon:"🎁",l:"Regalos"},
+    {id:"musica",   icon:"🎵",l:"Música"},
     {id:"ranking",  icon:"🏆",l:"Ranking"},
     {id:"chat",     icon:"💬",l:"Chat"},
-    {id:"batalla",  icon:"⚔️",l:"Batalla"},
-    {id:"espect",   icon:"👁️",l:"Espectadores"},
+    {id:"batalla",  icon:"⚔️", l:"Batalla"},
+    {id:"espect",   icon:"👁️", l:"Espectadores"},
   ];
 
-  const LC={gift:"rgba(254,44,85,.08)",follow:"rgba(37,244,238,.08)",msg:"rgba(255,255,255,.02)",
-    like:"rgba(254,44,85,.05)",sub:"rgba(139,92,246,.08)",share:"rgba(255,255,255,.03)",sys:"rgba(37,244,238,.05)"};
-  const LB={gift:"#fe2c55",follow:"#25f4ee",msg:"#252535",like:"#fe2c55",sub:"#8b5cf6",share:"#555",sys:"#25f4ee"};
-
+  const LC={gift:"rgba(254,44,85,.08)",follow:"rgba(37,244,238,.08)",msg:"rgba(255,255,255,.02)",like:"rgba(254,44,85,.05)",sub:"rgba(139,92,246,.08)",share:"rgba(255,255,255,.04)",sys:"rgba(37,244,238,.06)"};
+  const LB={gift:"#fe2c55",follow:"#25f4ee",msg:"#2a2a3a",like:"#fe2c55",sub:"#8b5cf6",share:"#666",sys:"#25f4ee"};
+  const bCls=ev=>ev.startsWith("Follow")?"bf":ev.startsWith("Gift")?"bg":ev.startsWith("Like")?"bl":ev.startsWith("Sub")?"bs":"bsh";
   const bIco=ev=>ev.startsWith("Follow")?"➕":ev.startsWith("Gift")?"🎁":ev.startsWith("Like")?"❤️":ev.startsWith("Sub")?"⭐":"📤";
-  const bClr=ev=>ev.startsWith("Follow")?"#25f4ee":ev.startsWith("Gift")?"#fe2c55":ev.startsWith("Like")?"#fe2c55":ev.startsWith("Sub")?"#8b5cf6":"#555";
-
-  const C={background:"#0f0f1e",border:"1px solid #1a1a2e",borderRadius:14,padding:15,marginBottom:12};
-  const lbl={display:"block",color:"#445",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:5};
-  const inp={width:"100%",background:"#080810",border:"1px solid #1e1e35",borderRadius:8,padding:"9px 12px",color:"#fff",fontSize:12,outline:"none"};
-
+  const C={background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:15,marginBottom:12};
+  const lbl={display:"block",color:"#556",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:5};
+  const inp={width:"100%",background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,padding:"9px 12px",color:"#fff",fontSize:12,outline:"none"};
   const fActs=actions.filter(a=>a.name.toLowerCase().includes(searchQ.toLowerCase()));
 
   return (
-    <div style={{display:"flex",minHeight:"100vh",background:"#080810"}}>
-      {/* Modales */}
-      {showM&&(
-        <ActModal action={editA} ttsMode={ttsMode} ttsVoiceId={ttsVoice}
-          ttsNativeVoice={nativeVoice} vol={ttsVol}
-          onSave={saveAction} onClose={()=>{setShowM(false);setEditA(null);}}/>
-      )}
-      {delConfirm&&(
+    <div style={{display:"flex",minHeight:"100vh",background:"#0a0a0f"}}>
+
+      {/* ── Modales ── */}
+      {showM && <ActModal action={editA} ttsMode={ttsMode} ttsVoiceId={ttsVoice} ttsNativeVoice={nativeVoice} vol={ttsVol} onSave={saveAction} onClose={()=>{setShowM(false);setEditA(null);}}/>}
+
+      {delConfirm && (
         <div className="mo" onClick={()=>setDelConfirm(null)}>
           <div className="mb" style={{maxWidth:320}} onClick={e=>e.stopPropagation()}>
             <div style={{textAlign:"center",marginBottom:16}}>
               <div style={{fontSize:32,marginBottom:8}}>🗑️</div>
               <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:15,marginBottom:6}}>Eliminar acción</div>
-              <div style={{color:"#555",fontSize:12}}>
-                ¿Eliminar <span style={{color:"#fff",fontWeight:700}}>"{actions.find(a=>a.id===delConfirm)?.name}"</span>? No se puede deshacer.
-              </div>
+              <div style={{color:"#555",fontSize:12}}>¿Eliminar <span style={{color:"#fff",fontWeight:700}}>"{actions.find(a=>a.id===delConfirm)?.name}"</span>? No se puede deshacer.</div>
             </div>
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>setDelConfirm(null)}
-                style={{flex:1,background:"transparent",border:"1px solid #222235",borderRadius:9,
-                  padding:"10px",color:"#555",fontWeight:600,cursor:"pointer",fontSize:12}}>Cancelar</button>
-              <button onClick={()=>deleteAction(delConfirm)}
-                style={{flex:1,background:"rgba(254,44,85,.12)",border:"1px solid rgba(254,44,85,.3)",
-                  borderRadius:9,padding:"10px",color:"#fe2c55",fontWeight:700,cursor:"pointer",fontSize:12}}>Sí, eliminar</button>
+              <button onClick={()=>setDelConfirm(null)} style={{flex:1,background:"transparent",border:"1px solid #252535",borderRadius:9,padding:"10px",color:"#555",fontWeight:600,cursor:"pointer",fontSize:12}}>Cancelar</button>
+              <button onClick={()=>deleteAction(delConfirm)} style={{flex:1,background:"rgba(254,44,85,.15)",border:"1px solid rgba(254,44,85,.35)",borderRadius:9,padding:"10px",color:"#fe2c55",fontWeight:700,cursor:"pointer",fontSize:12}}>Sí, eliminar</button>
             </div>
           </div>
         </div>
       )}
-      {toast&&<div className="toast">{toast}</div>}
 
-      {/* ─── SIDEBAR DESKTOP ─────────────────────────── */}
-      <div className="sidebar-desktop" style={{width:210,background:"#0c0c1a",borderRight:"1px solid #161626",
-        display:"flex",flexDirection:"column",padding:"14px 10px",
-        position:"fixed",top:0,bottom:0,left:0,zIndex:50}}>
+      {toast && <div className="toast">{toast}</div>}
+      {sb && <div onClick={()=>setSb(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:40}}/>}
+
+      {/* ── Sidebar ── */}
+      <div style={{width:215,background:"#0d0d18",borderRight:"1px solid #1a1a28",display:"flex",flexDirection:"column",padding:"13px 10px",position:"fixed",top:0,bottom:0,left:0,zIndex:50,transform:sb?"translateX(0)":"translateX(-100%)",transition:"transform .28s ease"}}>
         <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:14,paddingLeft:2}}>
-          <div style={{width:28,height:28,borderRadius:7,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",
-            display:"flex",alignItems:"center",justifyContent:"center",
-            fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:14}}>T</div>
-          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16,letterSpacing:-.5}}>
-            ik<span style={{color:"#fe2c55"}}>Panel</span>
-          </span>
+          <div style={{width:27,height:27,borderRadius:7,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:13}}>T</div>
+          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16,letterSpacing:-.5}}>ik<span style={{color:"#fe2c55"}}>Panel</span></span>
         </div>
-        {/* User */}
-        <div style={{display:"flex",alignItems:"center",gap:7,background:"#161626",
-          borderRadius:9,padding:"7px 9px",marginBottom:9}}>
-          <div style={{width:27,height:27,borderRadius:"50%",flexShrink:0,
-            background:"linear-gradient(135deg,#fe2c55,#25f4ee)",
-            display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:11}}>
-            {user.avatar}
-          </div>
+        <div style={{display:"flex",alignItems:"center",gap:7,background:"#1a1a28",borderRadius:9,padding:"7px 9px",marginBottom:9}}>
+          <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:11}}>{user.avatar}</div>
           <div style={{overflow:"hidden"}}>
             <div style={{fontSize:11,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{user.name}</div>
             <div style={{fontSize:9,color:"#fe2c55",fontWeight:600,marginTop:1}}>{user.plan}</div>
           </div>
         </div>
-        {/* Status */}
-        <div style={{display:"flex",alignItems:"center",gap:6,
-          background:conn?"rgba(37,244,238,.04)":"rgba(255,255,255,.02)",
-          border:`1px solid ${conn?"rgba(37,244,238,.15)":"#161626"}`,
-          borderRadius:20,padding:"4px 9px",fontSize:9,color:conn?"#25f4ee":"#444",marginBottom:12,overflow:"hidden"}}>
-          <div className={conn?"ld":""} style={{width:5,height:5,borderRadius:"50%",flexShrink:0,
-            background:conn?"#25f4ee":"#252535",boxShadow:conn?"0 0 7px #25f4ee":"none"}}/>
-          <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-            {conn?`@${tUser}`:"Sin conexión"}
-          </span>
+        <div style={{display:"flex",alignItems:"center",gap:6,background:conn?"rgba(37,244,238,.05)":"rgba(255,255,255,.02)",border:`1px solid ${conn?"rgba(37,244,238,.18)":"#1a1a28"}`,borderRadius:20,padding:"4px 9px",fontSize:9,color:conn?"#25f4ee":"#444",marginBottom:12,overflow:"hidden"}}>
+          <div className={conn?"ld":""} style={{width:5,height:5,borderRadius:"50%",flexShrink:0,background:conn?"#25f4ee":"#252535",boxShadow:conn?"0 0 7px #25f4ee":"none"}}/>
+          <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{conn?`@${tUser}`:"Sin conexión"}</span>
         </div>
-        {/* Nav */}
-        <nav style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
+        <nav style={{display:"flex",flexDirection:"column",gap:2,flex:1,overflowY:"auto"}}>
           {TABS.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)}
-              style={{display:"flex",alignItems:"center",gap:7,
-                background:tab===t.id?"rgba(254,44,85,.09)":"transparent",
-                border:tab===t.id?"1px solid rgba(254,44,85,.18)":"1px solid transparent",
-                borderRadius:8,padding:"8px 9px",color:tab===t.id?"#fff":"#555",
-                cursor:"pointer",fontSize:11,fontWeight:tab===t.id?700:500,textAlign:"left"}}>
+            <button key={t.id} onClick={()=>{setTab(t.id);setSb(false);}}
+              style={{display:"flex",alignItems:"center",gap:7,background:tab===t.id?"rgba(254,44,85,.1)":"transparent",border:tab===t.id?"1px solid rgba(254,44,85,.18)":"1px solid transparent",borderRadius:8,padding:"8px 8px",color:tab===t.id?"#fff":"#555",cursor:"pointer",fontSize:11,fontWeight:tab===t.id?700:500,textAlign:"left"}}>
               <span style={{fontSize:13}}>{t.icon}</span>{t.l}
             </button>
           ))}
         </nav>
-        {wakeLockOn&&<div style={{fontSize:8,color:"#252535",textAlign:"center",marginBottom:4}}>🔆 Pantalla activa</div>}
-        <button onClick={()=>{localStorage.removeItem("tp_session");setUser(null);}}
-          style={{background:"transparent",border:"1px solid #161626",borderRadius:7,
-            padding:"6px 8px",color:"#333",cursor:"pointer",fontSize:10,marginTop:4}}>
-          Cerrar sesión
-        </button>
+        <button onClick={()=>{localStorage.removeItem("tp_session");setUser(null);}} style={{background:"transparent",border:"1px solid #1a1a28",borderRadius:7,padding:"6px 8px",color:"#444",cursor:"pointer",fontSize:10,marginTop:5}}>Cerrar sesión</button>
       </div>
 
-      {/* ─── BOTTOM NAV MOBILE ───────────────────────── */}
-      <div className="bottom-nav">
-        {TABS.map(t=>(
-          <button key={t.id} className={tab===t.id?"act":""} onClick={()=>setTab(t.id)}>
-            <span className="ico">{t.icon}</span>
-            {t.l}
-          </button>
-        ))}
-      </div>
-
-      {/* ─── MAIN ───────────────────────────────────── */}
-      <div className="main-content" style={{flex:1,marginLeft:210,display:"flex",flexDirection:"column",minWidth:0}}>
+      {/* ── Main ── */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
         {/* Topbar */}
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-          padding:"9px 16px",borderBottom:"1px solid #161626",background:"#080810",
-          position:"sticky",top:0,zIndex:30}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px",borderBottom:"1px solid #1a1a28",background:"#0a0a0f",position:"sticky",top:0,zIndex:30}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:15,letterSpacing:-.3}}>
-              {TABS.find(t=>t.id===tab)?.icon} {TABS.find(t=>t.id===tab)?.l}
-            </span>
+            <button onClick={()=>setSb(!sb)} style={{background:"#1a1a28",border:"1px solid #252535",borderRadius:6,width:29,height:29,cursor:"pointer",color:"#fff",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center"}}>☰</button>
+            <div>
+              <div style={{fontSize:13,fontWeight:700}}>{TABS.find(t=>t.id===tab)?.icon} {TABS.find(t=>t.id===tab)?.l}</div>
+            </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            {/* TTS Queue badge */}
-            {ttsQueue>0&&(
-              <div className="tts-badge">
-                🔊 {ttsQueue} en cola
-              </div>
-            )}
-            {conn&&<div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(254,44,85,.1)",
-              border:"1px solid rgba(254,44,85,.25)",borderRadius:20,padding:"4px 12px",
-              color:"#fe2c55",fontWeight:800,fontSize:10,letterSpacing:1}}>
-              <div className="ld" style={{width:6,height:6,borderRadius:"50%",background:"#fe2c55"}}/>LIVE
+            {wakeLockOn && <span style={{fontSize:9,color:"#25f4ee",background:"rgba(37,244,238,.08)",border:"1px solid rgba(37,244,238,.2)",borderRadius:20,padding:"2px 8px"}}>🔆 Pantalla activa</span>}
+            {conn && <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.25)",borderRadius:20,padding:"3px 10px"}}>
+              <div className="ld" style={{width:5,height:5,borderRadius:"50%",background:"#fe2c55",boxShadow:"0 0 6px #fe2c55"}}/>
+              <span style={{fontSize:9,color:"#fe2c55",fontWeight:700}}>LIVE</span>
             </div>}
           </div>
         </div>
 
-        {/* Content */}
-        <div style={{padding:14,flex:1}}>
+        {/* Contenido */}
+        <div style={{flex:1,padding:12,overflowY:"auto"}}>
 
-          {/* ═══ DASHBOARD ═══════════════════════════ */}
-          {tab==="dashboard"&&(
+          {/* ══════════════════════════════════════════════════════
+              TAB: DASHBOARD
+          ══════════════════════════════════════════════════════ */}
+          {tab==="dashboard" && (
             <div className="ai">
-              {/* Conectar */}
               <div style={C}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13,marginBottom:14,color:"#fff"}}>
-                  🎯 Conectar al LIVE
-                </div>
-                <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:connErr?8:0}}>
-                  <div style={{display:"flex",alignItems:"center",flex:1,background:"#080810",
-                    border:"1px solid #1e1e35",borderRadius:10,overflow:"hidden"}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:10}}>🎯 Conectar al LIVE</div>
+                <div style={{display:"flex",gap:8,marginBottom:8}}>
+                  <div style={{display:"flex",alignItems:"center",flex:1,background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,overflow:"hidden"}}>
                     <span style={{color:"#fe2c55",fontWeight:800,padding:"0 10px",fontSize:14}}>@</span>
-                    <input style={{flex:1,background:"transparent",border:"none",padding:"11px 8px 11px 0",
-                      color:"#fff",fontSize:13,outline:"none"}}
-                      placeholder="tu_usuario_tiktok"
-                      value={tUser}
-                      onChange={e=>setTUser(e.target.value)}
-                      disabled={conn||conn2}/>
+                    <input style={{flex:1,background:"transparent",border:"none",padding:"10px 10px 10px 0",color:"#fff",fontSize:12,outline:"none"}} placeholder="tu_usuario_tiktok" value={tUser} onChange={e=>setTUser(e.target.value)} disabled={conn||conn2}/>
                   </div>
-                  {!conn
-                    ?<button onClick={connect} disabled={conn2||!tUser.trim()}
-                      style={{background:(!conn2&&tUser.trim())?"linear-gradient(135deg,#fe2c55,#ff6b81)":"#151525",
-                        border:"none",borderRadius:10,padding:"11px 18px",
-                        color:(!conn2&&tUser.trim())?"#fff":"#333",fontSize:13,fontWeight:700,
-                        cursor:(!conn2&&tUser.trim())?"pointer":"not-allowed",whiteSpace:"nowrap"}}>
-                      {conn2?`Conectando${dots}`:"Conectar"}
-                    </button>
-                    :<button onClick={disconnect}
-                      style={{background:"rgba(254,44,85,.09)",border:"1px solid rgba(254,44,85,.25)",
-                        borderRadius:10,padding:"11px 18px",color:"#fe2c55",fontSize:13,
-                        fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
-                      Desconectar
-                    </button>
-                  }
+                  {!conn ? <button style={{background:(!conn2&&tUser)?"linear-gradient(135deg,#fe2c55,#ff6b81)":"#2a2a3a",border:"none",borderRadius:8,padding:"10px 18px",color:(!conn2&&tUser)?"#fff":"#555",fontSize:12,fontWeight:700,cursor:(!conn2&&tUser)?"pointer":"not-allowed"}} onClick={connect} disabled={conn2||!tUser}>{conn2?`Conectando${dots}`:"Conectar"}</button>
+                  : <button style={{background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.3)",borderRadius:8,padding:"10px 18px",color:"#fe2c55",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={disconnect}>Desconectar</button>}
                 </div>
-                {connErr&&<div style={{color:"#fe2c55",fontSize:11,marginTop:6,padding:"6px 10px",
-                  background:"rgba(254,44,85,.06)",borderRadius:7}}>⚠️ {connErr}</div>}
-                {conn2&&<div style={{height:2,background:"#1a1a2e",borderRadius:1,marginTop:10,overflow:"hidden"}}>
-                  <div className="cf" style={{height:"100%",width:"45%",background:"linear-gradient(90deg,#25f4ee,#fe2c55)",borderRadius:1}}/>
-                </div>}
+                {connErr && <div style={{color:"#fe2c55",fontSize:11,marginTop:4}}>⚠️ {connErr}</div>}
+                {conn2 && <div style={{height:2,background:"#1e1e2e",borderRadius:1,marginTop:8,overflow:"hidden"}}><div className="cf" style={{height:"100%",width:"60%",background:"linear-gradient(90deg,#25f4ee,#fe2c55)"}}/></div>}
+                <div style={{marginTop:10}}>
+                  <label style={lbl}>Session ID (opcional para cuentas privadas)</label>
+                  <input style={inp} placeholder="sessionid=..." value={sessId} onChange={e=>setSessId(e.target.value)} disabled={conn}/>
+                </div>
               </div>
 
               {/* Stats */}
               <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:8,marginBottom:12}}>
-                {[
-                  {label:"Espectadores",value:stats.viewers,icon:"👁️",c:"#25f4ee"},
-                  {label:"Regalos",     value:stats.gifts,  icon:"🎁",c:"#fe2c55"},
-                  {label:"Seguidores",  value:stats.follows,icon:"➕",c:"#a78bfa"},
-                  {label:"Likes",       value:stats.likes,  icon:"❤️",c:"#fb7185"},
-                ].map(s=>(
-                  <div key={s.label} style={{...C,margin:0,display:"flex",alignItems:"center",gap:10,padding:12}}>
-                    <span style={{fontSize:22}}>{s.icon}</span>
-                    <div>
-                      <div style={{fontSize:20,fontWeight:900,color:s.c,lineHeight:1,fontFamily:"'Syne',sans-serif"}}>{s.value.toLocaleString()}</div>
-                      <div style={{fontSize:9,color:"#444",fontWeight:700,letterSpacing:.5}}>{s.label}</div>
-                    </div>
+                {[{label:"Espectadores",value:stats.viewers,icon:"👁️",c:"#25f4ee"},{label:"Regalos",value:stats.gifts,icon:"🎁",c:"#fe2c55"},{label:"Seguidores",value:stats.follows,icon:"➕",c:"#a78bfa"},{label:"Mensajes",value:stats.messages,icon:"💬",c:"#fbbf24"},{label:"Likes",value:stats.likes,icon:"❤️",c:"#fe2c55"},{label:"Diamantes",value:totDia,icon:"💎",c:"#25f4ee"}].map(s=>(
+                  <div key={s.label} style={{...C,marginBottom:0,textAlign:"center",padding:"12px 8px"}}>
+                    <div style={{fontSize:20}}>{s.icon}</div>
+                    <div style={{fontSize:22,fontWeight:900,color:s.c,fontFamily:"'Syne',sans-serif"}}>{s.value.toLocaleString()}</div>
+                    <div style={{fontSize:9,color:"#555",fontWeight:600,marginTop:2}}>{s.label}</div>
                   </div>
                 ))}
               </div>
 
-              {/* Totales */}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-                <div style={{...C,margin:0,padding:12,textAlign:"center"}}>
-                  <div style={{fontSize:9,color:"#fbbf24",fontWeight:700,letterSpacing:1,marginBottom:4}}>💎 DIAMANTES TOTALES</div>
-                  <div style={{fontSize:22,fontWeight:900,color:"#fbbf24",fontFamily:"'Syne',sans-serif"}}>{totDia.toLocaleString()}</div>
+              {/* Alertas toggle */}
+              <div style={{...C,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#fff"}}>🔔 Alertas de sonido</div>
+                  <div style={{fontSize:10,color:"#555",marginTop:2}}>{alertsOn?"Activadas — reproduciendo sonidos y TTS":"Silenciadas — sin reproducción"}</div>
                 </div>
-                <div style={{...C,margin:0,padding:12,textAlign:"center"}}>
-                  <div style={{fontSize:9,color:"#fb7185",fontWeight:700,letterSpacing:1,marginBottom:4}}>❤️ LIKES TOTALES</div>
-                  <div style={{fontSize:22,fontWeight:900,color:"#fb7185",fontFamily:"'Syne',sans-serif"}}>{totLike.toLocaleString()}</div>
-                </div>
+                <Toggle on={alertsOn} onChange={()=>setAlertsOn(!alertsOn)}/>
               </div>
 
-              {/* Actividad */}
+              {/* Log */}
               <div style={C}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:12,marginBottom:10,color:"#fff"}}>📋 Actividad en tiempo real</div>
-                <div style={{background:"#080810",borderRadius:10,padding:10,height:190,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
-                  {log.length===0
-                    ?<div style={{color:"#2a2a3a",fontSize:12,textAlign:"center",marginTop:60}}>{conn?"Esperando actividad...":"Conecta tu LIVE para ver actividad"}</div>
-                    :log.map((item,i)=>(
-                      <div key={i} className="log-item" style={{background:LC[item.t]||"rgba(255,255,255,.02)",borderLeftColor:LB[item.t]||"#222",color:LB[item.t]||"#666"}}>
-                        {item.tx}
-                      </div>
-                    ))
-                  }
+                <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:8}}>📋 Actividad reciente</div>
+                <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:220,overflowY:"auto",position:"relative"}}>
+                  {fh.map(h=><div key={h.id} className="fh" style={{left:`${h.x}%`,bottom:0}}>❤️</div>)}
+                  {log.length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"20px 0"}}>{conn?"Esperando eventos...":"Conecta tu LIVE para ver actividad"}</div>
+                  : log.map((item,i)=><div key={i} className="ai" style={{fontSize:11,padding:"5px 8px",borderRadius:6,background:LC[item.t]||"rgba(255,255,255,.02)",color:LB[item.t]||"#888",borderLeft:`2px solid ${LB[item.t]||"#333"}`}}>{item.tx}</div>)}
                 </div>
               </div>
             </div>
           )}
 
-          {/* ═══ ACCIONES ═══════════════════════════ */}
-          {tab==="acciones"&&(
+          {/* ══════════════════════════════════════════════════════
+              TAB: ACCIONES
+          ══════════════════════════════════════════════════════ */}
+          {tab==="acciones" && (
             <div className="ai">
-              {/* Header con buscador y botón */}
-              <div style={{display:"flex",gap:8,marginBottom:12}}>
-                <input style={{...inp,flex:1,fontSize:12}} placeholder="🔍 Buscar acción..."
-                  value={searchQ} onChange={e=>setSearchQ(e.target.value)}/>
-                <button onClick={()=>{setEditA(null);setShowM(true);}}
-                  style={{background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:9,
-                    padding:"9px 16px",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
-                  + Nueva
-                </button>
+              <div style={{display:"flex",gap:8,marginBottom:10}}>
+                <input style={{...inp,flex:1}} placeholder="🔍 Buscar acción..." value={searchQ} onChange={e=>setSearchQ(e.target.value)}/>
+                <button onClick={()=>{setEditA(null);setShowM(true);}} style={{background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:8,padding:"9px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>+ Nueva</button>
               </div>
+              {fActs.length===0 ? <div style={{...C,textAlign:"center",color:"#444",padding:"30px 0",fontSize:12}}>No hay acciones. Crea una con el botón +</div>
+              : fActs.map(act=>(
+                <div key={act.id} style={{...C,opacity:act.enabled?1:.5}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:act.soundName||act.ttsOn?8:0}}>
+                    <div style={{fontSize:18}}>{bIco(act.event)}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:700,color:"#fff",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{act.name}</div>
+                      <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
+                        <span className={`badge ${bCls(act.event)}`}>{act.event}</span>
+                        {act.giftName&&act.giftName!=="Cualquier regalo"&&<span className="badge bsh">{act.giftName}</span>}
+                        {act.soundName&&<span className="badge" style={{background:"rgba(37,244,238,.08)",color:"#25f4ee",border:"1px solid rgba(37,244,238,.18)"}}>🎵 {act.soundName.length>15?act.soundName.slice(0,15)+"...":act.soundName}</span>}
+                        {act.ttsOn&&<span className="badge" style={{background:"rgba(139,92,246,.08)",color:"#8b5cf6",border:"1px solid rgba(139,92,246,.18)"}}>🔊 TTS</span>}
+                      </div>
+                    </div>
+                    <Toggle on={act.enabled} onChange={()=>setActions(p=>p.map(a=>a.id===act.id?{...a,enabled:!a.enabled}:a))} size="sm"/>
+                    <IBtn ico="▶" onClick={()=>testAction(act)} color="#25f4ee" title="Probar"/>
+                    <IBtn ico="✏️" onClick={()=>{setEditA(act);setShowM(true);}} color="#fbbf24" title="Editar"/>
+                    <IBtn ico="🗑" onClick={()=>setDelConfirm(act.id)} color="#fe2c55" title="Eliminar"/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
-              {/* Toggle alertas globales */}
-              <div style={{...C,display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          {/* ══════════════════════════════════════════════════════
+              TAB: VOZ & AUDIO (TTS mejorado del jsx)
+          ══════════════════════════════════════════════════════ */}
+          {tab==="tts" && (
+            <div className="ai">
+
+              {/* Motor TTS */}
+              <SecHdr title="🎙️ MOTOR DE VOZ"/>
+              <div style={C}>
+                <div style={{display:"flex",gap:6,marginBottom:14}}>
+                  {[{id:"native",label:"🌐 Navegador (Gratis)"},{id:"elevenlabs",label:"⚡ ElevenLabs (IA)"}].map(m=>(
+                    <button key={m.id} className={`mode-btn${ttsMode===m.id?" act":""}`} onClick={()=>setTtsMode(m.id)}>{m.label}</button>
+                  ))}
+                </div>
+
+                {ttsMode==="native" && (
+                  <div style={{marginBottom:12}}>
+                    <label style={lbl}>Voz del sistema</label>
+                    <select style={inp} value={nativeVoice} onChange={e=>setNativeVoice(e.target.value)}>
+                      {nativeVoices.map(v=><option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}
+                    </select>
+                  </div>
+                )}
+                {ttsMode==="elevenlabs" && (
+                  <div style={{marginBottom:12}}>
+                    <label style={lbl}>Voz ElevenLabs {elOk===true&&<span style={{color:"#4ade80"}}>✓ Conectado</span>}{elOk===false&&<span style={{color:"#fe2c55"}}>✗ Error de API</span>}</label>
+                    <select style={inp} value={ttsVoice} onChange={e=>setTtsVoice(e.target.value)}>
+                      {elVoices.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {[{l:"Volumen",v:ttsVol,s:setTtsVol,min:0,max:100,step:1,fmt:v=>`${v}%`},
+                  {l:"Velocidad",v:ttsSpeed,s:setTtsSpeed,min:.5,max:2,step:.1,fmt:v=>v.toFixed(1)+"x"},
+                  {l:"Tono",v:ttsPitch,s:setTtsPitch,min:0,max:2,step:.1,fmt:v=>v.toFixed(1)}].map(r=>(
+                  <div key={r.l} style={{marginBottom:12}}>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                      <span style={{color:"#aaa",fontSize:11}}>{r.l}</span>
+                      <span style={{color:"#fff",fontSize:11,fontWeight:700}}>{r.fmt(r.v)}</span>
+                    </div>
+                    <input type="range" min={r.min} max={r.max} step={r.step} value={r.v} onChange={e=>r.s(Number(e.target.value))} style={{width:"100%",accentColor:"#fe2c55",cursor:"pointer"}}/>
+                  </div>
+                ))}
+
                 <div>
-                  <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Alertas de sonido</div>
-                  <div style={{fontSize:10,color:"#444",marginTop:2}}>Activar/desactivar todos los sonidos y TTS</div>
+                  <label style={lbl}>Texto de prueba</label>
+                  <div style={{display:"flex",gap:8}}>
+                    <input style={{...inp,flex:1}} value={ttsTestText} onChange={e=>setTtsTestText(e.target.value)}/>
+                    <button onClick={speakTest} style={{background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:8,padding:"9px 14px",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>▶ Probar</button>
+                  </div>
                 </div>
-                <Toggle on={alertsOn} onChange={()=>setAlertsOn(!alertsOn)}/>
               </div>
 
-              {/* Lista de acciones */}
-              {fActs.length===0&&(
-                <div style={{...C,textAlign:"center",color:"#333",padding:"32px 16px"}}>
-                  <div style={{fontSize:28,marginBottom:8}}>🎬</div>
-                  <div style={{fontSize:12}}>Sin acciones. Crea una pulsando "+ Nueva"</div>
+              {/* TTS Global */}
+              <SecHdr title="🔊 TTS GLOBAL"/>
+              <div style={{...C,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>TTS activado</div>
+                  <div style={{fontSize:10,color:"#555",marginTop:2}}>Lee los mensajes del chat en voz alta</div>
                 </div>
-              )}
-              {fActs.map(act=>{
-                const giftDb=TIKTOK_GIFTS_DB.find(g=>g.id===act.giftName||g.name.toLowerCase()===act.giftName?.toLowerCase());
-                return (
-                  <div key={act.id} style={{...C,opacity:act.enabled?1:.5,borderColor:act.enabled?"#1a1a2e":"#111120"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      {/* Ícono evento */}
-                      <div style={{fontSize:20}}>{bIco(act.event)}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:700,fontSize:13,color:"#fff",
-                          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                          {act.name}
+                <Toggle on={ttsOn} onChange={()=>setTtsOn(!ttsOn)} color="#25f4ee"/>
+              </div>
+
+              {/* Eventos a leer */}
+              <SecHdr title="📢 EVENTOS A LEER"/>
+              <div style={C}>
+                {[{l:"Chat (mensajes)",v:ttsChat,s:setTtsChat},{l:"Regalos",v:ttsGifts,s:setTtsGifts},{l:"Seguidores",v:ttsFollows,s:setTtsFollows},{l:"Compartidos",v:ttsShares,s:setTtsShares},{l:"Super Fan",v:ttsSuperFan,s:setTtsSuperFan},{l:"Se unió al LIVE",v:ttsJoin,s:setTtsJoin}].map(ev=>(
+                  <div key={ev.l} style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,paddingBottom:10,borderBottom:"1px solid #0f0f1a"}}>
+                    <span style={{color:"#aaa",fontSize:12}}>{ev.l}</span>
+                    <Toggle on={ev.v} onChange={()=>ev.s(!ev.v)} size="sm" color="#25f4ee"/>
+                  </div>
+                ))}
+              </div>
+
+              {/* Plantillas */}
+              <SecHdr title="📝 PLANTILLAS DE LECTURA"/>
+              <div style={C}>
+                {[{l:"Chat",v:tplChat,s:setTplChat,h:"{username} {nickname} {message}"},
+                  {l:"Regalos",v:tplGift,s:setTplGift,h:"{username} {giftName} {repeatCount} {totalValue}"},
+                  {l:"Seguidores",v:tplFollow,s:setTplFollow,h:"{username} {nickname}"},
+                  {l:"Compartidos",v:tplShare,s:setTplShare,h:"{username} {nickname}"},
+                  {l:"Se unió",v:tplJoin,s:setTplJoin,h:"{username} {nickname}"},
+                  {l:"Super Fan",v:tplSuperFan,s:setTplSuperFan,h:"{username} {nickname}"}].map(t=>(
+                  <div key={t.l} style={{marginBottom:14}}>
+                    <label style={{...lbl,color:"#aaa",marginBottom:4,fontWeight:700}}>{t.l}</label>
+                    <input style={inp} value={t.v} onChange={e=>t.s(e.target.value)}/>
+                    <div style={{color:"#444",fontSize:10,marginTop:3}}>Variables: <span style={{color:"#25f4ee",fontFamily:"monospace"}}>{t.h}</span></div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Filtros */}
+              <SecHdr title="👥 FILTROS DE USUARIOS"/>
+              <div style={C}>
+                {[{l:"Leer a todos",sub:"Activa o desactiva todos los filtros",v:filterAll,s:setFilterAll},
+                  {l:"Seguidores",sub:"Lee a usuarios que te siguen",v:filterFollowers,s:setFilterFollowers},
+                  {l:"Moderadores",sub:"Lee a personas asignadas como moderadores",v:filterMods,s:setFilterMods},
+                  {l:"Super Fans",sub:"Usuarios que se hicieron super fan",v:filterSuperFans,s:setFilterSuperFans}].map(f=>(
+                  <div key={f.l} style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,paddingBottom:12,borderBottom:"1px solid #0f0f1a"}}>
+                    <div>
+                      <div style={{fontSize:12,color:"#aaa",fontWeight:600}}>{f.l}</div>
+                      <div style={{fontSize:10,color:"#444",marginTop:2}}>{f.sub}</div>
+                    </div>
+                    <Toggle on={f.v} onChange={()=>f.s(!f.v)} size="sm" color="#25f4ee"/>
+                  </div>
+                ))}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,paddingBottom:12,borderBottom:"1px solid #0f0f1a"}}>
+                  <div>
+                    <div style={{fontSize:12,color:"#aaa",fontWeight:600}}>Fan Club · Nivel mínimo {filterFanLevel}</div>
+                    <div style={{fontSize:10,color:"#444",marginTop:2}}>Lee solo si nivel ≥ {filterFanLevel}</div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <input type="number" min={1} max={50} value={filterFanLevel} onChange={e=>setFilterFanLevel(Number(e.target.value))} style={{...inp,width:50,textAlign:"center",padding:"6px"}}/>
+                    <Toggle on={filterFanClub} onChange={()=>setFilterFanClub(!filterFanClub)} size="sm" color="#25f4ee"/>
+                  </div>
+                </div>
+                <div>
+                  <label style={lbl}>Usuarios personalizados</label>
+                  <div style={{display:"flex",gap:8,marginBottom:8}}>
+                    <input style={{...inp,flex:1}} placeholder="@usuario" value={filterCustomInput} onChange={e=>setFilterCustomInput(e.target.value)}/>
+                    <button style={{background:"rgba(124,58,237,.15)",border:"1px solid rgba(124,58,237,.3)",borderRadius:8,padding:"9px 12px",color:"#a78bfa",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>{if(filterCustomInput.trim()){setFilterCustomUsers(p=>[...p,filterCustomInput.trim()]);setFilterCustomInput("");}}}>+ Agregar</button>
+                  </div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {filterCustomUsers.map((u,i)=>(
+                      <div key={i} style={{background:"#1a1a28",border:"1px solid #252535",borderRadius:20,padding:"4px 10px",color:"#aaa",fontSize:11,display:"flex",alignItems:"center",gap:6}}>
+                        {u}<span style={{cursor:"pointer",color:"#fe2c55"}} onClick={()=>setFilterCustomUsers(p=>p.filter((_,j)=>j!==i))}>×</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Cola */}
+              <SecHdr title="⚙️ COLA Y OPCIONES"/>
+              <div style={C}>
+                {[{l:"Cola infinita",sub:"Lee todo sin descartar mensajes",v:queueInfinite,s:setQueueInfinite},
+                  {l:"Leer mensajes viejos al activar",sub:"Lee mensajes anteriores al encender TTS",v:queueReadOld,s:setQueueReadOld},
+                  {l:"Omitir emojis",sub:"No lee emojis aislados",v:queueSkipEmoji,s:setQueueSkipEmoji},
+                  {l:"Omitir mensajes con @",sub:"No lee mensajes con menciones",v:queueSkipAt,s:setQueueSkipAt},
+                  {l:"Omitir comandos !",sub:"No lee mensajes que empiezan con !",v:queueSkipCmd,s:setQueueSkipCmd},
+                  {l:"Filtro anti-spam",sub:'Bloquea patrones como "jajaja", "xdxd"',v:queueAntiSpam,s:setQueueAntiSpam},
+                  {l:"Ignorar mensajes repetidos",sub:"No lee el mismo mensaje varias veces seguidas",v:queueIgnoreRep,s:setQueueIgnoreRep}].map(o=>(
+                  <div key={o.l} style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,paddingBottom:10,borderBottom:"1px solid #0f0f1a"}}>
+                    <div>
+                      <div style={{fontSize:12,color:"#aaa",fontWeight:600}}>{o.l}</div>
+                      {o.sub&&<div style={{fontSize:10,color:"#444",marginTop:2}}>{o.sub}</div>}
+                    </div>
+                    <Toggle on={o.v} onChange={()=>o.s(!o.v)} size="sm" color="#25f4ee"/>
+                  </div>
+                ))}
+                {queueIgnoreRep && (
+                  <div style={{opacity:.9}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                      <div style={{fontSize:12,color:"#aaa"}}>Máx. repeticiones permitidas</div>
+                      <input type="number" min={1} max={20} value={queueMaxRep} onChange={e=>setQueueMaxRep(Number(e.target.value))} style={{...inp,width:55,textAlign:"center",padding:"6px"}}/>
+                    </div>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <div style={{fontSize:12,color:"#aaa"}}>Ventana de tiempo (segundos)</div>
+                      <input type="number" min={5} max={120} value={queueWindow} onChange={e=>setQueueWindow(Number(e.target.value))} style={{...inp,width:55,textAlign:"center",padding:"6px"}}/>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════
+              TAB: REGALOS (por regalo individual)
+          ══════════════════════════════════════════════════════ */}
+          {tab==="regalos" && (
+            <div className="ai">
+
+              {/* Sonido default */}
+              <SecHdr title="🔔 SONIDO DEFAULT (todos los regalos)"/>
+              <div style={C}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+                  <span style={{fontSize:26}}>🎁</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Cualquier regalo</div>
+                    <div style={{fontSize:10,color:"#555",marginTop:2}}>Se activa para regalos sin configuración específica</div>
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <input type="range" min={0} max={100} value={defaultGiftVol} onChange={e=>setDefaultGiftVol(Number(e.target.value))} style={{flex:1,accentColor:"#fe2c55",cursor:"pointer"}}/>
+                  <span style={{color:"#fff",fontSize:11,fontWeight:700,minWidth:35}}>{defaultGiftVol}%</span>
+                </div>
+              </div>
+
+              {/* Agregar regalo */}
+              <SecHdr title="🎀 PERSONALIZAR POR REGALO"/>
+              <div style={{...C,position:"relative"}}>
+                <div style={{display:"flex",gap:8,marginBottom:addingGift?10:0}}>
+                  <input style={{...inp,flex:1}} placeholder="🔍 Buscar regalo para agregar..." value={giftSearch} onChange={e=>{setGiftSearch(e.target.value);setAddingGift(true);}} onFocus={()=>setAddingGift(true)}/>
+                  <button style={{background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",borderRadius:8,padding:"9px 14px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>setAddingGift(!addingGift)}>+ Agregar</button>
+                </div>
+                {addingGift && (
+                  <div style={{background:"#1a1a28",border:"1px solid #252535",borderRadius:12,overflow:"hidden",marginBottom:8}}>
+                    <div style={{maxHeight:240,overflowY:"auto"}}>
+                      {TIKTOK_GIFTS_LIST.filter(g=>g.name.toLowerCase().includes(giftSearch.toLowerCase())).map(g=>(
+                        <div key={g.id} onClick={()=>addGift(g)} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",cursor:"pointer",borderBottom:"1px solid #0f0f1a",transition:"background .1s"}}
+                          onMouseEnter={e=>e.currentTarget.style.background="rgba(254,44,85,.06)"}
+                          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                          <span style={{fontSize:22,minWidth:32}}>{g.emoji}</span>
+                          <span style={{flex:1,color:"#fff",fontSize:12,fontWeight:600}}>{g.name}</span>
+                          <span style={{color:"#fbbf24",fontSize:10,background:"rgba(251,191,36,.08)",padding:"2px 8px",borderRadius:20}}>🪙 {g.coins}</span>
                         </div>
-                        <div style={{display:"flex",gap:5,marginTop:3,flexWrap:"wrap"}}>
-                          <span style={{fontSize:9,fontWeight:700,color:bClr(act.event),
-                            background:`rgba(${bClr(act.event)==="#fe2c55"?"254,44,85":bClr(act.event)==="#25f4ee"?"37,244,238":"139,92,246"},.1)`,
-                            border:`1px solid currentColor`,borderRadius:20,padding:"1px 7px",opacity:.8}}>
-                            {act.event}
-                          </span>
-                          {giftDb&&<span style={{fontSize:9,color:"#fbbf24",fontWeight:700,
-                            background:"rgba(251,191,36,.08)",border:"1px solid rgba(251,191,36,.2)",
-                            borderRadius:20,padding:"1px 7px"}}>
-                            {giftDb.emoji} {giftDb.name} · 🪙{giftDb.coins.toLocaleString()}
-                          </span>}
-                          {act.soundName&&<span style={{fontSize:9,color:"#25f4ee",
-                            background:"rgba(37,244,238,.07)",border:"1px solid rgba(37,244,238,.15)",
-                            borderRadius:20,padding:"1px 7px"}}>🎵 {act.soundName}</span>}
-                          {act.ttsOn&&<span style={{fontSize:9,color:"#a78bfa",
-                            background:"rgba(167,139,250,.07)",border:"1px solid rgba(167,139,250,.15)",
-                            borderRadius:20,padding:"1px 7px"}}>🔊 TTS</span>}
+                      ))}
+                    </div>
+                    <button onClick={()=>setAddingGift(false)} style={{width:"100%",background:"transparent",border:"none",borderTop:"1px solid #252535",padding:"8px",color:"#555",fontSize:11,cursor:"pointer"}}>✕ Cerrar</button>
+                  </div>
+                )}
+
+                {addedGifts.length===0 && (
+                  <div style={{textAlign:"center",color:"#444",padding:"20px 0",fontSize:12}}>
+                    Busca y agrega regalos arriba para configurarlos individualmente
+                  </div>
+                )}
+              </div>
+
+              {/* Cards de regalos */}
+              {addedGifts.map(gift=>{
+                const cfg = giftConfigs[gift.id]||defGiftCfg();
+                return (
+                  <div key={gift.id} className="gift-card" style={{...C,border:"1px solid #1e1e2e"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+                      <div style={{width:50,height:50,borderRadius:12,background:"#0d0d15",border:"1px solid #252535",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <span style={{fontSize:28}}>{gift.emoji}</span>
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{gift.name}</div>
+                        <div style={{color:"#fbbf24",fontSize:10,marginTop:2}}>🪙 {gift.coins} monedas TikTok</div>
+                      </div>
+                      <Toggle on={cfg.enabled} onChange={()=>setGiftCfg(gift.id,"enabled",!cfg.enabled)}/>
+                      <button onClick={()=>setAddedGifts(p=>p.filter(g=>g.id!==gift.id))} style={{background:"transparent",border:"none",color:"#444",cursor:"pointer",fontSize:16,padding:"4px 8px"}}>✕</button>
+                    </div>
+
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,opacity:cfg.enabled?1:.4}}>
+                      {/* Sonido */}
+                      <div style={{gridColumn:"1/-1"}}>
+                        <label style={lbl}>Archivo de sonido</label>
+                        <div className={`ua ${cfg.soundName?"has":""}`}>
+                          <input type="file" accept="audio/*" onChange={async e=>{
+                            const file=e.target.files[0]; if(!file)return;
+                            const data=await fileToBase64(file);
+                            setGiftCfg(gift.id,"soundData",data); setGiftCfg(gift.id,"soundName",file.name);
+                          }}/>
+                          <div style={{width:28,height:28,borderRadius:7,background:"rgba(37,244,238,.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,flexShrink:0}}>{cfg.soundName?"🎵":"+"}</div>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:11,fontWeight:600,color:cfg.soundName?"#25f4ee":"#555",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{cfg.soundName||"Subir sonido (MP3/WAV)"}</div>
+                          </div>
+                          {cfg.soundData && <button onClick={e=>{e.preventDefault();e.stopPropagation();playAudio(cfg.soundData,cfg.volume/100);}} style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.3)",borderRadius:6,padding:"4px 9px",color:"#25f4ee",fontSize:10,fontWeight:700,cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>▶</button>}
+                          {cfg.soundName && <button onClick={e=>{e.preventDefault();e.stopPropagation();setGiftCfg(gift.id,"soundData","");setGiftCfg(gift.id,"soundName","");}} style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",borderRadius:6,padding:"4px 8px",color:"#fe2c55",fontSize:10,fontWeight:700,cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>✕</button>}
                         </div>
                       </div>
-                      {/* Controles */}
-                      <Toggle on={act.enabled} onChange={()=>setActions(p=>p.map(a=>a.id===act.id?{...a,enabled:!a.enabled}:a))} size="sm"/>
-                      <button onClick={()=>testAction(act)}
-                        style={{background:"rgba(37,244,238,.07)",border:"1px solid rgba(37,244,238,.2)",
-                          borderRadius:7,padding:"5px 9px",color:"#25f4ee",fontSize:10,fontWeight:700,cursor:"pointer"}}>▶</button>
-                      <button onClick={()=>{setEditA(act);setShowM(true);}}
-                        style={{background:"rgba(255,255,255,.04)",border:"1px solid #1e1e35",
-                          borderRadius:7,padding:"5px 9px",color:"#aaa",fontSize:10,cursor:"pointer"}}>✏️</button>
-                      <button onClick={()=>setDelConfirm(act.id)}
-                        style={{background:"rgba(254,44,85,.06)",border:"1px solid rgba(254,44,85,.15)",
-                          borderRadius:7,padding:"5px 9px",color:"#fe2c55",fontSize:10,cursor:"pointer"}}>🗑️</button>
+
+                      {/* Volumen */}
+                      <div>
+                        <label style={lbl}>Volumen · {cfg.volume}%</label>
+                        <input type="range" min={0} max={100} value={cfg.volume} onChange={e=>setGiftCfg(gift.id,"volume",Number(e.target.value))} style={{width:"100%",accentColor:"#fe2c55",cursor:"pointer"}}/>
+                      </div>
+
+                      {/* Duración */}
+                      <div>
+                        <label style={lbl}>Duración alerta · {cfg.duration}s</label>
+                        <input type="range" min={1} max={60} value={cfg.duration} onChange={e=>setGiftCfg(gift.id,"duration",Number(e.target.value))} style={{width:"100%",accentColor:"#fe2c55",cursor:"pointer"}}/>
+                      </div>
+
+                      {/* TTS toggle */}
+                      <div style={{gridColumn:"1/-1",display:"flex",alignItems:"center",gap:10,paddingTop:4}}>
+                        <Toggle on={cfg.tts} onChange={()=>setGiftCfg(gift.id,"tts",!cfg.tts)} size="sm" color="#25f4ee"/>
+                        <span style={{fontSize:12,color:"#aaa"}}>Leer con TTS al recibir</span>
+                      </div>
+
+                      {/* Plantilla TTS del regalo */}
+                      {cfg.tts && (
+                        <div style={{gridColumn:"1/-1"}}>
+                          <label style={lbl}>Plantilla TTS para este regalo</label>
+                          <input style={inp} value={cfg.ttsTemplate} onChange={e=>setGiftCfg(gift.id,"ttsTemplate",e.target.value)}/>
+                          <div style={{color:"#444",fontSize:10,marginTop:3}}>Variables: <span style={{color:"#25f4ee",fontFamily:"monospace"}}>{"{username} {giftName} {repeatCount} {totalValue}"}</span></div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1302,375 +1234,278 @@ function App() {
             </div>
           )}
 
-          {/* ═══ TTS / VOZ & AUDIO ══════════════════ */}
-          {tab==="tts"&&(
+          {/* ══════════════════════════════════════════════════════
+              TAB: MÚSICA (Spotify)
+          ══════════════════════════════════════════════════════ */}
+          {tab==="musica" && (
             <div className="ai">
-              {/* Modo */}
-              <div style={C}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13,marginBottom:12,color:"#fff"}}>🔊 Motor de voz</div>
-                <div style={{display:"flex",gap:6,marginBottom:14}}>
-                  {[{id:"native",l:"🌐 Voz del navegador (gratis)"},{id:"elevenlabs",l:"⚡ ElevenLabs (IA)"}].map(m=>(
-                    <button key={m.id} onClick={()=>setTtsMode(m.id)}
-                      style={{flex:1,padding:"9px 6px",borderRadius:9,
-                        border:`1px solid ${ttsMode===m.id?"rgba(254,44,85,.4)":"#1e1e35"}`,
-                        background:ttsMode===m.id?"rgba(254,44,85,.08)":"transparent",
-                        color:ttsMode===m.id?"#fe2c55":"#555",fontSize:11,fontWeight:700,cursor:"pointer"}}>
-                      {m.l}
-                    </button>
-                  ))}
-                </div>
 
-                {/* TTS Global ON/OFF */}
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,
-                  padding:"10px 12px",background:ttsOn?"rgba(37,244,238,.04)":"rgba(255,255,255,.02)",
-                  border:`1px solid ${ttsOn?"rgba(37,244,238,.2)":"#1e1e35"}`,borderRadius:10}}>
+              <SecHdr title="🎵 SPOTIFY POR COMANDOS"/>
+              <div style={C}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:spotifyEnabled?14:0}}>
                   <div>
-                    <div style={{fontSize:12,fontWeight:700,color:ttsOn?"#25f4ee":"#666"}}>
-                      {ttsOn?"TTS activado — leyendo chat":"TTS desactivado"}
-                    </div>
-                    <div style={{fontSize:10,color:"#444",marginTop:2}}>Lee mensajes del chat en voz alta</div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>Activar módulo Spotify</div>
+                    <div style={{fontSize:10,color:"#555",marginTop:2}}>Espectadores piden canciones con un comando en el chat</div>
                   </div>
-                  <Toggle on={ttsOn} onChange={()=>{setTtsOn(!ttsOn);if(ttsOn)clearTTSQueue();}} color="#25f4ee"/>
+                  <Toggle on={spotifyEnabled} onChange={()=>setSpotifyEnabled(!spotifyEnabled)}/>
                 </div>
 
-                {/* Cola visual */}
-                {ttsQueue>0&&(
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-                    padding:"7px 12px",background:"rgba(37,244,238,.04)",border:"1px solid rgba(37,244,238,.15)",
-                    borderRadius:8,marginBottom:10}}>
-                    <span className="tts-badge">🔊 {ttsQueue} mensajes en cola</span>
-                    <button onClick={clearTTSQueue}
-                      style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",
-                        borderRadius:6,padding:"4px 10px",color:"#fe2c55",fontSize:10,fontWeight:700,cursor:"pointer"}}>
-                      Limpiar cola
+                {!spotifyEnabled && (
+                  <div style={{background:"rgba(37,244,238,.05)",border:"1px solid rgba(37,244,238,.12)",borderRadius:10,padding:"12px 14px",color:"#aaa",fontSize:11,lineHeight:1.6,marginTop:12}}>
+                    💡 Similar a Tikfinity: conecta tu Spotify y tus espectadores escriben <strong style={{color:"#1DB954"}}>{spotifyCmd} nombre de canción</strong> en el chat para añadir canciones a la cola. Puedes elegir quién puede usar el comando.
+                  </div>
+                )}
+
+                {spotifyEnabled && (
+                  <>
+                    <button style={{width:"100%",background:spotifyConnected?"rgba(29,185,84,.15)":"linear-gradient(135deg,#1DB954,#17a349)",border:spotifyConnected?"1px solid rgba(29,185,84,.4)":"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:12}} onClick={()=>setSpotifyConnected(!spotifyConnected)}>
+                      {spotifyConnected?"✓ Spotify conectado — clic para desconectar":"🎵 Conectar cuenta de Spotify"}
                     </button>
-                  </div>
+                    {spotifyConnected && (
+                      <div style={{background:"rgba(29,185,84,.06)",border:"1px solid rgba(29,185,84,.2)",borderRadius:10,padding:"12px 14px"}}>
+                        <div style={{color:"#1DB954",fontWeight:700,fontSize:9,letterSpacing:1.5,marginBottom:5}}>▶ REPRODUCIENDO AHORA</div>
+                        {spotifyNowPlaying ? (
+                          <div style={{display:"flex",alignItems:"center",gap:10}}>
+                            <div style={{width:36,height:36,borderRadius:6,background:"rgba(29,185,84,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🎵</div>
+                            <div>
+                              <div style={{fontSize:12,fontWeight:700,color:"#fff"}}>{spotifyNowPlaying.title}</div>
+                              <div style={{fontSize:10,color:"#1DB954"}}>{spotifyNowPlaying.artist}</div>
+                            </div>
+                          </div>
+                        ) : <div style={{color:"#444",fontSize:12}}>Sin canción en reproducción</div>}
+                      </div>
+                    )}
+                  </>
                 )}
-
-                {/* Volumen */}
-                <div style={{marginBottom:12}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                    <span style={{fontSize:11,color:"#888"}}>Volumen</span>
-                    <span style={{fontSize:11,color:"#fff",fontWeight:700}}>{ttsVol}%</span>
-                  </div>
-                  <input type="range" min={0} max={100} value={ttsVol}
-                    onChange={e=>setTtsVol(Number(e.target.value))}
-                    style={{width:"100%",accentColor:"#fe2c55",cursor:"pointer"}}/>
-                </div>
-
-                {/* Selector de voz */}
-                {ttsMode==="native"&&nativeVoices.length>0&&(
-                  <div style={{marginBottom:12}}>
-                    <label style={lbl}>Voz del navegador</label>
-                    <select style={{...inp,cursor:"pointer"}} value={nativeVoice}
-                      onChange={e=>setNativeVoice(e.target.value)}>
-                      {nativeVoices.map(v=><option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}
-                    </select>
-                  </div>
-                )}
-                {ttsMode==="elevenlabs"&&(
-                  <div style={{marginBottom:12}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                      <label style={lbl}>Voz ElevenLabs</label>
-                      {elOk===true&&<span style={{fontSize:9,color:"#4ade80"}}>✓ Conectado</span>}
-                      {elOk===false&&<span style={{fontSize:9,color:"#fe2c55"}}>✗ Error de clave API</span>}
-                    </div>
-                    <select style={{...inp,cursor:"pointer"}} value={ttsVoice}
-                      onChange={e=>setTtsVoice(e.target.value)}>
-                      {elVoices.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
-                    </select>
-                  </div>
-                )}
-
-                {/* Probar */}
-                <button onClick={()=>{
-                  const text="Hola, este es el TTS de tu LIVE de TikTok. ¡Todo está funcionando!";
-                  enqueueTTS(text,ttsMode==="elevenlabs"?ttsVoice:nativeVoice,ttsVol/100,ttsMode);
-                }}
-                  style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",
-                    borderRadius:9,padding:"9px",color:"#fe2c55",fontSize:12,fontWeight:700,
-                    cursor:"pointer",width:"100%"}}>
-                  🔊 Probar voz ahora
-                </button>
               </div>
 
-              {/* Info sobre el bug del TTS nativo en Chrome */}
-              {ttsMode==="native"&&(
-                <div style={{...C,borderColor:"rgba(251,191,36,.15)"}}>
-                  <div style={{fontSize:10,color:"#fbbf24",fontWeight:700,marginBottom:5}}>💡 Tip: TTS en Chrome/Android</div>
-                  <div style={{fontSize:11,color:"#555",lineHeight:1.6}}>
-                    El TTS nativo puede pausarse si cambias de app. Este panel activa un Wake Lock y un resume automático para que nunca se calle. Si hay silencio, toca "Limpiar cola" y vuelve a activar.
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ═══ RANKING ════════════════════════════ */}
-          {tab==="ranking"&&(
-            <div className="ai">
-              <div style={{display:"flex",gap:8,marginBottom:12}}>
-                <div style={{...C,flex:1,margin:0,textAlign:"center",padding:10}}>
-                  <div style={{fontSize:9,color:"#fbbf24",fontWeight:700,letterSpacing:1,marginBottom:4}}>💎 DIAMANTES</div>
-                  <div style={{fontSize:20,fontWeight:900,color:"#fbbf24",fontFamily:"'Syne',sans-serif"}}>{totDia.toLocaleString()}</div>
-                </div>
-                <div style={{...C,flex:1,margin:0,textAlign:"center",padding:10}}>
-                  <div style={{fontSize:9,color:"#fb7185",fontWeight:700,letterSpacing:1,marginBottom:4}}>❤️ LIKES</div>
-                  <div style={{fontSize:20,fontWeight:900,color:"#fb7185",fontFamily:"'Syne',sans-serif"}}>{totLike.toLocaleString()}</div>
-                </div>
-              </div>
-
-              <div style={C}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13,marginBottom:12}}>🏆 Top Diamantes</div>
-                {tapR.length===0
-                  ?<div style={{color:"#333",fontSize:12,textAlign:"center",padding:"20px 0"}}>Sin datos aún</div>
-                  :tapR.map((u,i)=>(
-                    <div key={u.user} className={i===0?"rank1":i===1?"rank2":i===2?"rank3":""}
-                      style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",
-                        borderRadius:9,border:"1px solid transparent",marginBottom:5}}>
-                      <span style={{fontSize:i<3?18:13,minWidth:20,textAlign:"center"}}>
-                        {i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}`}
-                      </span>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontSize:12,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.nickname}</div>
-                        <div style={{fontSize:10,color:"#555"}}>{u.gifts} regalos</div>
+              {spotifyEnabled && (
+                <>
+                  <SecHdr title="⌨️ COMANDO"/>
+                  <div style={C}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+                      <div>
+                        <label style={lbl}>Comando para pedir canción</label>
+                        <input style={inp} value={spotifyCmd} onChange={e=>setSpotifyCmd(e.target.value)} placeholder="!song"/>
+                        <div style={{color:"#444",fontSize:10,marginTop:3}}>Uso: <span style={{color:"#1DB954"}}>{spotifyCmd} Never Gonna Give You Up</span></div>
                       </div>
-                      <span style={{fontSize:13,fontWeight:700,color:"#fbbf24"}}>💎 {u.diamonds}</span>
-                    </div>
-                  ))
-                }
-              </div>
-
-              <div style={C}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13,marginBottom:12}}>❤️ Top Likes</div>
-                {likeR.length===0
-                  ?<div style={{color:"#333",fontSize:12,textAlign:"center",padding:"20px 0"}}>Sin datos aún</div>
-                  :likeR.map((u,i)=>(
-                    <div key={u.user} className={i===0?"rank1":i===1?"rank2":i===2?"rank3":""}
-                      style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",
-                        borderRadius:9,border:"1px solid transparent",marginBottom:5}}>
-                      <span style={{fontSize:i<3?18:13,minWidth:20,textAlign:"center"}}>
-                        {i===0?"🥇":i===1?"🥈":i===2?"🥉":`${i+1}`}
-                      </span>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:12,fontWeight:700,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{u.nickname}</div>
+                      <div>
+                        <label style={lbl}>Máx. canciones en cola</label>
+                        <input type="number" min={1} max={50} value={spotifyMaxQueue} onChange={e=>setSpotifyMaxQueue(Number(e.target.value))} style={inp}/>
                       </div>
-                      <span style={{fontSize:13,fontWeight:700,color:"#fb7185"}}>❤️ {u.count}</span>
+                      <div style={{gridColumn:"1/-1"}}>
+                        <label style={lbl}>Cooldown entre peticiones · {spotifyCooldown}s</label>
+                        <input type="range" min={0} max={300} step={5} value={spotifyCooldown} onChange={e=>setSpotifyCooldown(Number(e.target.value))} style={{width:"100%",accentColor:"#1DB954",cursor:"pointer"}}/>
+                        <div style={{color:"#444",fontSize:10,marginTop:3}}>Espera de {spotifyCooldown}s entre comandos del mismo usuario</div>
+                      </div>
                     </div>
-                  ))
-                }
-              </div>
-            </div>
-          )}
-
-          {/* ═══ CHAT ════════════════════════════ */}
-          {tab==="chat"&&(
-            <div className="ai">
-              <div style={C}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13}}>💬 Chat en vivo</div>
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{fontSize:10,color:"#444"}}>{chatLog.length} mensajes</span>
-                    <button onClick={()=>setChatLog([])}
-                      style={{background:"rgba(255,255,255,.04)",border:"1px solid #1e1e35",borderRadius:7,
-                        padding:"4px 9px",color:"#555",fontSize:10,cursor:"pointer"}}>Limpiar</button>
                   </div>
-                </div>
-                <div style={{background:"#080810",borderRadius:10,padding:10,height:420,overflowY:"auto",display:"flex",flexDirection:"column",gap:5}}>
-                  {chatLog.length===0
-                    ?<div style={{color:"#2a2a3a",fontSize:12,textAlign:"center",marginTop:80}}>
-                      {conn?"Esperando mensajes...":"Conecta tu LIVE para ver el chat"}
+
+                  <SecHdr title="🔒 PERMISOS"/>
+                  <div style={C}>
+                    <div style={{marginBottom:16}}>
+                      <label style={lbl}>¿Quién puede usar {spotifyCmd}?</label>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:8}}>
+                        {SPOTIFY_PERMS.map(p=>(
+                          <button key={p} className={`perm-chip${spotifyPerm===p?" sel":""}`} onClick={()=>setSpotifyPerm(p)}>{p}</button>
+                        ))}
+                      </div>
                     </div>
-                    :chatLog.map((m,i)=>(
-                      <div key={i} className="log-item" style={{background:"rgba(255,255,255,.025)",borderLeftColor:"#252545"}}>
-                        <span style={{color:"#fe2c55",fontWeight:700,marginRight:5}}>@{m.user}</span>
-                        <span style={{color:"#ccc"}}>{m.text}</span>
-                      </div>
-                    ))
-                  }
-                </div>
-              </div>
-            </div>
-          )}
 
-          {/* ═══ BATALLA ════════════════════════════
-              CAMBIO CLAVE: mostrar puntos INDIVIDUALES por host, no agrupados */}
-          {tab==="batalla"&&(
-            <div className="ai">
-              {!battle
-                ?<div style={{...C,textAlign:"center",padding:"40px 20px"}}>
-                  <div style={{fontSize:40,marginBottom:12}}>⚔️</div>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16,marginBottom:6}}>Sin batalla activa</div>
-                  <div style={{color:"#444",fontSize:12}}>Cuando hagas una batalla en TikTok LIVE, los datos aparecerán aquí con puntos individuales.</div>
-                </div>
-                :(()=>{
-                  const teams=(battle.teams||[]);
-                  const maxPts=Math.max(1,...teams.map(t=>t.points));
-
-                  // Detectar si hay miembros individuales (2v2)
-                  const hasIndividual=teams.some(t=>t.members&&t.members.length>1);
-
-                  return (
-                    <div>
-                      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:15,marginBottom:14,
-                        textAlign:"center",color:"#fff",letterSpacing:-.3}}>
-                        ⚔️ Batalla en vivo
-                      </div>
-
-                      {/* Si hay datos individuales (2v2), mostrar por persona */}
-                      {hasIndividual?(
-                        <div>
-                          <div style={{fontSize:9,color:"#555",fontWeight:700,letterSpacing:1,textAlign:"center",marginBottom:10}}>PUNTOS INDIVIDUALES</div>
-                          {teams.map((team,ti)=>(
-                            <div key={ti} style={{marginBottom:14}}>
-                              <div style={{fontSize:10,color:"#fe2c55",fontWeight:700,letterSpacing:1,marginBottom:8,
-                                padding:"4px 10px",background:"rgba(254,44,85,.06)",borderRadius:6,display:"inline-block"}}>
-                                EQUIPO {ti+1}
-                              </div>
-                              {team.members.map((m,mi)=>{
-                                const maxM=Math.max(1,...teams.flatMap(t=>t.members?.map(mm=>mm.points)||[t.points]));
-                                const pct=Math.max(3,(m.points/maxM)*100);
-                                return (
-                                  <div key={mi} style={{marginBottom:10}}>
-                                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
-                                      <span style={{fontSize:12,fontWeight:700,color:"#fff"}}>{m.nickname}</span>
-                                      <span className="battle-score" style={{fontSize:18,color:ti===0?"#fe2c55":"#25f4ee"}}>
-                                        {m.points.toLocaleString()}
-                                      </span>
-                                    </div>
-                                    <div style={{background:"#0a0a18",borderRadius:4,height:8,overflow:"hidden"}}>
-                                      <div className="battle-bar" style={{width:`${pct}%`,
-                                        background:`linear-gradient(90deg,${ti===0?"#fe2c55,#ff8f9f":"#25f4ee,#7ff9f5"})`}}/>
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                    {spotifyPerm==="Usuarios personalizados" && (
+                      <div style={{marginBottom:16}}>
+                        <label style={lbl}>Usuarios autorizados</label>
+                        <div style={{display:"flex",gap:8,marginBottom:8}}>
+                          <input style={{...inp,flex:1}} placeholder="@usuario" value={spotifyCustomInput} onChange={e=>setSpotifyCustomInput(e.target.value)}/>
+                          <button style={{background:"rgba(29,185,84,.15)",border:"1px solid rgba(29,185,84,.3)",borderRadius:8,padding:"9px 12px",color:"#1DB954",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>{if(spotifyCustomInput.trim()){setSpotifyCustomUsers(p=>[...p,spotifyCustomInput.trim()]);setSpotifyCustomInput("");}}}>+ Agregar</button>
+                        </div>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                          {spotifyCustomUsers.map((u,i)=>(
+                            <div key={i} style={{background:"#1a1a28",border:"1px solid #252535",borderRadius:20,padding:"4px 10px",color:"#aaa",fontSize:11,display:"flex",alignItems:"center",gap:6}}>
+                              {u}<span style={{cursor:"pointer",color:"#fe2c55"}} onClick={()=>setSpotifyCustomUsers(p=>p.filter((_,j)=>j!==i))}>×</span>
                             </div>
                           ))}
                         </div>
-                      ):(
-                        /* Sin miembros individuales: mostrar por host (1v1 o datos simples) */
-                        <div>
-                          <div style={{fontSize:9,color:"#555",fontWeight:700,letterSpacing:1,textAlign:"center",marginBottom:10}}>PUNTOS POR STREAMER</div>
-                          {teams.map((team,ti)=>{
-                            const pct=Math.max(3,(team.points/maxPts)*100);
-                            const isOwner=team.hostName.toLowerCase()===battle.ownerUsername;
-                            return (
-                              <div key={ti} style={{...C,marginBottom:10,
-                                borderColor:isOwner?"rgba(254,44,85,.3)":"rgba(37,244,238,.2)"}}>
-                                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                                  <div>
-                                    <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>
-                                      {isOwner?"⭐ ":""}{team.hostNickname}
-                                    </div>
-                                    <div style={{fontSize:10,color:"#444"}}>@{team.hostName}</div>
-                                  </div>
-                                  <div className="battle-score" style={{color:isOwner?"#fe2c55":"#25f4ee"}}>
-                                    {team.points.toLocaleString()}
-                                  </div>
-                                </div>
-                                <div style={{background:"#0a0a18",borderRadius:6,height:10,overflow:"hidden"}}>
-                                  <div className="battle-bar" style={{width:`${pct}%`,
-                                    background:`linear-gradient(90deg,${isOwner?"#fe2c55,#ff8f9f":"#25f4ee,#7ff9f5"})`}}/>
-                                </div>
-                              </div>
-                            );
-                          })}
+                      </div>
+                    )}
 
-                          {/* Resumen comparativo */}
-                          {teams.length>=2&&(
-                            <div style={{...C,padding:12,textAlign:"center"}}>
-                              <div style={{fontSize:9,color:"#555",fontWeight:700,letterSpacing:1,marginBottom:8}}>DIFERENCIA DE PUNTOS</div>
-                              <div style={{fontSize:24,fontWeight:900,fontFamily:"'Syne',sans-serif",
-                                color:Math.abs(teams[0].points-teams[1].points)>0?"#fbbf24":"#555"}}>
-                                {Math.abs(teams[0].points-(teams[1]?.points||0)).toLocaleString()}
-                              </div>
-                              <div style={{fontSize:10,color:"#444",marginTop:4}}>
-                                {teams[0].points>=(teams[1]?.points||0)
-                                  ?`${teams[0].hostNickname} va ganando`
-                                  :`${teams[1].hostNickname} va ganando`}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:8,borderTop:"1px solid #0f0f1a"}}>
+                      <div>
+                        <div style={{fontSize:12,color:"#aaa",fontWeight:600}}>Permitir saltar canción</div>
+                        <div style={{fontSize:10,color:"#444",marginTop:2}}>Habilita un comando para pasar a la siguiente</div>
+                      </div>
+                      <Toggle on={spotifyAllowSkip} onChange={()=>setSpotifyAllowSkip(!spotifyAllowSkip)} size="sm" color="#1DB954"/>
+                    </div>
 
-                      {/* Debug info colapsable */}
-                      <div style={{...C,borderColor:"#111120"}}>
-                        <div style={{fontSize:9,color:"#252545",fontWeight:700}}>
-                          Equipos detectados: {teams.length} · 
-                          {hasIndividual?` Modo 2v2 (${teams.reduce((acc,t)=>acc+(t.members?.length||0),0)} jugadores)`:` Modo individual por host`}
+                    {spotifyAllowSkip && (
+                      <div style={{marginTop:12}}>
+                        <label style={lbl}>¿Quién puede saltar canciones?</label>
+                        <div style={{display:"flex",flexWrap:"wrap",gap:7,marginTop:8}}>
+                          {SPOTIFY_PERMS.map(p=>(
+                            <button key={p} className={`perm-chip${spotifySkipPerm===p?" sel":""}`} onClick={()=>setSpotifySkipPerm(p)}>{p}</button>
+                          ))}
                         </div>
                       </div>
-                    </div>
-                  );
-                })()
-              }
+                    )}
+                  </div>
+
+                  <SecHdr title="🎶 COLA DE CANCIONES"/>
+                  <div style={C}>
+                    {spotifyQueue.length===0 ? (
+                      <div style={{color:"#444",textAlign:"center",padding:"24px 0",fontSize:12}}>
+                        Cola vacía · Los espectadores usan <span style={{color:"#1DB954"}}>{spotifyCmd} [canción]</span> en el chat
+                      </div>
+                    ) : spotifyQueue.map((s,i)=>(
+                      <div key={i} className="sq-item">
+                        <span style={{color:"#555",minWidth:20,fontSize:11}}>{i+1}.</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.title}</div>
+                          <div style={{fontSize:10,color:"#555",marginTop:1}}>@{s.user}</div>
+                        </div>
+                        <button onClick={()=>setSpotifyQueue(p=>p.filter((_,j)=>j!==i))} style={{background:"transparent",border:"none",color:"#444",cursor:"pointer",fontSize:14}}>✕</button>
+                      </div>
+                    ))}
+                    {/* Demo: agregar canción de prueba */}
+                    <button onClick={()=>setSpotifyQueue(p=>[...p,{title:"Never Gonna Give You Up - Rick Astley",user:"viewer123"}])} style={{width:"100%",background:"rgba(29,185,84,.08)",border:"1px dashed rgba(29,185,84,.2)",borderRadius:8,padding:"8px",color:"#1DB954",fontSize:11,cursor:"pointer",marginTop:8}}>+ Agregar canción de prueba</button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
-          {/* ═══ ESPECTADORES ═══════════════════════ */}
-          {tab==="espect"&&(
+          {/* ══════════════════════════════════════════════════════
+              TAB: RANKING
+          ══════════════════════════════════════════════════════ */}
+          {tab==="ranking" && (
             <div className="ai">
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
-                <div style={{...C,margin:0,textAlign:"center",padding:12}}>
-                  <div style={{fontSize:9,color:"#25f4ee",fontWeight:700,letterSpacing:1,marginBottom:4}}>👁️ AHORA</div>
-                  <div style={{fontSize:24,fontWeight:900,color:"#25f4ee",fontFamily:"'Syne',sans-serif"}}>{stats.viewers.toLocaleString()}</div>
-                </div>
-                <div style={{...C,margin:0,textAlign:"center",padding:12}}>
-                  <div style={{fontSize:9,color:"#a78bfa",fontWeight:700,letterSpacing:1,marginBottom:4}}>📜 HISTORIAL</div>
-                  <div style={{fontSize:24,fontWeight:900,color:"#a78bfa",fontFamily:"'Syne',sans-serif"}}>{viewR.length.toLocaleString()}</div>
-                </div>
+              <div style={C}>
+                <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:12}}>💎 Top Diamantes</div>
+                {tapR.length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"16px 0"}}>{conn?"Sin datos aún...":"Conecta el LIVE"}</div>
+                : tapR.map((u,i)=>(
+                  <div key={u.user} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid #0f0f1a"}}>
+                    <div style={{width:22,height:22,borderRadius:"50%",background:i===0?"#fbbf24":i===1?"#9ca3af":i===2?"#cd7c2f":"#1e1e2e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,flexShrink:0}}>{i+1}</div>
+                    <div style={{flex:1,fontSize:11,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{u.nickname||u.user}</div>
+                    <div style={{fontSize:11,color:"#25f4ee",fontWeight:700}}>💎 {u.diamonds}</div>
+                    <div style={{fontSize:10,color:"#555"}}>×{u.gifts}</div>
+                  </div>
+                ))}
               </div>
+              <div style={C}>
+                <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:12}}>❤️ Top Likes</div>
+                {likeR.length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"16px 0"}}>{conn?"Sin datos aún...":"Conecta el LIVE"}</div>
+                : likeR.map((u,i)=>(
+                  <div key={u.user} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 0",borderBottom:"1px solid #0f0f1a"}}>
+                    <div style={{width:22,height:22,borderRadius:"50%",background:i===0?"#fbbf24":i===1?"#9ca3af":i===2?"#cd7c2f":"#1e1e2e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,flexShrink:0}}>{i+1}</div>
+                    <div style={{flex:1,fontSize:11,fontWeight:600,color:"#fff",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{u.nickname||u.user}</div>
+                    <div style={{fontSize:11,color:"#fe2c55",fontWeight:700}}>❤️ {u.count}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-              {topViewers.length>0&&(
-                <div style={C}>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13,marginBottom:10}}>👁️ Activos ahora</div>
-                  {topViewers.slice(0,10).map((v,i)=>(
-                    <div key={v.user} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",
-                      borderRadius:8,marginBottom:4,background:"rgba(37,244,238,.03)",border:"1px solid #1a1a2e"}}>
-                      <span style={{fontSize:11,color:"#333",minWidth:18,textAlign:"center"}}>{i+1}</span>
-                      <span style={{flex:1,fontSize:12,fontWeight:600,color:"#ddd",
-                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{v.nickname||v.user}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
+          {/* ══════════════════════════════════════════════════════
+              TAB: CHAT
+          ══════════════════════════════════════════════════════ */}
+          {tab==="chat" && (
+            <div className="ai">
               <div style={C}>
                 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
-                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13}}>📜 Historial de entradas</div>
-                  <button onClick={()=>{setViewR([]);sv("viewR",[]);}}
-                    style={{background:"rgba(254,44,85,.06)",border:"1px solid rgba(254,44,85,.15)",
-                      borderRadius:7,padding:"4px 9px",color:"#fe2c55",fontSize:10,cursor:"pointer"}}>Limpiar</button>
+                  <div style={{fontSize:11,fontWeight:700,color:"#fff"}}>💬 Chat en tiempo real</div>
+                  <button onClick={()=>setLog([])} style={{background:"transparent",border:"1px solid #252535",borderRadius:6,padding:"4px 10px",color:"#555",fontSize:10,cursor:"pointer"}}>Limpiar</button>
                 </div>
-                <div style={{maxHeight:320,overflowY:"auto",display:"flex",flexDirection:"column",gap:4}}>
-                  {viewR.length===0
-                    ?<div style={{color:"#2a2a3a",fontSize:12,textAlign:"center",padding:"20px 0"}}>Sin historial aún</div>
-                    :viewR.map((v,i)=>(
-                      <div key={v.user+i} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",
-                        borderRadius:7,background:"rgba(255,255,255,.02)"}}>
-                        <span style={{flex:1,fontSize:11,color:"#aaa",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                          {v.nickname||v.user}
-                        </span>
-                        <span style={{fontSize:9,color:"#333"}}>
-                          {new Date(v.joinTime).toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"})}
-                        </span>
-                      </div>
-                    ))
-                  }
+                <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:"60vh",overflowY:"auto"}}>
+                  {log.filter(l=>l.t==="msg").length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"20px 0"}}>{conn?"Sin mensajes aún...":"Conecta el LIVE"}</div>
+                  : log.filter(l=>l.t==="msg").map((item,i)=>(
+                    <div key={i} className="ai" style={{fontSize:12,padding:"7px 10px",borderRadius:8,background:"rgba(255,255,255,.02)",borderLeft:"2px solid #2a2a3a"}}>{item.tx}</div>
+                  ))}
                 </div>
               </div>
             </div>
           )}
 
-        </div>
-      </div>
+          {/* ══════════════════════════════════════════════════════
+              TAB: BATALLA
+          ══════════════════════════════════════════════════════ */}
+          {tab==="batalla" && (
+            <div className="ai">
+              {!battle ? (
+                <div style={{...C,textAlign:"center",padding:"32px 16px"}}>
+                  <div style={{fontSize:32,marginBottom:8}}>⚔️</div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#fff",marginBottom:6}}>Sin batalla activa</div>
+                  <div style={{fontSize:11,color:"#555"}}>Los datos de batalla aparecerán aquí cuando estés en un VS LIVE</div>
+                </div>
+              ) : (
+                <div style={C}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#fff",marginBottom:12}}>⚔️ Batalla activa</div>
+                  {battle.teams?.map((team,i)=>{
+                    const total = battle.teams.reduce((s,t)=>s+t.points,0)||1;
+                    const pct = Math.round((team.points/total)*100);
+                    const isOwner = team.hostName?.toLowerCase()===battle.ownerUsername;
+                    return (
+                      <div key={i} style={{marginBottom:12,padding:"10px 12px",background:isOwner?"rgba(254,44,85,.06)":"rgba(37,244,238,.04)",borderRadius:10,border:`1px solid ${isOwner?"rgba(254,44,85,.2)":"rgba(37,244,238,.15)"}`}}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                          <div>
+                            <span style={{fontSize:12,fontWeight:700,color:isOwner?"#fe2c55":"#25f4ee"}}>@{team.hostNickname}</span>
+                            {isOwner&&<span style={{fontSize:9,color:"#fe2c55",marginLeft:6,background:"rgba(254,44,85,.12)",padding:"1px 6px",borderRadius:20}}>TÚ</span>}
+                          </div>
+                          <span style={{fontSize:13,fontWeight:800,color:"#fff"}}>💎 {team.points.toLocaleString()}</span>
+                        </div>
+                        <div style={{height:6,background:"#1e1e2e",borderRadius:3,overflow:"hidden"}}>
+                          <div style={{height:"100%",width:`${pct}%`,background:isOwner?"linear-gradient(90deg,#fe2c55,#ff6b81)":"linear-gradient(90deg,#25f4ee,#1DB954)",borderRadius:3,transition:"width .5s ease"}}/>
+                        </div>
+                        <div style={{fontSize:9,color:"#555",marginTop:3,textAlign:"right"}}>{pct}%</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════
+              TAB: ESPECTADORES
+          ══════════════════════════════════════════════════════ */}
+          {tab==="espect" && (
+            <div className="ai">
+              <div style={{display:"flex",gap:6,marginBottom:10}}>
+                {["historial","activos"].map(t=>(
+                  <button key={t} className={`mode-btn${vTab===t?" act":""}`} onClick={()=>setVTab(t)}>
+                    {t==="historial"?"📋 Historial":"👁️ Activos ahora"}
+                  </button>
+                ))}
+              </div>
+              <div style={C}>
+                {vTab==="historial" && (
+                  viewR.length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"16px 0"}}>{conn?"Sin entradas aún...":"Conecta el LIVE"}</div>
+                  : viewR.map((u,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #0f0f1a"}}>
+                      <div style={{width:22,height:22,borderRadius:"50%",background:"#1e1e2e",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:"#555",flexShrink:0}}>{(u.nickname||u.user)[0]?.toUpperCase()}</div>
+                      <div style={{flex:1,fontSize:11,color:"#fff"}}>@{u.nickname||u.user}</div>
+                      <div style={{fontSize:9,color:"#555"}}>{new Date(u.joinTime).toLocaleTimeString()}</div>
+                    </div>
+                  ))
+                )}
+                {vTab==="activos" && (
+                  topViewers.length===0 ? <div style={{color:"#444",fontSize:11,textAlign:"center",padding:"16px 0"}}>{conn?"Sin espectadores activos...":"Conecta el LIVE"}</div>
+                  : topViewers.map((u,i)=>(
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #0f0f1a"}}>
+                      <div style={{width:6,height:6,borderRadius:"50%",background:"#25f4ee",flexShrink:0}}/>
+                      <div style={{flex:1,fontSize:11,color:"#fff"}}>@{u.nickname||u.user}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+        </div>{/* fin content */}
+      </div>{/* fin main */}
     </div>
   );
 }
 
-ReactDOM.render(<App/>, document.getElementById("root"));
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
