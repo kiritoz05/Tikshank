@@ -1164,7 +1164,18 @@ function App() {
     });
     sock.on("battle", (d) => {
       if (d && d.teams) {
-        setBattle(__spreadProps(__spreadValues({}, d), { ownerUsername: (d.ownerUsername || tUser || "").toLowerCase().replace(/^@/, ""), teams: d.teams.map((t) => ({ hostName: t.hostName || t.uniqueId || t.displayId || "?", hostNickname: t.hostNickname || t.nickname || t.hostName || "?", points: Number(t.points || t.battleScore || t.score || 0) })).filter((t) => t.hostName !== "?") }));
+        // Asignar teamIdx si no viene: alternar 0,1,0,1 por posición
+        const mapped = d.teams.map((t, i) => ({
+          hostName: t.hostName || t.uniqueId || t.displayId || "?",
+          hostNickname: t.hostNickname || t.nickname || t.hostName || "?",
+          points: Number(t.points || t.battleScore || t.score || 0),
+          userId: t.userId || t.hostName || "",
+          teamIdx: t.teamIdx !== undefined ? Number(t.teamIdx) : (i % 2)
+        })).filter((t) => t.hostName !== "?");
+        setBattle(__spreadProps(__spreadValues({}, d), {
+          ownerUsername: (d.ownerUsername || tUser || "").toLowerCase().replace(/^@/, ""),
+          teams: mapped
+        }));
       } else setBattle(d);
     });
     sock.on("tiktok_disconnected", (d) => {
