@@ -1679,7 +1679,7 @@ function App() {
           // LADO IZQUIERDO
           /* @__PURE__ */ React.createElement("div", { style: { flex: 1, textAlign: "left" } },
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#fe2c55", letterSpacing: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-              "@", leader0.hostNickname || leader0.hostName || "Equipo 1"
+              "@", (() => { const n = leader0.hostNickname || leader0.hostName || "Equipo 1"; return /^\d{6,}$/.test(n) ? "ID·"+n.slice(-4) : n; })()
             ),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#fe2c55", lineHeight: 1.1 } }, pts0.toLocaleString()),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#777" } }, "diamantes")
@@ -1694,7 +1694,7 @@ function App() {
           // LADO DERECHO
           /* @__PURE__ */ React.createElement("div", { style: { flex: 1, textAlign: "right" } },
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#25f4ee", letterSpacing: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-              "@", leader1.hostNickname || leader1.hostName || "Equipo 2"
+              "@", (() => { const n = leader1.hostNickname || leader1.hostName || "Equipo 2"; return /^\d{6,}$/.test(n) ? "ID·"+n.slice(-4) : n; })()
             ),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#25f4ee", lineHeight: 1.1 } }, pts1.toLocaleString()),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#777" } }, "diamantes")
@@ -1715,7 +1715,10 @@ function App() {
         // QUIÉN VA GANANDO
         pts0 !== pts1 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 6, fontSize: 10, color: "#555" } },
           /* @__PURE__ */ React.createElement("span", { style: { color: pts0 > pts1 ? "#fe2c55" : "#25f4ee", fontWeight: 700 } },
-            "@", pts0 > pts1 ? (leader0.hostNickname || leader0.hostName) : (leader1.hostNickname || leader1.hostName)
+            "@", (() => {
+              const n = pts0 > pts1 ? (leader0.hostNickname || leader0.hostName) : (leader1.hostNickname || leader1.hostName);
+              return /^\d{6,}$/.test(n) ? "ID·" + n.slice(-4) : (n || "?");
+            })()
           ),
           " va ganando por ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#fff" } }, Math.abs(pts0 - pts1).toLocaleString())
         )
@@ -1723,25 +1726,60 @@ function App() {
       // ── PARTICIPANTES (todos) ──
       cleanPlayers.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 } },
         cleanPlayers.map((player, idx) => {
-          const isLeft = player.teamIdx === 0 || idx % 2 === 0;
+          const isLeft = player.teamIdx === 0 || (player.teamIdx === undefined && idx % 2 === 0);
           const accent = isLeft ? "#fe2c55" : "#25f4ee";
           const isOwner = safeLc(player.userId || player.hostName) === safeLc(battle.ownerUsername);
           const pct = total > 0 ? Math.round((player.points||0) / total * 100) : 0;
-          return /* @__PURE__ */ React.createElement("div", { key: idx, style: { background: "#12121e", border: "1px solid " + (isOwner ? "rgba(254,44,85,.3)" : "#1e1e2e"), borderRadius: 12, padding: "10px 12px" } },
-            /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 } },
+
+          // Resolver nombre: si es número largo usar nickname o "...1234"
+          const rawName = player.hostNickname || player.hostName || player.uniqueId || "";
+          const isNumeric = /^\d{6,}$/.test(rawName);
+          const displayName = isNumeric
+            ? (player.hostNickname && !/^\d{6,}$/.test(player.hostNickname)
+                ? player.hostNickname
+                : "ID·" + rawName.slice(-4))
+            : rawName;
+
+          return /* @__PURE__ */ React.createElement("div", { key: idx, style: {
+            background: "#12121e",
+            border: "1px solid " + (isOwner ? "rgba(254,44,85,.4)" : (isLeft ? "rgba(254,44,85,.15)" : "rgba(37,244,238,.15)")),
+            borderRadius: 12,
+            padding: "10px 10px 8px"
+          }},
+            // Nombre + puntos
+            /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
               /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } },
-                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: accent, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-                  "@", player.hostNickname || player.hostName || player.uniqueId || "?"
-                ),
-                isOwner && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#fe2c55", background: "rgba(254,44,85,.12)", padding: "1px 5px", borderRadius: 999 } }, "TÚ")
+                /* @__PURE__ */ React.createElement("div", { style: {
+                  fontSize: 11, fontWeight: 800, color: accent,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                }}, "@", displayName),
+                isOwner && /* @__PURE__ */ React.createElement("span", { style: {
+                  fontSize: 8, color: "#fe2c55", background: "rgba(254,44,85,.12)",
+                  padding: "1px 5px", borderRadius: 999
+                }}, "TÚ")
               ),
-              /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } },
-                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 900, color: "#fff", lineHeight: 1 } }, (player.points||0).toLocaleString()),
-                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#777" } }, pct, "%")
+              /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 6 } },
+                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 900, color: "#fff", lineHeight: 1 } },
+                  (player.points||0).toLocaleString()
+                ),
+                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#666", marginTop: 1 } }, pct, "%")
               )
             ),
-            /* @__PURE__ */ React.createElement("div", { style: { height: 5, background: "#1e1e2e", borderRadius: 999, overflow: "hidden" } },
-              /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: pct + "%", background: "linear-gradient(90deg," + accent + "," + accent + "bb)", borderRadius: 999, transition: "width .3s ease" } })
+            // Barra individual
+            /* @__PURE__ */ React.createElement("div", { style: { height: 5, background: "#1e1e2e", borderRadius: 999, overflow: "hidden", marginTop: 4 } },
+              /* @__PURE__ */ React.createElement("div", { style: {
+                height: "100%",
+                width: pct + "%",
+                background: isLeft
+                  ? "linear-gradient(90deg,#fe2c55,#ff6b81)"
+                  : "linear-gradient(90deg,#25f4ee,#00d4cc)",
+                borderRadius: 999,
+                transition: "width .35s ease"
+              }})
+            ),
+            // Label diamantes
+            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", marginTop: 4 } },
+              "diamantes · equipo ", isLeft ? "A" : "B"
             )
           );
         })
