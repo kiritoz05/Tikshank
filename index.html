@@ -1559,65 +1559,72 @@ function App() {
     const ownerKey = safeLc(battle.ownerUsername);
     const side0 = allPlayers.filter((p) => p.teamIdx === 0 || p.teamIdx === "0");
     const side1 = allPlayers.filter((p) => p.teamIdx === 1 || p.teamIdx === "1");
-    const fallback0 = side0.length === 0 && side1.length === 0;
-    const left  = fallback0 ? allPlayers.slice(0,1) : side0;
-    const right = fallback0 ? allPlayers.slice(1)   : side1;
+    const useFallback = side0.length === 0 && side1.length === 0;
+    const left  = useFallback ? allPlayers.slice(0, 1) : side0;
+    const right = useFallback ? allPlayers.slice(1)    : side1;
     const pts0 = left.reduce((s, p) => s + Number(p.points || 0), 0);
     const pts1 = right.reduce((s, p) => s + Number(p.points || 0), 0);
     const total = Math.max(1, pts0 + pts1);
     const pct0 = Math.round(pts0 / total * 100);
     const pct1 = 100 - pct0;
-    const name0 = left[0]?.hostNickname || left[0]?.hostName || "Equipo 1";
-    const name1 = right[0]?.hostNickname || right[0]?.hostName || "Equipo 2";
-    const isOwner0 = left.some(p => safeLc(p.userId || p.hostName) === ownerKey);
-    const isOwner1 = right.some(p => safeLc(p.userId || p.hostName) === ownerKey);
+    const name0 = (left[0] && (left[0].hostNickname || left[0].hostName)) || "Equipo 1";
+    const name1 = (right[0] && (right[0].hostNickname || right[0].hostName)) || "Equipo 2";
+    const isOwner0 = left.some(function(p) { return safeLc(p.userId || p.hostName) === ownerKey; });
+    const isOwner1 = right.some(function(p) { return safeLc(p.userId || p.hostName) === ownerKey; });
     const leading = pts0 > pts1 ? name0 : pts1 > pts0 ? name1 : null;
     const diff = Math.abs(pts0 - pts1);
-    if (allPlayers.length === 0) return /* @__PURE__ */ React.createElement("div", { style: { ...C, textAlign: "center", padding: "24px 16px" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "⚔️"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#fff" } }, "Cargando datos de batalla..."));
-    return /* @__PURE__ */ React.createElement("div", { style: { ...C, padding: 16 } },
-      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 8 } },
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#fe2c55", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, name0),
-          isOwner0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#fe2c55", opacity: 0.7, marginTop: 1 } }, "TÚ")
+    if (allPlayers.length === 0) {
+      return React.createElement("div", { style: Object.assign({}, C, { textAlign: "center", padding: "24px 16px" }) },
+        React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "⚔️"),
+        React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#fff" } }, "Cargando batalla...")
+      );
+    }
+    return React.createElement("div", { style: Object.assign({}, C, { padding: 16 }) },
+      React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 8 } },
+        React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+          React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#fe2c55", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, name0),
+          isOwner0 ? React.createElement("div", { style: { fontSize: 8, color: "#fe2c55", opacity: 0.7, marginTop: 1 } }, "TÚ") : null
         ),
-        /* @__PURE__ */ React.createElement("div", { style: { background: "linear-gradient(135deg,#fe2c55,#25f4ee)", borderRadius: 8, padding: "4px 10px", fontSize: 10, fontWeight: 900, color: "#fff", flexShrink: 0 } }, "VS"),
-        /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, textAlign: "right" } },
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#25f4ee", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, name1),
-          isOwner1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#25f4ee", opacity: 0.7, marginTop: 1, textAlign: "right" } }, "TÚ")
+        React.createElement("div", { style: { background: "linear-gradient(135deg,#fe2c55,#25f4ee)", borderRadius: 8, padding: "4px 10px", fontSize: 10, fontWeight: 900, color: "#fff", flexShrink: 0 } }, "VS"),
+        React.createElement("div", { style: { flex: 1, minWidth: 0, textAlign: "right" } },
+          React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: "#25f4ee", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, name1),
+          isOwner1 ? React.createElement("div", { style: { fontSize: 8, color: "#25f4ee", opacity: 0.7, marginTop: 1 } }, "TÚ") : null
         )
       ),
-      /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 10, marginBottom: 14, alignItems: "center" } },
-        /* @__PURE__ */ React.createElement("div", { style: { background: isOwner0 ? "rgba(254,44,85,.15)" : "rgba(254,44,85,.07)", border: "1px solid " + (isOwner0 ? "rgba(254,44,85,.4)" : "rgba(254,44,85,.15)"), borderRadius: 12, padding: "14px 10px", textAlign: "center" } },
-          isOwner0 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, fontWeight: 800, color: "#fe2c55", letterSpacing: 1, marginBottom: 4 } }, "TÚ"),
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#fe2c55", lineHeight: 1 } }, Number(pts0).toLocaleString()),
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#888", marginTop: 4 } }, "diamantes"),
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fe2c55", marginTop: 2 } }, pct0, "%")
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 10, marginBottom: 14, alignItems: "center" } },
+        React.createElement("div", { style: { background: isOwner0 ? "rgba(254,44,85,.15)" : "rgba(254,44,85,.07)", border: "1px solid " + (isOwner0 ? "rgba(254,44,85,.4)" : "rgba(254,44,85,.15)"), borderRadius: 12, padding: "14px 10px", textAlign: "center" } },
+          isOwner0 ? React.createElement("div", { style: { fontSize: 8, fontWeight: 800, color: "#fe2c55", letterSpacing: 1, marginBottom: 4 } }, "TÚ") : null,
+          React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#fe2c55", lineHeight: 1 } }, Number(pts0).toLocaleString()),
+          React.createElement("div", { style: { fontSize: 9, color: "#888", marginTop: 4 } }, "diamantes"),
+          React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fe2c55", marginTop: 2 } }, pct0, "%")
         ),
-        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, textAlign: "center" } }, "⚡"),
-        /* @__PURE__ */ React.createElement("div", { style: { background: isOwner1 ? "rgba(37,244,238,.15)" : "rgba(37,244,238,.07)", border: "1px solid " + (isOwner1 ? "rgba(37,244,238,.4)" : "rgba(37,244,238,.15)"), borderRadius: 12, padding: "14px 10px", textAlign: "center" } },
-          isOwner1 && /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, fontWeight: 800, color: "#25f4ee", letterSpacing: 1, marginBottom: 4 } }, "TÚ"),
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#25f4ee", lineHeight: 1 } }, Number(pts1).toLocaleString()),
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#888", marginTop: 4 } }, "diamantes"),
-          /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#25f4ee", marginTop: 2 } }, pct1, "%")
+        React.createElement("div", { style: { fontSize: 18, textAlign: "center" } }, "⚡"),
+        React.createElement("div", { style: { background: isOwner1 ? "rgba(37,244,238,.15)" : "rgba(37,244,238,.07)", border: "1px solid " + (isOwner1 ? "rgba(37,244,238,.4)" : "rgba(37,244,238,.15)"), borderRadius: 12, padding: "14px 10px", textAlign: "center" } },
+          isOwner1 ? React.createElement("div", { style: { fontSize: 8, fontWeight: 800, color: "#25f4ee", letterSpacing: 1, marginBottom: 4 } }, "TÚ") : null,
+          React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#25f4ee", lineHeight: 1 } }, Number(pts1).toLocaleString()),
+          React.createElement("div", { style: { fontSize: 9, color: "#888", marginTop: 4 } }, "diamantes"),
+          React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#25f4ee", marginTop: 2 } }, pct1, "%")
         )
       ),
-      /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 10 } },
-        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", height: 10, borderRadius: 999, overflow: "hidden", background: "#1e1e2e" } },
-          /* @__PURE__ */ React.createElement("div", { style: { width: pct0 + "%", background: "linear-gradient(90deg,#fe2c55,#ff6b81)", transition: "width .4s ease", borderRadius: "999px 0 0 999px" } }),
-          /* @__PURE__ */ React.createElement("div", { style: { width: pct1 + "%", background: "linear-gradient(90deg,#00d4cc,#25f4ee)", transition: "width .4s ease", borderRadius: "0 999px 999px 0" } })
+      React.createElement("div", { style: { marginBottom: 10 } },
+        React.createElement("div", { style: { display: "flex", height: 10, borderRadius: 999, overflow: "hidden", background: "#1e1e2e" } },
+          React.createElement("div", { style: { width: pct0 + "%", background: "linear-gradient(90deg,#fe2c55,#ff6b81)", transition: "width .4s ease", borderRadius: "999px 0 0 999px" } }),
+          React.createElement("div", { style: { width: pct1 + "%", background: "linear-gradient(90deg,#00d4cc,#25f4ee)", transition: "width .4s ease", borderRadius: "0 999px 999px 0" } })
         ),
-        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 5, fontSize: 9, color: "#555" } },
-          /* @__PURE__ */ React.createElement("span", { style: { color: "#fe2c55", fontWeight: 700 } }, pct0, "%"),
-          /* @__PURE__ */ React.createElement("span", null, Number(total).toLocaleString(), " total"),
-          /* @__PURE__ */ React.createElement("span", { style: { color: "#25f4ee", fontWeight: 700 } }, pct1, "%")
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 5, fontSize: 9, color: "#555" } },
+          React.createElement("span", { style: { color: "#fe2c55", fontWeight: 700 } }, pct0, "%"),
+          React.createElement("span", null, Number(total).toLocaleString(), " total"),
+          React.createElement("span", { style: { color: "#25f4ee", fontWeight: 700 } }, pct1, "%")
         )
       ),
-      leading ? /* @__PURE__ */ React.createElement("div", { style: { background: "rgba(255,255,255,.03)", border: "1px solid #1e1e2e", borderRadius: 9, padding: "8px 12px", textAlign: "center", fontSize: 11, color: "#aaa" } },
-        /* @__PURE__ */ React.createElement("span", { style: { color: pts0 > pts1 ? "#fe2c55" : "#25f4ee", fontWeight: 800 } }, leading),
-        " va ganando por ",
-        /* @__PURE__ */ React.createElement("span", { style: { color: "#fff", fontWeight: 700 } }, Number(diff).toLocaleString())
-      ) : /* @__PURE__ */ React.createElement("div", { style: { background: "rgba(255,255,255,.03)", border: "1px solid #1e1e2e", borderRadius: 9, padding: "8px 12px", textAlign: "center", fontSize: 11, color: "#f5c518", fontWeight: 700 } }, "¡Empate!")
-    )),
+      leading
+        ? React.createElement("div", { style: { background: "rgba(255,255,255,.03)", border: "1px solid #1e1e2e", borderRadius: 9, padding: "8px 12px", textAlign: "center", fontSize: 11, color: "#aaa" } },
+            React.createElement("span", { style: { color: pts0 > pts1 ? "#fe2c55" : "#25f4ee", fontWeight: 800 } }, leading),
+            " va ganando por ",
+            React.createElement("span", { style: { color: "#fff", fontWeight: 700 } }, Number(diff).toLocaleString())
+          )
+        : React.createElement("div", { style: { background: "rgba(255,255,255,.03)", border: "1px solid #1e1e2e", borderRadius: 9, padding: "8px 12px", textAlign: "center", fontSize: 11, color: "#f5c518", fontWeight: 700 } }, "¡Empate!")
+  ))),
   tab === "espect" && /* @__PURE__ */ React.createElement("div", { className: "ai" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, ["historial", "activos"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, className: `mode-btn${vTab === t ? " act" : ""}`, onClick: () => setVTab(t) }, t === "historial" ? " Historial" : "\uFE0F Activos ahora"))), /* @__PURE__ */ React.createElement("div", { style: C }, vTab === "historial" && (viewR.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin entradas a\xFAn..." : "Conecta el LIVE") : viewR.map((u, i) => {
     var _a2;
     return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#555", flexShrink: 0 } }, (_a2 = (u.nickname || u.user)[0]) == null ? void 0 : _a2.toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, color: "#fff" } }, "@", u.nickname || u.user), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555" } }, new Date(u.joinTime).toLocaleTimeString()));
