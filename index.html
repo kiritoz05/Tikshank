@@ -655,26 +655,6 @@ function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, on
     onSave(__spreadValues({}, f));
   }, style: { flex: 2, background: "linear-gradient(135deg,#fe2c55,#ff6b81)", border: "none", borderRadius: 9, padding: "10px", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 12 } }, " Guardar Acci\xF3n"))));
 }
-class ErrorBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { hasError: false, error: "" }; }
-  static getDerivedStateFromError(e) { return { hasError: true, error: e?.message || "Error desconocido" }; }
-  render() {
-    if (this.state.hasError) {
-      return React.createElement("div", { style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0a0f", padding: 20 } },
-        React.createElement("div", { style: { background: "#12121e", border: "1px solid rgba(254,44,85,.3)", borderRadius: 16, padding: 28, maxWidth: 360, width: "100%", textAlign: "center" } },
-          React.createElement("div", { style: { fontSize: 36, marginBottom: 12 } }, "⚠️"),
-          React.createElement("div", { style: { fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16, marginBottom: 8 } }, "Algo salió mal"),
-          React.createElement("div", { style: { color: "#555", fontSize: 12, marginBottom: 20, fontFamily: "monospace" } }, this.state.error),
-          React.createElement("button", {
-            onClick: () => { try { localStorage.clear(); } catch(e) {} window.location.reload(); },
-            style: { background: "linear-gradient(135deg,#fe2c55,#ff6b81)", border: "none", borderRadius: 10, padding: "11px 24px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }
-          }, "Limpiar caché y recargar")
-        )
-      );
-    }
-    return this.props.children;
-  }
-}
 function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -698,14 +678,7 @@ function Login({ onLogin }) {
 }
 function App() {
   var _a, _b, _c;
-  const [user, setUser] = useState(() => {
-    try {
-      const s = ld("session", null);
-      if (s && typeof s === "object" && s.name && s.plan) return s;
-      localStorage.removeItem("tp_session");
-      return null;
-    } catch(e) { return null; }
-  });
+  const [user, setUser] = useState(() => ld("session", null));
   const [tab, setTab] = useState(() => ld("tab", "dashboard"));
   const [sb, setSb] = useState(false);
   const [battle, setBattle] = useState(null);
@@ -714,7 +687,6 @@ function App() {
   const [conn, setConn] = useState(false);
   const [conn2, setConn2] = useState(false);
   const [dots, setDots] = useState("");
-  const [serverOk, setServerOk] = useState(true);
   const [connErr, setConnErr] = useState("");
   const wakeLockRef = useRef(null);
   const [wakeLockOn, setWakeLockOn] = useState(false);
@@ -1307,11 +1279,9 @@ function App() {
     }
   }, []);
   useEffect(() => {
-    let sock;
-    try { sock = io(SERVER, { transports: ["websocket"], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 1500, reconnectionDelayMax: 8e3, timeout: 12e3 }); }
-    catch(e) { console.error("Socket init error:", e.message); setServerOk(false); return; }
-    sock.on("connect", () => { console.log("Socket conectado:", sock.id); setServerOk(true); });
-    sock.on("connect_error", (e) => { console.warn("Socket error:", e.message); setServerOk(false); });
+    const sock = io(SERVER, { transports: ["websocket"], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 1500, reconnectionDelayMax: 8e3, timeout: 12e3 });
+    sock.on("connect", () => console.log("Socket conectado:", sock.id));
+    sock.on("connect_error", (e) => console.warn("Socket error:", e.message));
     sock.on("event", (d) => {
       if (d.type === "chat") {
         setLog((p) => [{ t: "msg", tx: ` @${d.nickname || d.user}: ${d.comment}`, user: d.user, nick: d.nickname || d.user, comment: d.comment || "" }, ...p].slice(0, 120));
@@ -1386,7 +1356,7 @@ function App() {
     sock.on("tiktok_error", (d) => {
       setLog((p) => [{ t: "sys", tx: `\u26A0\uFE0F Error: ${d.message}` }, ...p].slice(0, 50));
     });
-    return () => { if (sock) sock.disconnect(); };
+    return () => sock.disconnect();
   }, [fireAction]);
   useEffect(() => {
     const savedUser = ld("tuser", "");
@@ -1488,15 +1458,7 @@ function App() {
   const lbl = { display: "block", color: "#556", fontSize: 9, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", marginBottom: 5 };
   const inp = { width: "100%", background: "#0a0a0f", border: "1px solid #252535", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 12, outline: "none" };
   const fActs = actions.filter((a) => a.name.toLowerCase().includes(searchQ.toLowerCase()));
-  return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: "#0a0a0f", flexDirection: "column" } },
-    !serverOk && /* @__PURE__ */ React.createElement("div", { style: { background: "rgba(254,44,85,.12)", border: "1px solid rgba(254,44,85,.3)", borderRadius: 10, padding: "10px 16px", margin: "10px 10px 0 10px", display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "#fe2c55", fontWeight: 600, zIndex: 999 } },
-      /* @__PURE__ */ React.createElement("span", { style: { fontSize: 18 } }, "⚠️"),
-      /* @__PURE__ */ React.createElement("div", null,
-        /* @__PURE__ */ React.createElement("div", null, "Servidor offline — No se puede conectar al backend de Railway."),
-        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#ff9999", marginTop: 2, fontWeight: 400 } }, "Ve a railway.app y reactiva tu servicio. La UI funciona con normalidad.")
-      )
-    ),
-    /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flex: 1 } }, showM && /* @__PURE__ */ React.createElement(ActModal, { action: editA, ttsMode, ttsVoiceId: ttsVoice, ttsNativeVoice: nativeVoice, vol: ttsVol, onSave: saveAction, onClose: () => {
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", minHeight: "100vh", background: "#0a0a0f" } }, showM && /* @__PURE__ */ React.createElement(ActModal, { action: editA, ttsMode, ttsVoiceId: ttsVoice, ttsNativeVoice: nativeVoice, vol: ttsVol, onSave: saveAction, onClose: () => {
     setShowM(false);
     setEditA(null);
   } }), delConfirm && /* @__PURE__ */ React.createElement("div", { className: "mo", onClick: () => setDelConfirm(null) }, /* @__PURE__ */ React.createElement("div", { className: "mb", style: { maxWidth: 320 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "\uFE0F"), /* @__PURE__ */ React.createElement("div", { style: { fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 15, marginBottom: 6 } }, "Eliminar acci\xF3n"), /* @__PURE__ */ React.createElement("div", { style: { color: "#555", fontSize: 12 } }, "\xBFEliminar ", /* @__PURE__ */ React.createElement("span", { style: { color: "#fff", fontWeight: 700 } }, '"', (_a = actions.find((a) => a.id === delConfirm)) == null ? void 0 : _a.name, '"'), "? No se puede deshacer.")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { onClick: () => setDelConfirm(null), style: { flex: 1, background: "transparent", border: "1px solid #252535", borderRadius: 9, padding: "10px", color: "#555", fontWeight: 600, cursor: "pointer", fontSize: 12 } }, "Cancelar"), /* @__PURE__ */ React.createElement("button", { onClick: () => deleteAction(delConfirm), style: { flex: 1, background: "rgba(254,44,85,.15)", border: "1px solid rgba(254,44,85,.35)", borderRadius: 9, padding: "10px", color: "#fe2c55", fontWeight: 700, cursor: "pointer", fontSize: 12 } }, "S\xED, eliminar")))), toast && /* @__PURE__ */ React.createElement("div", { className: "toast" }, toast), sb && /* @__PURE__ */ React.createElement("div", { onClick: () => setSb(false), style: { position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", zIndex: 40 } }), /* @__PURE__ */ React.createElement("div", { style: { width: 215, background: "#0d0d18", borderRight: "1px solid #1a1a28", display: "flex", flexDirection: "column", padding: "13px 10px", position: "fixed", top: 0, bottom: 0, left: 0, zIndex: 50, transform: sb ? "translateX(0)" : "translateX(-100%)", transition: "transform .28s ease" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 14, paddingLeft: 2 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 27, height: 27, borderRadius: 7, background: "linear-gradient(135deg,#fe2c55,#25f4ee)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Syne',sans-serif", fontWeight: 900, fontSize: 13 } }, "T"), /* @__PURE__ */ React.createElement("span", { style: { fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16, letterSpacing: -0.5 } }, "ik", /* @__PURE__ */ React.createElement("span", { style: { color: "#fe2c55" } }, "Panel"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 7, background: "#1a1a28", borderRadius: 9, padding: "7px 9px", marginBottom: 9 } }, /* @__PURE__ */ React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg,#fe2c55,#25f4ee)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 11 } }, user.avatar), /* @__PURE__ */ React.createElement("div", { style: { overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, user.name), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#fe2c55", fontWeight: 600, marginTop: 1 } }, user.plan))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, background: conn ? "rgba(37,244,238,.05)" : "rgba(255,255,255,.02)", border: `1px solid ${conn ? "rgba(37,244,238,.18)" : "#1a1a28"}`, borderRadius: 20, padding: "4px 9px", fontSize: 9, color: conn ? "#25f4ee" : "#444", marginBottom: 12, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { className: conn ? "ld" : "", style: { width: 5, height: 5, borderRadius: "50%", flexShrink: 0, background: conn ? "#25f4ee" : "#252535", boxShadow: conn ? "0 0 7px #25f4ee" : "none" } }), /* @__PURE__ */ React.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, conn ? `@${tUser}` : "Sin conexi\xF3n")), /* @__PURE__ */ React.createElement("nav", { style: { display: "flex", flexDirection: "column", gap: 2, flex: 1, overflowY: "auto" } }, TABS.map((t) => /* @__PURE__ */ React.createElement(
@@ -1682,11 +1644,9 @@ function App() {
   tab === "espect" && /* @__PURE__ */ React.createElement("div", { className: "ai" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, ["historial", "activos"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, className: `mode-btn${vTab === t ? " act" : ""}`, onClick: () => setVTab(t) }, t === "historial" ? " Historial" : "\uFE0F Activos ahora"))), /* @__PURE__ */ React.createElement("div", { style: C }, vTab === "historial" && (viewR.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin entradas a\xFAn..." : "Conecta el LIVE") : viewR.map((u, i) => {
     var _a2;
     return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#555", flexShrink: 0 } }, (_a2 = (u.nickname || u.user)[0]) == null ? void 0 : _a2.toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, color: "#fff" } }, "@", u.nickname || u.user), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555" } }, new Date(u.joinTime).toLocaleTimeString()));
-  })), vTab === "activos" && (topViewers.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin espectadores activos..." : "Conecta el LIVE") : topViewers.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 6, height: 6, borderRadius: "50%", background: "#25f4ee", flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, color: "#fff" } }, "@", u.nickname || u.user))))))))));
+  })), vTab === "activos" && (topViewers.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin espectadores activos..." : "Conecta el LIVE") : topViewers.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 6, height: 6, borderRadius: "50%", background: "#25f4ee", flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, color: "#fff" } }, "@", u.nickname || u.user)))))))));
 }
-ReactDOM.createRoot(document.getElementById("root")).render(
-  React.createElement(ErrorBoundary, null, React.createElement(App, null))
-);
+ReactDOM.createRoot(document.getElementById("root")).render(/* @__PURE__ */ React.createElement(App, null));
 </script>
 </body>
 </html>
