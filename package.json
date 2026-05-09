@@ -2,9 +2,7 @@
   "name": "tikpanel",
   "version": "1.0.0",
   "private": true,
-  "engines": {
-    "node": ">=18"
-  },
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -19,4 +17,3 @@
     "@vitejs/plugin-react": "^4.2.1",
     "vite": "^5.2.0"
   }
-}
