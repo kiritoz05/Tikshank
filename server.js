@@ -176,111 +176,101 @@ function extractName(u) {
 }
 
 
-function normalizeBattlePoints(u) {
-  if (!u) return 0;
-  return Number(
-    u.battleScore || u.score || u.points || u.teamPoints ||
-    u.totalScore  || u.totalPoints || u.point || 0
-  );
+function extractTeams(data) {
+  const armies = data.battleArmies || (data.linkMicBattleInfo && data.linkMicBattleInfo.battleArmies) || [];
+
+  if (armies.length > 0) {
+    return armies.map(function(army, idx) {
+      var host   = army.hostUser || {};
+      var uid    = host.uniqueId || host.displayId || String(army.hostUserId || "");
+      var nn     = host.nickname || host.displayName || uid;
+      var userId = String(host.userId || host.id || army.hostUserId || "");
+      var hostName     = (uid && !/^\d{8,}$/.test(uid)) ? uid : (userId || ("player_" + idx));
+      var hostNickname = nn || hostName;
+
+      // Buscar puntos en TODOS los campos posibles
+      var points = 0;
+      var directFields = [
+        army.points, army.teamPoints, army.score, army.battleScore,
+        army.point,  army.totalScore, army.totalPoints, army.teamScore,
+        army.armyScore, army.matchScore, army.groupScore, army.displayScore
+      ];
+      for (var i = 0; i < directFields.length; i++) {
+        var n = Number(directFields[i]);
+        if (Number.isFinite(n) && n > 0) { points = n; break; }
+      }
+      // Sumar participantes si no hay puntos directos
+      if (points === 0 && Array.isArray(army.participants)) {
+        points = army.participants.reduce(function(sum, p) {
+          var pf = [p.battleScore, p.score, p.points, p.teamPoints, p.groupScore, p.totalScore];
+          for (var j = 0; j < pf.length; j++) {
+            var pn = Number(pf[j]);
+            if (Number.isFinite(pn) && pn > 0) return sum + pn;
+          }
+          return sum;
+        }, 0);
+      }
+
+      var teamIdx = army.armyType !== undefined ? Number(army.armyType) % 2
+                  : army.teamId  !== undefined ? Number(army.teamId)   % 2
+                  : idx % 2;
+
+      return { hostName: hostName, hostNickname: hostNickname, userId: userId, points: points, teamIdx: teamIdx };
+    }).filter(function(t) { return t.hostName && t.hostName !== "?"; });
+  }
+
+  // Fallback: battleUsers
+  var users = data.battleUsers || data.participants || [];
+  return users.map(function(u, i) {
+    return {
+      hostName:     u.uniqueId || u.displayId || String(u.userId || i),
+      hostNickname: u.nickname || u.displayName || u.uniqueId || "",
+      userId:       String(u.userId || u.id || ""),
+      points:       Number(u.battleScore || u.score || u.points || 0),
+      teamIdx:      i % 2,
+    };
+  }).filter(function(t) { return t.hostName; });
 }
 
-function extractTeams(data) {
-  if (Array.isArray(data.battleArmies) && data.battleArmies.length > 0) {
-
-    data.battleArmies.forEach(army => {
-      if (army.hostUser) registerUser(army.hostUser);
-      if (Array.isArray(army.participants)) army.participants.forEach(p => registerUser(p));
-    });
-
-    const result = [];
-    const seen = new Set();
-
-    data.battleArmies.forEach((army, armyIdx) => {
-      let teamIdx;
-      if (army.armyType !== undefined && army.armyType !== null) {
-        teamIdx = Number(army.armyType) % 2;
-      } else if (army.teamId !== undefined && army.teamId !== null) {
-        teamIdx = Number(army.teamId) % 2;
-      } else {
-        teamIdx = armyIdx % 2;
-      }
-
-      const teamPoints = Number(
-        army.points || army.teamScore || army.teamPoints ||
-        army.score || army.battleScore || army.point ||
-        army.totalScore || army.totalPoints || 0
-      );
-
-      // ✅ Solo usar hostUser como anfitrión del equipo (no fans/participantes)
-      const hostRaw = army.hostUser;
-      if (!hostRaw) return;
-
-      const r = extractName(hostRaw);
-      const userId = String(hostRaw.userId || hostRaw.id || army.hostUserId || army.hostId || "");
-      let hostName     = r.hostName;
-      let hostNickname = r.hostNickname;
-
-      if (!hostName || /^\d{8,}$/.test(hostName)) {
-        const resolved = resolveNameFromMap(userId);
-        if (resolved) {
-          hostName     = resolved.uniqueId;
-          hostNickname = resolved.nickname || hostNickname || resolved.uniqueId;
-        } else {
-          hostName = userId || `player_${armyIdx}`;
-        }
-      }
-      if (!hostNickname) hostNickname = hostName;
-
-      // También acumular puntos de participantes para el equipo
-      const partPoints = Array.isArray(army.participants)
-        ? army.participants.reduce((acc, p) => acc + normalizeBattlePoints(p), 0)
-        : 0;
-      const finalPoints = teamPoints || partPoints;
-
-      const dedupeKey = String(userId || hostName);
-      if (!dedupeKey || seen.has(dedupeKey)) return;
-      seen.add(dedupeKey);
-
-      // Si no hay puntos en el ejército, buscar en hostUser directamente
-      const hostPoints = normalizeBattlePoints(hostRaw);
-      const bestPoints = finalPoints || hostPoints || 0;
-      result.push({ hostName, hostNickname, userId, points: bestPoints, teamIdx });
-    });
-
-    if (result.length > 0) return result;
+function normalizeBattlePoints(u) {
+  if (!u) return 0;
+  // Buscar en TODOS los campos posibles donde TikTok puede poner los puntos
+  const fields = [
+    u.battleScore, u.score, u.points, u.teamPoints,
+    u.totalScore, u.totalPoints, u.point, u.groupScore,
+    u.armyScore, u.matchScore, u.coinCount, u.giftCount,
+    u.teamScore, u.displayScore, u.voteCount
+  ];
+  for (const v of fields) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return n;
   }
+  return 0;
+}
 
-  if (Array.isArray(data.battleUsers) && data.battleUsers.length > 0) {
-    return data.battleUsers.map((u, idx) => {
-      let hostName = u.uniqueId || u.displayId || "";
-      let hostNickname = u.nickname || u.displayName || hostName;
-      const userId = String(u.userId || u.id || "");
-
-      if (!hostName || /^\d{8,}$/.test(hostName)) {
-        const resolved = resolveNameFromMap(userId);
-        if (resolved) { hostName = resolved.uniqueId; hostNickname = resolved.nickname; }
-        else hostName = userId || "?";
-      }
-      return {
-        hostName, hostNickname, userId,
-        points: normalizeBattlePoints(u),
-        teamIdx: u.teamIdx !== undefined && u.teamIdx !== null ? Number(u.teamIdx) : (u.teamId !== undefined && u.teamId !== null ? Number(u.teamId) % 2 : idx % 2)
-      };
-    }).filter(t => t.hostName !== "?");
+function getArmyPoints(army) {
+  if (!army) return 0;
+  // Buscar puntos del ejército en TODOS los campos posibles
+  const direct = [
+    army.points, army.teamPoints, army.score, army.battleScore,
+    army.point, army.totalScore, army.totalPoints, army.teamScore,
+    army.armyScore, army.matchScore, army.groupScore, army.displayScore
+  ];
+  for (const v of direct) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return n;
   }
-
-  const candidates = [data.battleItems, data.users, data.armies, data.items, data.teams].filter(Array.isArray);
-  for (const arr of candidates) {
-    const teams = arr.map((item, idx) => {
-      const u    = item.hostUser || item.host || item.user || item;
-      const base = normalizeBattleUser(u);
-      if (!base) return null;
-      const pts  = normalizeBattlePoints(item) || base.points || 0;
-      return { ...base, userId: String(u.userId || u.id || ""), points: pts, teamIdx: item.teamIdx !== undefined && item.teamIdx !== null ? Number(item.teamIdx) : (item.teamId !== undefined && item.teamId !== null ? Number(item.teamId) % 2 : idx % 2) };
-    }).filter(Boolean);
-    if (teams.length > 0) return teams;
+  // Sumar puntos de todos los participantes
+  if (Array.isArray(army.participants) && army.participants.length > 0) {
+    const sum = army.participants.reduce((acc, p) => acc + normalizeBattlePoints(p), 0);
+    if (sum > 0) return sum;
   }
-  return [];
+  // Intentar hostUser
+  if (army.hostUser) {
+    const hp = normalizeBattlePoints(army.hostUser);
+    if (hp > 0) return hp;
+  }
+  return 0;
 }
 
 // Emitir batalla actualizada cuando se resuelva un ID
@@ -392,7 +382,17 @@ async function startTikTokConnection(username, sessionId) {
   let lastStatus = 1;
 
   tiktok.on("linkMicArmies", (data) => {
-    console.log("[linkMicArmies] RAW FULL:", JSON.stringify(data).slice(0, 4000));
+    console.log("[linkMicArmies] RAW FULL:", JSON.stringify(data).slice(0, 8000));
+    // Log específico de puntos para debug
+    if (Array.isArray(data.battleArmies)) {
+      data.battleArmies.forEach((army, i) => {
+        const pts = getArmyPoints(army);
+        console.log(`[army ${i} POINTS] getArmyPoints=${pts} raw={points:${army.points},teamPoints:${army.teamPoints},score:${army.score},battleScore:${army.battleScore},armyScore:${army.armyScore}}`);
+        (army.participants||[]).slice(0,2).forEach((p,j) => {
+          console.log(`  [participant ${j}] bs=${p.battleScore} s=${p.score} pts=${p.points} tp=${p.teamPoints} gs=${p.groupScore}`);
+        });
+      });
+    }
     if (Array.isArray(data.battleArmies)) {
       data.battleArmies.forEach((army, i) => {
         console.log(`[army ${i}] hostUserId=${army.hostUserId} armyType=${army.armyType} teamId=${army.teamId} points=${army.points||army.teamPoints||army.score||0}`);
