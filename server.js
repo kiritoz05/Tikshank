@@ -358,22 +358,20 @@ async function startTikTokConnection(username, sessionId) {
     const status = data.battleStatus || 1;
     console.log("[linkMicBattle] players:", teams.length, JSON.stringify(teams));
 
-    const battlePayload = { status, teams, ownerUsername, timestamp: Date.now() };
+    // Snapshot inmutable para closure de resolveUserId
+    const teamsSnap = teams.map(t => ({ ...t }));
+    const battlePayload = { status, teams: teamsSnap, ownerUsername, timestamp: Date.now() };
     if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : battlePayload;
     io.emit("battle", battlePayload);
 
-    if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : { status, teams, ownerUsername, timestamp: Date.now() };
-    const cb = emitUpdatedBattle(username, ownerUsername, teams, status);
-    teams.forEach(t => {
+    const cb = emitUpdatedBattle(username, ownerUsername, teamsSnap, status);
+    teamsSnap.forEach(t => {
       if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
       if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb);
     });
   });
 
   // ── linkMicArmies ──────────────────────────────────────────────────────
-  let lastTeams  = [];
-  let lastStatus = 1;
-
   tiktok.on("linkMicArmies", (data) => {
     console.log("[linkMicArmies] RAW FULL:", JSON.stringify(data).slice(0, 4000));
     if (Array.isArray(data.battleArmies)) {
@@ -390,16 +388,14 @@ async function startTikTokConnection(username, sessionId) {
     console.log(`[linkMicArmies] individual players=${teams.length}`);
     if (teams.length === 0) return;
 
-    lastTeams  = teams;
-    lastStatus = 1;
-
-    const battlePayload = { status: 1, teams, ownerUsername, timestamp: Date.now() };
+    // Snapshot inmutable para evitar bug de closure mutable con resolveUserId
+    const teamsSnapshot = teams.map(t => ({ ...t }));
+    const battlePayload = { status: 1, teams: teamsSnapshot, ownerUsername, timestamp: Date.now() };
     if (sessions[username]) sessions[username].lastBattle = battlePayload;
     io.emit("battle", battlePayload);
 
-    if (sessions[username]) sessions[username].lastBattle = { status: 1, teams, ownerUsername, timestamp: Date.now() };
-    const cb = emitUpdatedBattle(username, ownerUsername, teams, 1);
-    teams.forEach(t => {
+    const cb = emitUpdatedBattle(username, ownerUsername, teamsSnapshot, 1);
+    teamsSnapshot.forEach(t => {
       if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
       if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb);
     });
@@ -447,6 +443,19 @@ app.post("/disconnect", (req, res) => {
   const { username } = req.body;
   if (username) cleanSession(username);
   res.json({ success:true });
+});
+
+// ── Re-emitir batalla al nuevo cliente que se conecta ─────────────────────
+io.on("connection", (socket) => {
+  // Buscar si hay alguna sesión activa con batalla guardada
+  for (const key of Object.keys(sessions)) {
+    const s = sessions[key];
+    if (s?.lastBattle) {
+      console.log(`[socket-join] Re-emitiendo lastBattle a nuevo cliente (${socket.id})`);
+      socket.emit("battle", s.lastBattle);
+      break; // solo la primera activa
+    }
+  }
 });
 
 const PORT = process.env.PORT || 3001;
