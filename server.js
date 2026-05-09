@@ -167,73 +167,57 @@ function extractName(u) {
 function extractTeams(data) {
   if (Array.isArray(data.battleArmies) && data.battleArmies.length > 0) {
 
-    // Registrar todos los usuarios visibles en userMap
     data.battleArmies.forEach(army => {
       if (army.hostUser) registerUser(army.hostUser);
       if (Array.isArray(army.participants)) army.participants.forEach(p => registerUser(p));
     });
 
-    // TikTok manda 1 army POR CADA ANFITRIÓN.
-    // 1v1 → 2 armies. 2v2 → 4 armies.
-    // teamIdx: se usa army.armyType o army.teamId para saber a qué equipo pertenece.
-    // Si armyType no está definido, alternamos 0,1,0,1 por posición del array.
+    const result = [];
+    const seen = new Set();
 
-    const result = data.battleArmies.map((army, armyIdx) => {
-      const pts = Number(
-        army.points || army.teamScore || army.teamPoints ||
-        army.score  || army.battleScore || army.point ||
-        army.totalScore || army.totalPoints || 0
-      );
-
-      let hostName = "";
-      let hostNickname = "";
-      let userId = "";
-
-      if (army.hostUser) {
-        const r = extractName(army.hostUser);
-        hostName     = r.hostName;
-        hostNickname = r.hostNickname;
-        userId       = r.userId || String(army.hostUser.userId || army.hostUser.id || "");
-      }
-
-      const rawHostId = String(army.hostUserId || army.hostId || "");
-      if ((!hostName || /^\d{8,}$/.test(hostName)) && rawHostId) {
-        userId = rawHostId;
-        if (Array.isArray(army.participants)) {
-          const match = army.participants.find(p =>
-            String(p.userId || p.id || "") === rawHostId
-          );
-          if (match) {
-            const r = extractName(match);
-            if (r.hostName && !/^\d{8,}$/.test(r.hostName)) {
-              hostName     = r.hostName;
-              hostNickname = r.hostNickname;
-            }
-          }
-        }
-        if (!hostName || /^\d{8,}$/.test(hostName)) {
-          const r = resolveNameFromMap(rawHostId);
-          if (r) { hostName = r.uniqueId; hostNickname = r.nickname; }
-          else { hostName = rawHostId; hostNickname = rawHostId; }
-        }
-      }
-
-      if (!userId) userId = rawHostId || hostName || "";
-
-      // ── teamIdx: determinar a qué equipo pertenece este anfitrión ──
-      // armyType: 0 = equipo izquierdo, 1 = equipo derecho (según TikTok)
-      // Si no existe, usamos posición par/impar
+    data.battleArmies.forEach((army, armyIdx) => {
       let teamIdx;
       if (army.armyType !== undefined && army.armyType !== null) {
-        teamIdx = Number(army.armyType) % 2; // normalizar a 0 o 1
+        teamIdx = Number(army.armyType) % 2;
       } else if (army.teamId !== undefined && army.teamId !== null) {
         teamIdx = Number(army.teamId) % 2;
       } else {
-        teamIdx = armyIdx % 2; // fallback: alternancia 0,1,0,1
+        teamIdx = armyIdx % 2;
       }
 
-      return { hostName, hostNickname, userId, points: pts, teamIdx };
-    }).filter(t => t.hostName && t.hostName !== "");
+      const teamPoints = Number(
+        army.points || army.teamScore || army.teamPoints ||
+        army.score || army.battleScore || army.point ||
+        army.totalScore || army.totalPoints || 0
+      );
+
+      const participants = Array.isArray(army.participants) && army.participants.length
+        ? army.participants
+        : (army.hostUser ? [army.hostUser] : []);
+
+      participants.forEach((p, partIdx) => {
+        const r = extractName(p);
+        const userId = String(p.userId || p.id || army.hostUserId || army.hostId || r.userId || "");
+        let hostName = r.hostName;
+        let hostNickname = r.hostNickname;
+        if (!hostName || /^\d{8,}$/.test(hostName)) {
+          const resolved = resolveNameFromMap(userId);
+          if (resolved) {
+            hostName = resolved.uniqueId;
+            hostNickname = resolved.nickname || hostNickname || resolved.uniqueId;
+          }
+        }
+        if (!hostName) hostName = userId || `player_${armyIdx}_${partIdx}`;
+        if (!hostNickname) hostNickname = hostName;
+
+        const points = normalizeBattlePoints(p) || teamPoints;
+        const dedupeKey = String(userId || hostName);
+        if (!dedupeKey || seen.has(dedupeKey)) return;
+        seen.add(dedupeKey);
+
+        result.push({ hostName, hostNickname, userId, points, teamIdx });
+      });
+    });
 
     if (result.length > 0) return result;
   }
@@ -251,8 +235,8 @@ function extractTeams(data) {
       }
       return {
         hostName, hostNickname, userId,
-        points: Number(u.battleScore || u.score || u.points || 0),
-        teamIdx: idx % 2
+        points: normalizeBattlePoints(u),
+        teamIdx: u.teamIdx !== undefined && u.teamIdx !== null ? Number(u.teamIdx) : (u.teamId !== undefined && u.teamId !== null ? Number(u.teamId) % 2 : idx % 2)
       };
     }).filter(t => t.hostName !== "?");
   }
@@ -263,8 +247,8 @@ function extractTeams(data) {
       const u    = item.hostUser || item.host || item.user || item;
       const base = normalizeBattleUser(u);
       if (!base) return null;
-      const pts  = Number(item.points || item.battleScore || item.score || base.points || 0);
-      return { ...base, userId: String(u.userId || u.id || ""), points: pts, teamIdx: idx % 2 };
+      const pts  = normalizeBattlePoints(item) || base.points || 0;
+      return { ...base, userId: String(u.userId || u.id || ""), points: pts, teamIdx: item.teamIdx !== undefined && item.teamIdx !== null ? Number(item.teamIdx) : (item.teamId !== undefined && item.teamId !== null ? Number(item.teamId) % 2 : idx % 2) };
     }).filter(Boolean);
     if (teams.length > 0) return teams;
   }
@@ -359,7 +343,7 @@ async function startTikTokConnection(username, sessionId) {
 
     const teams  = extractTeams(data);
     const status = data.battleStatus || 1;
-    console.log("[linkMicBattle] teams:", JSON.stringify(teams));
+    console.log("[linkMicBattle] players:", teams.length, JSON.stringify(teams));
 
     io.emit("battle", { status, teams, ownerUsername, timestamp: Date.now() });
 
@@ -387,6 +371,7 @@ async function startTikTokConnection(username, sessionId) {
     }
 
     const teams = extractTeams(data);
+    console.log(`[linkMicArmies] individual players=${teams.length}`);
     if (teams.length === 0) return;
 
     lastTeams  = teams;
