@@ -176,58 +176,94 @@ function extractName(u) {
 }
 
 
+function getPersonPoints(p) {
+  if (!p) return 0;
+  var fs = [p.battleScore, p.score, p.points, p.teamPoints, p.groupScore,
+            p.totalScore, p.point, p.armyScore, p.matchScore, p.displayScore];
+  for (var i = 0; i < fs.length; i++) {
+    var n = Number(fs[i]);
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return 0;
+}
+
+function getPersonName(u) {
+  if (!u) return { name: "", nick: "", uid: "" };
+  var uid  = String(u.uniqueId || u.displayId || "");
+  var nick = String(u.nickname || u.displayName || u.name || "");
+  var id   = String(u.userId || u.id || "");
+  // Si uid es numérico largo, buscar en userMap
+  var name = (uid && !/^\d{6,}$/.test(uid)) ? uid : (userMap[id]?.uniqueId || userMap[uid]?.uniqueId || uid || id);
+  var nn   = nick || userMap[id]?.nickname || userMap[uid]?.nickname || name;
+  return { name: name, nick: nn, uid: id || uid };
+}
+
 function extractTeams(data) {
   const armies = data.battleArmies || (data.linkMicBattleInfo && data.linkMicBattleInfo.battleArmies) || [];
+  var results = [];
 
   if (armies.length > 0) {
-    return armies.map(function(army, idx) {
-      var host   = army.hostUser || {};
-      var uid    = host.uniqueId || host.displayId || String(army.hostUserId || "");
-      var nn     = host.nickname || host.displayName || uid;
-      var userId = String(host.userId || host.id || army.hostUserId || "");
-      var hostName     = (uid && !/^\d{8,}$/.test(uid)) ? uid : (userId || ("player_" + idx));
-      var hostNickname = nn || hostName;
-
-      // Buscar puntos en TODOS los campos posibles
-      var points = 0;
-      var directFields = [
-        army.points, army.teamPoints, army.score, army.battleScore,
-        army.point,  army.totalScore, army.totalPoints, army.teamScore,
-        army.armyScore, army.matchScore, army.groupScore, army.displayScore
-      ];
-      for (var i = 0; i < directFields.length; i++) {
-        var n = Number(directFields[i]);
-        if (Number.isFinite(n) && n > 0) { points = n; break; }
-      }
-      // Sumar participantes si no hay puntos directos
-      if (points === 0 && Array.isArray(army.participants)) {
-        points = army.participants.reduce(function(sum, p) {
-          var pf = [p.battleScore, p.score, p.points, p.teamPoints, p.groupScore, p.totalScore];
-          for (var j = 0; j < pf.length; j++) {
-            var pn = Number(pf[j]);
-            if (Number.isFinite(pn) && pn > 0) return sum + pn;
-          }
-          return sum;
-        }, 0);
-      }
-
+    armies.forEach(function(army, armyIdx) {
       var teamIdx = army.armyType !== undefined ? Number(army.armyType) % 2
                   : army.teamId  !== undefined ? Number(army.teamId)   % 2
-                  : idx % 2;
+                  : armyIdx % 2;
 
-      return { hostName: hostName, hostNickname: hostNickname, userId: userId, points: points, teamIdx: teamIdx };
-    }).filter(function(t) { return t.hostName && t.hostName !== "?"; });
+      // ── Registrar host del ejército
+      if (army.hostUser) registerUser(army.hostUser);
+
+      // ── Sacar CADA participante como jugador individual
+      var participants = army.participants || [];
+      if (participants.length > 0) {
+        participants.forEach(function(p) {
+          if (!p) return;
+          var user = p.user || p;
+          registerUser(user);
+          var r = getPersonName(user);
+          var pts = getPersonPoints(p);
+          if (!r.name && !r.uid) return;
+          results.push({
+            hostName:     r.name || r.uid || ("player_" + results.length),
+            hostNickname: r.nick || r.name || r.uid,
+            userId:       r.uid,
+            points:       pts,
+            teamIdx:      teamIdx,
+            isHost:       false
+          });
+        });
+      } else {
+        // Sin participants — usar hostUser solo
+        var host = army.hostUser || {};
+        registerUser(host);
+        var r2 = getPersonName(host);
+        var armyPts = getPersonPoints(army);
+        if (r2.name || r2.uid) {
+          results.push({
+            hostName:     r2.name || r2.uid || ("player_" + results.length),
+            hostNickname: r2.nick || r2.name || r2.uid,
+            userId:       r2.uid || String(army.hostUserId || ""),
+            points:       armyPts,
+            teamIdx:      teamIdx,
+            isHost:       true
+          });
+        }
+      }
+    });
+
+    if (results.length > 0) return results;
   }
 
   // Fallback: battleUsers
   var users = data.battleUsers || data.participants || [];
   return users.map(function(u, i) {
+    registerUser(u);
+    var r = getPersonName(u);
     return {
-      hostName:     u.uniqueId || u.displayId || String(u.userId || i),
-      hostNickname: u.nickname || u.displayName || u.uniqueId || "",
-      userId:       String(u.userId || u.id || ""),
-      points:       Number(u.battleScore || u.score || u.points || 0),
+      hostName:     r.name || r.uid || ("p" + i),
+      hostNickname: r.nick || r.name || r.uid,
+      userId:       r.uid,
+      points:       getPersonPoints(u),
       teamIdx:      i % 2,
+      isHost:       false
     };
   }).filter(function(t) { return t.hostName; });
 }
