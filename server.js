@@ -386,7 +386,7 @@ async function startTikTokConnection(username, sessionId) {
       });
     }
 
-    const teams = extractTeams(data);
+    const teams = extractTeams(data).slice().sort((a,b) => Number(a.teamIdx||0) - Number(b.teamIdx||0));
     if (teams.length === 0) return;
 
     lastTeams  = teams;
