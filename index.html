@@ -116,7 +116,7 @@ function _startSynthKA() {
       window.speechSynthesis.pause();
       window.speechSynthesis.resume();
     }
-  }, 8e3);
+  }, 3e3);
 }
 function _stopSynthKA() {
   if (_synthKA) {
@@ -126,6 +126,12 @@ function _stopSynthKA() {
 }
 function enqueueTTS(text, voiceId, vol, mode) {
   if (!text || !text.trim()) return;
+  // Filtrar palabras bloqueadas
+  try {
+    const blocked = JSON.parse(localStorage.getItem("tp_blockedWords") || "[]");
+    const lower = text.toLowerCase();
+    if (Array.isArray(blocked) && blocked.some(w => w && lower.includes(w.toLowerCase()))) return;
+  } catch(e) {}
   ttsQueue.push({ text: text.trim(), voiceId, vol, mode });
   if (!ttsActive) drainQueue();
 }
@@ -167,9 +173,14 @@ function speakNative(text, voiceId, vol) {
     const doSpeak = () => {
       window.speechSynthesis.cancel();
       setTimeout(() => {
-        const utt = new SpeechSynthesisUtterance(text);
+        // Limpiar texto problemático que congela el TTS
+        const cleanText = (text || "")
+          .replace(/Aceves/gi, "Aseves")
+          .replace(/[\uD800-\uDFFF]/g, " ")  // eliminar surrogates/emojis raros
+          .replace(/\s+/g, " ").trim();
+        const utt = new SpeechSynthesisUtterance(cleanText || text);
         utt.volume = Math.min(1, Math.max(0, vol));
-        utt.rate = 1;
+        utt.rate = 0.95;
         utt.pitch = 1;
         utt.lang = "es-MX";
         const voices = window.speechSynthesis.getVoices();
@@ -182,14 +193,19 @@ function speakNative(text, voiceId, vol) {
             res();
           }
         };
-        utt.onend = finish;
+        // Watchdog: si se congela más del tiempo estimado, forzar siguiente
+        const maxMs = Math.max(6000, ((cleanText || text).length / 10) * 1000) + 3000;
+        const watchdog = setTimeout(() => {
+          if (!done) { window.speechSynthesis.cancel(); finish(); }
+        }, maxMs);
+        utt.onend = () => { clearTimeout(watchdog); finish(); };
         utt.onerror = (e) => {
+          clearTimeout(watchdog);
           console.warn("synth error:", e.error);
           finish();
         };
         _startSynthKA();
         window.speechSynthesis.speak(utt);
-        setTimeout(finish, 22e3);
       }, 120);
     };
     const vv = window.speechSynthesis.getVoices();
@@ -778,6 +794,8 @@ function App() {
   const [spotifySkipPerm, setSpotifySkipPerm] = useState(() => ld("spotifySkipPerm", "Solo moderadores"));
   const [spotifyCustomUsers, setSpotifyCustomUsers] = useState(() => ld("spotifyCustomUsers", []));
   const [spotifyCustomInput, setSpotifyCustomInput] = useState("");
+  const [blockedWords, setBlockedWords] = useState(() => { try { return JSON.parse(localStorage.getItem("tp_blockedWords") || "[]"); } catch(e) { return []; } });
+  const [blockWordInput, setBlockWordInput] = useState("");
   const [spotifyQueue, setSpotifyQueue] = useState(() => ld("spotifyQueue", []));
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [spotifyNowPlaying, setSpotifyNowPlaying] = useState(null);
@@ -949,6 +967,21 @@ function App() {
     sv("tuser", tUser);
   }, [tUser]);
   useEffect(() => {
+    if (!conn || !tUser) return;
+    const _pollIv = setInterval(async () => {
+      try {
+        const r = await fetch(`${SERVER}/battle/${encodeURIComponent(tUser.replace(/^@/,""))}`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d && d.teams && d.teams.length > 0) {
+            setBattle((prev) => normalizeBattlePayload(d, tUser));
+          }
+        }
+      } catch(e) {}
+    }, 2000);
+    return () => clearInterval(_pollIv);
+  }, [conn, tUser]);
+  useEffect(() => {
     sv("sessid", sessId);
   }, [sessId]);
   useEffect(() => {
@@ -999,6 +1032,7 @@ function App() {
   useEffect(() => {
     sv("spotifyCustomUsers", spotifyCustomUsers);
   }, [spotifyCustomUsers]);
+  useEffect(() => { try { localStorage.setItem("tp_blockedWords", JSON.stringify(blockedWords)); } catch(e) {} }, [blockedWords]);
   useEffect(() => {
     sv("spotifyQueue", spotifyQueue);
   }, [spotifyQueue]);
@@ -1481,7 +1515,7 @@ function App() {
       setFilterCustomUsers((p) => [...p, filterCustomInput.trim()]);
       setFilterCustomInput("");
     }
-  } }, "+ Agregar")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, filterCustomUsers.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { background: "#1a1a28", border: "1px solid #252535", borderRadius: 20, padding: "4px 10px", color: "#aaa", fontSize: 11, display: "flex", alignItems: "center", gap: 6 } }, u, /* @__PURE__ */ React.createElement("span", { style: { cursor: "pointer", color: "#fe2c55" }, onClick: () => setFilterCustomUsers((p) => p.filter((_, j) => j !== i)) }, "\xD7")))))), /* @__PURE__ */ React.createElement(SecHdr, { title: "\u2699\uFE0F COLA Y OPCIONES" }), /* @__PURE__ */ React.createElement("div", { style: C }, [
+  } }, "+ Agregar")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, filterCustomUsers.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { background: "#1a1a28", border: "1px solid #252535", borderRadius: 20, padding: "4px 10px", color: "#aaa", fontSize: 11, display: "flex", alignItems: "center", gap: 6 } }, u, /* @__PURE__ */ React.createElement("span", { style: { cursor: "pointer", color: "#fe2c55" }, onClick: () => setFilterCustomUsers((p) => p.filter((_, j) => j !== i)) }, "\xD7")))))), /* @__PURE__ */ React.createElement(SecHdr, { title: "\uD83D\uDEAB PALABRAS BLOQUEADAS" }), /* @__PURE__ */ React.createElement("div", { style: C }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", marginBottom: 8, lineHeight: 1.6 } }, "El TTS no leer\xE1 mensajes que contengan estas palabras."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 8 } }, /* @__PURE__ */ React.createElement("input", { value: blockWordInput, onChange: (e) => setBlockWordInput(e.target.value), onKeyDown: (e) => { if (e.key === "Enter" && blockWordInput.trim()) { const w = blockWordInput.trim().toLowerCase(); setBlockedWords((p) => p.includes(w) ? p : [...p, w]); setBlockWordInput(""); } }, placeholder: "Escribe y presiona Enter...", style: { flex: 1, background: "#0a0a0f", border: "1px solid #252535", borderRadius: 7, padding: "6px 10px", color: "#fff", fontSize: 11 } }), /* @__PURE__ */ React.createElement("button", { onClick: () => { if (blockWordInput.trim()) { const w = blockWordInput.trim().toLowerCase(); setBlockedWords((p) => p.includes(w) ? p : [...p, w]); setBlockWordInput(""); } }, style: { padding: "6px 12px", background: "rgba(254,44,85,.15)", border: "1px solid rgba(254,44,85,.3)", borderRadius: 7, color: "#fe2c55", fontSize: 11, cursor: "pointer", fontWeight: 700 } }, "+ Agregar")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 5 } }, blockedWords.map((w, i) => /* @__PURE__ */ React.createElement("span", { key: i, style: { padding: "3px 10px", background: "rgba(254,44,85,.1)", border: "1px solid rgba(254,44,85,.2)", borderRadius: 20, fontSize: 11, color: "#fe2c55", display: "flex", alignItems: "center", gap: 5 } }, w, /* @__PURE__ */ React.createElement("span", { style: { cursor: "pointer", fontSize: 14, lineHeight: 1 }, onClick: () => setBlockedWords((p) => p.filter((_, j) => j !== i)) }, "\xD7")))))), /* @__PURE__ */ React.createElement("div", { style: { display: "none" } }, [
     { l: "Cola infinita", sub: "Lee todo sin descartar mensajes", v: queueInfinite, s: setQueueInfinite },
     { l: "Leer mensajes viejos al activar", sub: "Lee mensajes anteriores al encender TTS", v: queueReadOld, s: setQueueReadOld },
     { l: "Omitir emojis", sub: "No lee emojis aislados", v: queueSkipEmoji, s: setQueueSkipEmoji },

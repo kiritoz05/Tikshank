@@ -175,6 +175,15 @@ function extractName(u) {
   return { hostName, hostNickname, userId };
 }
 
+
+function normalizeBattlePoints(u) {
+  if (!u) return 0;
+  return Number(
+    u.battleScore || u.score || u.points || u.teamPoints ||
+    u.totalScore  || u.totalPoints || u.point || 0
+  );
+}
+
 function extractTeams(data) {
   if (Array.isArray(data.battleArmies) && data.battleArmies.length > 0) {
 
@@ -202,32 +211,37 @@ function extractTeams(data) {
         army.totalScore || army.totalPoints || 0
       );
 
-      const participants = Array.isArray(army.participants) && army.participants.length
-        ? army.participants
-        : (army.hostUser ? [army.hostUser] : []);
+      // ✅ Solo usar hostUser como anfitrión del equipo (no fans/participantes)
+      const hostRaw = army.hostUser;
+      if (!hostRaw) return;
 
-      participants.forEach((p, partIdx) => {
-        const r = extractName(p);
-        const userId = String(p.userId || p.id || army.hostUserId || army.hostId || r.userId || "");
-        let hostName = r.hostName;
-        let hostNickname = r.hostNickname;
-        if (!hostName || /^\d{8,}$/.test(hostName)) {
-          const resolved = resolveNameFromMap(userId);
-          if (resolved) {
-            hostName = resolved.uniqueId;
-            hostNickname = resolved.nickname || hostNickname || resolved.uniqueId;
-          }
+      const r = extractName(hostRaw);
+      const userId = String(hostRaw.userId || hostRaw.id || army.hostUserId || army.hostId || "");
+      let hostName     = r.hostName;
+      let hostNickname = r.hostNickname;
+
+      if (!hostName || /^\d{8,}$/.test(hostName)) {
+        const resolved = resolveNameFromMap(userId);
+        if (resolved) {
+          hostName     = resolved.uniqueId;
+          hostNickname = resolved.nickname || hostNickname || resolved.uniqueId;
+        } else {
+          hostName = userId || `player_${armyIdx}`;
         }
-        if (!hostName) hostName = userId || `player_${armyIdx}_${partIdx}`;
-        if (!hostNickname) hostNickname = hostName;
+      }
+      if (!hostNickname) hostNickname = hostName;
 
-        const points = normalizeBattlePoints(p) || teamPoints;
-        const dedupeKey = String(userId || hostName);
-        if (!dedupeKey || seen.has(dedupeKey)) return;
-        seen.add(dedupeKey);
+      // También acumular puntos de participantes para el equipo
+      const partPoints = Array.isArray(army.participants)
+        ? army.participants.reduce((acc, p) => acc + normalizeBattlePoints(p), 0)
+        : 0;
+      const finalPoints = teamPoints || partPoints;
 
-        result.push({ hostName, hostNickname, userId, points, teamIdx });
-      });
+      const dedupeKey = String(userId || hostName);
+      if (!dedupeKey || seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+
+      result.push({ hostName, hostNickname, userId, points: finalPoints, teamIdx });
     });
 
     if (result.length > 0) return result;
@@ -418,6 +432,11 @@ async function startTikTokConnection(username, sessionId) {
 
   return tiktok;
 }
+
+app.get("/battle/:username", (req, res) => {
+  const s = getSessionRecord(req.params.username);
+  res.json(s?.lastBattle || null);
+});
 
 app.get("/", (req, res) => res.json({ status:"TikPanel Server ✅", connections:Object.keys(sessions).length, users:Object.keys(sessions) }));
 app.get("/status/:username", (req, res) => {
