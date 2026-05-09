@@ -5,12 +5,12 @@ const https = require("https");
 const { Server } = require("socket.io");
 const cors = require("cors");
 
-// ── Evitar que el proceso muera por errores async no capturados ──────────────
-process.on("unhandledRejection", (reason, promise) => {
-  console.error("[unhandledRejection] Caught:", reason?.message || reason);
+// ── Evitar crash por Promises no capturadas ──────────────────────────────────
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason?.message || reason);
 });
 process.on("uncaughtException", (err) => {
-  console.error("[uncaughtException] Caught:", err?.message || err);
+  console.error("[uncaughtException]", err?.message || err);
 });
 
 
@@ -135,7 +135,7 @@ async function resolveUserId(numericId, emitCallback) {
   console.log(`[resolve] ❌ No se pudo resolver ${numericId}`);
   pendingResolve.delete(numericId);
   } catch(outerErr) {
-    console.error("[resolveUserId] Error inesperado:", outerErr?.message || outerErr);
+    console.error("[resolveUserId] outer catch:", outerErr?.message || outerErr);
     pendingResolve.delete(numericId);
   }
 }
@@ -157,6 +157,15 @@ function cleanSession(username) {
     try { sessions[username].tiktok.disconnect(); } catch (e) {}
     delete sessions[username];
   }
+}
+
+// ── Normalizar puntos de batalla (estaba faltando esta función) ──────────────
+function normalizeBattlePoints(src) {
+  if (!src) return 0;
+  return Number(
+    src.battleScore || src.score || src.points || src.teamPoints ||
+    src.battlePoints || src.point || src.pts || 0
+  );
 }
 
 // Normalizar participante
@@ -192,6 +201,7 @@ function extractName(u) {
 function extractTeams(data) {
   if (Array.isArray(data.battleArmies) && data.battleArmies.length > 0) {
 
+    // Registrar todos los usuarios conocidos para el mapa de resolución
     data.battleArmies.forEach(army => {
       if (army.hostUser) registerUser(army.hostUser);
       if (Array.isArray(army.participants)) army.participants.forEach(p => registerUser(p));
@@ -201,6 +211,7 @@ function extractTeams(data) {
     const seen = new Set();
 
     data.battleArmies.forEach((army, armyIdx) => {
+      // Determinar teamIdx (equipo 0 o 1)
       let teamIdx;
       if (army.armyType !== undefined && army.armyType !== null) {
         teamIdx = Number(army.armyType) % 2;
@@ -210,21 +221,36 @@ function extractTeams(data) {
         teamIdx = armyIdx % 2;
       }
 
-      const teamPoints = Number(
+      // Los puntos del army son los del ANFITRIÓN principal
+      const armyPoints = Number(
         army.points || army.teamScore || army.teamPoints ||
         army.score || army.battleScore || army.point ||
         army.totalScore || army.totalPoints || 0
       );
 
-      const participants = Array.isArray(army.participants) && army.participants.length
-        ? army.participants
-        : (army.hostUser ? [army.hostUser] : []);
+      // El anfitrión principal: army.hostUser o buscar en participants por army.hostUserId
+      const hostUserId = String(army.hostUserId || army.hostId || "");
+      let hostEntry = army.hostUser || null;
 
-      participants.forEach((p, partIdx) => {
-        const r = extractName(p);
-        const userId = String(p.userId || p.id || army.hostUserId || army.hostId || r.userId || "");
+      // Si no hay hostUser pero hay participants, buscar el que coincide con hostUserId
+      if (!hostEntry && hostUserId && Array.isArray(army.participants)) {
+        hostEntry = army.participants.find(p =>
+          String(p.userId || p.id || "") === hostUserId
+        ) || null;
+      }
+      // Si aún no, usar el primer participante como host
+      if (!hostEntry && Array.isArray(army.participants) && army.participants.length > 0) {
+        hostEntry = army.participants[0];
+      }
+
+      // Crear entrada para el anfitrión con los puntos del army
+      if (hostEntry || hostUserId) {
+        const src = hostEntry || {};
+        const r = extractName(src);
+        const userId = String(src.userId || src.id || hostUserId || r.userId || "");
         let hostName = r.hostName;
         let hostNickname = r.hostNickname;
+
         if (!hostName || /^\d{8,}$/.test(hostName)) {
           const resolved = resolveNameFromMap(userId);
           if (resolved) {
@@ -232,16 +258,47 @@ function extractTeams(data) {
             hostNickname = resolved.nickname || hostNickname || resolved.uniqueId;
           }
         }
-        if (!hostName) hostName = userId || `player_${armyIdx}_${partIdx}`;
+        if (!hostName) hostName = userId || `host_${armyIdx}`;
         if (!hostNickname) hostNickname = hostName;
 
-        const points = normalizeBattlePoints(p) || teamPoints;
         const dedupeKey = String(userId || hostName);
-        if (!dedupeKey || seen.has(dedupeKey)) return;
-        seen.add(dedupeKey);
+        if (dedupeKey && !seen.has(dedupeKey)) {
+          seen.add(dedupeKey);
+          result.push({ hostName, hostNickname, userId, points: armyPoints, teamIdx });
+        }
+      }
 
-        result.push({ hostName, hostNickname, userId, points, teamIdx });
-      });
+      // Agregar otros participantes con sus puntos individuales (si tienen pts > 0)
+      if (Array.isArray(army.participants)) {
+        army.participants.forEach((p, partIdx) => {
+          const pId = String(p.userId || p.id || "");
+          const hostUserId2 = String(army.hostUserId || army.hostId || "");
+          // Saltar el que ya pusimos como host
+          if (pId && pId === hostUserId2) return;
+          if (result[0] && pId === String(result.find(r2 => r2.teamIdx === teamIdx)?.userId || "")) return;
+
+          const pPoints = normalizeBattlePoints(p);
+          // Solo incluir participantes con puntos propios
+          if (pPoints <= 0) return;
+
+          const r = extractName(p);
+          const userId = pId || r.userId || "";
+          let hostName = r.hostName;
+          let hostNickname = r.hostNickname;
+
+          if (!hostName || /^\d{8,}$/.test(hostName)) {
+            const resolved = resolveNameFromMap(userId);
+            if (resolved) { hostName = resolved.uniqueId; hostNickname = resolved.nickname; }
+          }
+          if (!hostName) hostName = userId || `player_${armyIdx}_${partIdx}`;
+          if (!hostNickname) hostNickname = hostName;
+
+          const dedupeKey = String(userId || hostName);
+          if (!dedupeKey || seen.has(dedupeKey)) return;
+          seen.add(dedupeKey);
+          result.push({ hostName, hostNickname, userId, points: pPoints, teamIdx });
+        });
+      }
     });
 
     if (result.length > 0) return result;
@@ -372,15 +429,15 @@ async function startTikTokConnection(username, sessionId) {
     const status = data.battleStatus || 1;
     console.log("[linkMicBattle] players:", teams.length, JSON.stringify(teams));
 
-    const teamsSnap = teams.map(t => ({ ...t }));
-    const battlePayload = { status, teams: teamsSnap, ownerUsername, timestamp: Date.now() };
+    const teamsSnap2 = teams.map(t => ({ ...t }));
+    const battlePayload = { status, teams: teamsSnap2, ownerUsername, timestamp: Date.now() };
     if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : battlePayload;
     io.emit("battle", battlePayload);
 
-    const cb = emitUpdatedBattle(username, ownerUsername, teamsSnap, status);
-    teamsSnap.forEach(t => {
-      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb).catch(e => console.error("[resolve-battle]", e?.message));
-      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb).catch(e => console.error("[resolve-battle]", e?.message));
+    const cb = emitUpdatedBattle(username, ownerUsername, teamsSnap2, status);
+    teamsSnap2.forEach(t => {
+      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb).catch(e => console.error("[resolve]", e?.message));
+      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb).catch(e => console.error("[resolve]", e?.message));
     });
   });
 
@@ -404,15 +461,15 @@ async function startTikTokConnection(username, sessionId) {
     console.log(`[linkMicArmies] individual players=${teams.length}`);
     if (teams.length === 0) return;
 
-    const teamsSnapshot = teams.map(t => ({ ...t }));
-    const battlePayload = { status: 1, teams: teamsSnapshot, ownerUsername, timestamp: Date.now() };
+    const teamsSnap = teams.map(t => ({ ...t }));
+    const battlePayload = { status: 1, teams: teamsSnap, ownerUsername, timestamp: Date.now() };
     if (sessions[username]) sessions[username].lastBattle = battlePayload;
     io.emit("battle", battlePayload);
 
-    const cb = emitUpdatedBattle(username, ownerUsername, teamsSnapshot, 1);
-    teamsSnapshot.forEach(t => {
-      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb).catch(e => console.error("[resolve-armies]", e?.message));
-      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb).catch(e => console.error("[resolve-armies]", e?.message));
+    const cb = emitUpdatedBattle(username, ownerUsername, teamsSnap, 1);
+    teamsSnap.forEach(t => {
+      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb).catch(e => console.error("[resolve]", e?.message));
+      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb).catch(e => console.error("[resolve]", e?.message));
     });
   });
 
