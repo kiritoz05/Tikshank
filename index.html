@@ -1325,7 +1325,7 @@ function App() {
       });
     });
     sock.on("battle", (d) => {
-      setBattle(normalizeBattlePayload(d, tUser || ""));
+      setBattle(normalizeBattlePayload(d, tUser || ld("tuser", "") || ""));
     });
     sock.on("tiktok_disconnected", (d) => {
       setConn(false);
@@ -1340,9 +1340,12 @@ function App() {
     const savedUser = ld("tuser", "");
     if (!savedUser) return;
     fetch(`${SERVER}/status/${encodeURIComponent(savedUser)}`).then((r) => r.json()).then((d) => {
-      if (d.connected) {
+      if (d.connected || d.battle) {
         setConn(true);
-        setLog([{ t: "sys", tx: `\u2705 Sesi\xF3n restaurada @${savedUser}` }]);
+        setLog([{ t: "sys", tx: `✅ Sesión restaurada @${savedUser}` }]);
+      }
+      if (d.battle) {
+        setBattle(normalizeBattlePayload(d.battle, savedUser));
       }
     }).catch(() => {
     });
@@ -1363,7 +1366,6 @@ function App() {
         setTotLike(0);
         setTapR([]);
         setLikeR([]);
-        setBattle(null);
         likeUserMapR.current = {};
         setViewR([]);
         sv("viewR", []);

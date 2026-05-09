@@ -126,6 +126,17 @@ async function resolveUserId(numericId, emitCallback) {
   pendingResolve.delete(numericId);
 }
 
+function getSessionRecord(username) {
+  const raw = String(username || '').trim();
+  if (!raw) return null;
+  if (sessions[raw]) return sessions[raw];
+  const normalized = raw.replace(/^@/, '').toLowerCase();
+  for (const key of Object.keys(sessions)) {
+    if (String(key || '').replace(/^@/, '').toLowerCase() === normalized) return sessions[key];
+  }
+  return null;
+}
+
 function cleanSession(username) {
   if (sessions[username]) {
     clearTimeout(sessions[username].retryTimer);
@@ -410,7 +421,7 @@ async function startTikTokConnection(username, sessionId) {
 
 app.get("/", (req, res) => res.json({ status:"TikPanel Server ✅", connections:Object.keys(sessions).length, users:Object.keys(sessions) }));
 app.get("/status/:username", (req, res) => {
-  const s = sessions[req.params.username];
+  const s = getSessionRecord(req.params.username);
   res.json({ connected: !!s?.tiktok, battle: s?.lastBattle || null });
 });
 
