@@ -1135,6 +1135,21 @@ function App() {
     return () => clearInterval(t);
   }, [conn2]);
   const safeLc = (v) => (v || "").toString().trim().toLowerCase().replace(/^@/, "");
+  const normalizeBattlePayload = (d, ownerFallback = "") => {
+    if (!d || !d.teams || !Array.isArray(d.teams)) return d || null;
+    const mapped = d.teams.map((t, i) => ({
+      hostName: t.hostName || t.uniqueId || t.displayId || "?",
+      hostNickname: t.hostNickname || t.nickname || t.hostName || "?",
+      points: getBattlePoints(t),
+      userId: t.userId || t.hostName || "",
+      teamIdx: t.teamIdx !== void 0 && t.teamIdx !== null ? Number(t.teamIdx) : t.team !== void 0 && t.team !== null ? Number(t.team) : null
+    })).filter((t) => t.hostName !== "?");
+    return __spreadProps(__spreadValues({}, d), {
+      ownerUsername: (d.ownerUsername || ownerFallback || tUser || "").toLowerCase().replace(/^@/, ""),
+      teams: mapped,
+      players: mapped
+    });
+  };
   const getBattlePoints = (src = {}) => {
     const nested = [src == null ? void 0 : src.stats, src == null ? void 0 : src.battleStats, src == null ? void 0 : src.rank, src == null ? void 0 : src.player, src == null ? void 0 : src.user].filter(Boolean);
     const candidates = [src == null ? void 0 : src.points, src == null ? void 0 : src.battleScore, src == null ? void 0 : src.score, src == null ? void 0 : src.groupScore, src == null ? void 0 : src.teamScore, src == null ? void 0 : src.point, src == null ? void 0 : src.voteCount, src == null ? void 0 : src.value, src == null ? void 0 : src.diamondCount, src == null ? void 0 : src.totalScore, src == null ? void 0 : src.displayScore, src == null ? void 0 : src.formattedScore];
@@ -1310,20 +1325,7 @@ function App() {
       });
     });
     sock.on("battle", (d) => {
-      if (d && d.teams) {
-        // Asignar teamIdx si no viene: alternar 0,1,0,1 por posición
-        const mapped = d.teams.map((t, i) => ({
-          hostName: t.hostName || t.uniqueId || t.displayId || "?",
-          hostNickname: t.hostNickname || t.nickname || t.hostName || "?",
-          points: getBattlePoints(t),
-          userId: t.userId || t.hostName || "",
-          teamIdx: t.teamIdx !== undefined && t.teamIdx !== null ? Number(t.teamIdx) : t.team !== undefined && t.team !== null ? Number(t.team) : null
-        })).filter((t) => t.hostName !== "?");
-        setBattle(__spreadProps(__spreadValues({}, d), {
-          ownerUsername: (d.ownerUsername || tUser || "").toLowerCase().replace(/^@/, ""),
-          teams: mapped
-        }));
-      } else setBattle(d);
+      setBattle(normalizeBattlePayload(d, tUser || ""));
     });
     sock.on("tiktok_disconnected", (d) => {
       setConn(false);

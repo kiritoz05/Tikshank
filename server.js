@@ -256,7 +256,7 @@ function extractTeams(data) {
 }
 
 // Emitir batalla actualizada cuando se resuelva un ID
-function emitUpdatedBattle(ownerUsername, lastTeams, status) {
+function emitUpdatedBattle(username, ownerUsername, lastTeams, status) {
   return function(resolvedUserId, uniqueId, nickname) {
     const updated = lastTeams.map(t => {
       if (String(t.userId) === String(resolvedUserId) || t.hostName === resolvedUserId) {
@@ -264,7 +264,9 @@ function emitUpdatedBattle(ownerUsername, lastTeams, status) {
       }
       return t;
     });
-    io.emit("battle", { status, teams: updated, ownerUsername, timestamp: Date.now() });
+    const payload = { status, teams: updated, ownerUsername, timestamp: Date.now() };
+    if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : payload;
+    io.emit("battle", payload);
     console.log(`[battle-update] Re-emitido con @${uniqueId} resuelto`);
   };
 }
@@ -283,7 +285,7 @@ async function startTikTokConnection(username, sessionId) {
 
   await tiktok.connect();
   const ownerUsername = username.replace(/^@/, "").toLowerCase();
-  sessions[username]  = { tiktok, retryTimer: null, ownerUsername };
+  sessions[username]  = { tiktok, retryTimer: null, ownerUsername, lastBattle: null };
   console.log(`✅ Conectado a @${username}`);
 
   const activeUsersMap = new Map();
@@ -345,9 +347,12 @@ async function startTikTokConnection(username, sessionId) {
     const status = data.battleStatus || 1;
     console.log("[linkMicBattle] players:", teams.length, JSON.stringify(teams));
 
-    io.emit("battle", { status, teams, ownerUsername, timestamp: Date.now() });
+    const battlePayload = { status, teams, ownerUsername, timestamp: Date.now() };
+    if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : battlePayload;
+    io.emit("battle", battlePayload);
 
-    const cb = emitUpdatedBattle(ownerUsername, teams, status);
+    if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : { status, teams, ownerUsername, timestamp: Date.now() };
+    const cb = emitUpdatedBattle(username, ownerUsername, teams, status);
     teams.forEach(t => {
       if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
       if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb);
@@ -377,9 +382,12 @@ async function startTikTokConnection(username, sessionId) {
     lastTeams  = teams;
     lastStatus = 1;
 
-    io.emit("battle", { status: 1, teams, ownerUsername, timestamp: Date.now() });
+    const battlePayload = { status: 1, teams, ownerUsername, timestamp: Date.now() };
+    if (sessions[username]) sessions[username].lastBattle = battlePayload;
+    io.emit("battle", battlePayload);
 
-    const cb = emitUpdatedBattle(ownerUsername, teams, 1);
+    if (sessions[username]) sessions[username].lastBattle = { status: 1, teams, ownerUsername, timestamp: Date.now() };
+    const cb = emitUpdatedBattle(username, ownerUsername, teams, 1);
     teams.forEach(t => {
       if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
       if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb);
@@ -401,7 +409,10 @@ async function startTikTokConnection(username, sessionId) {
 }
 
 app.get("/", (req, res) => res.json({ status:"TikPanel Server ✅", connections:Object.keys(sessions).length, users:Object.keys(sessions) }));
-app.get("/status/:username", (req, res) => res.json({ connected: !!sessions[req.params.username]?.tiktok }));
+app.get("/status/:username", (req, res) => {
+  const s = sessions[req.params.username];
+  res.json({ connected: !!s?.tiktok, battle: s?.lastBattle || null });
+});
 
 app.post("/connect", async (req, res) => {
   const { username, sessionId } = req.body;
