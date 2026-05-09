@@ -5,6 +5,15 @@ const https = require("https");
 const { Server } = require("socket.io");
 const cors = require("cors");
 
+// ── Evitar que el proceso muera por errores async no capturados ──────────────
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[unhandledRejection] Caught:", reason?.message || reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException] Caught:", err?.message || err);
+});
+
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -60,6 +69,7 @@ function registerUser(data) {
 const pendingResolve = new Set();
 
 async function resolveUserId(numericId, emitCallback) {
+  try {
   if (!numericId || userMap[numericId]?.uniqueId) return;
   if (pendingResolve.has(numericId)) return;
   pendingResolve.add(numericId);
@@ -124,6 +134,10 @@ async function resolveUserId(numericId, emitCallback) {
 
   console.log(`[resolve] ❌ No se pudo resolver ${numericId}`);
   pendingResolve.delete(numericId);
+  } catch(outerErr) {
+    console.error("[resolveUserId] Error inesperado:", outerErr?.message || outerErr);
+    pendingResolve.delete(numericId);
+  }
 }
 
 function getSessionRecord(username) {
@@ -358,7 +372,6 @@ async function startTikTokConnection(username, sessionId) {
     const status = data.battleStatus || 1;
     console.log("[linkMicBattle] players:", teams.length, JSON.stringify(teams));
 
-    // Snapshot inmutable para closure de resolveUserId
     const teamsSnap = teams.map(t => ({ ...t }));
     const battlePayload = { status, teams: teamsSnap, ownerUsername, timestamp: Date.now() };
     if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : battlePayload;
@@ -366,12 +379,15 @@ async function startTikTokConnection(username, sessionId) {
 
     const cb = emitUpdatedBattle(username, ownerUsername, teamsSnap, status);
     teamsSnap.forEach(t => {
-      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
-      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb);
+      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb).catch(e => console.error("[resolve-battle]", e?.message));
+      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb).catch(e => console.error("[resolve-battle]", e?.message));
     });
   });
 
   // ── linkMicArmies ──────────────────────────────────────────────────────
+  let lastTeams  = [];
+  let lastStatus = 1;
+
   tiktok.on("linkMicArmies", (data) => {
     console.log("[linkMicArmies] RAW FULL:", JSON.stringify(data).slice(0, 4000));
     if (Array.isArray(data.battleArmies)) {
@@ -388,7 +404,6 @@ async function startTikTokConnection(username, sessionId) {
     console.log(`[linkMicArmies] individual players=${teams.length}`);
     if (teams.length === 0) return;
 
-    // Snapshot inmutable para evitar bug de closure mutable con resolveUserId
     const teamsSnapshot = teams.map(t => ({ ...t }));
     const battlePayload = { status: 1, teams: teamsSnapshot, ownerUsername, timestamp: Date.now() };
     if (sessions[username]) sessions[username].lastBattle = battlePayload;
@@ -396,8 +411,8 @@ async function startTikTokConnection(username, sessionId) {
 
     const cb = emitUpdatedBattle(username, ownerUsername, teamsSnapshot, 1);
     teamsSnapshot.forEach(t => {
-      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
-      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb);
+      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb).catch(e => console.error("[resolve-armies]", e?.message));
+      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb).catch(e => console.error("[resolve-armies]", e?.message));
     });
   });
 
@@ -445,15 +460,14 @@ app.post("/disconnect", (req, res) => {
   res.json({ success:true });
 });
 
-// ── Re-emitir batalla al nuevo cliente que se conecta ─────────────────────
+// ── Re-emitir lastBattle a nuevos clientes (fix recarga de página) ──────────
 io.on("connection", (socket) => {
-  // Buscar si hay alguna sesión activa con batalla guardada
   for (const key of Object.keys(sessions)) {
     const s = sessions[key];
     if (s?.lastBattle) {
-      console.log(`[socket-join] Re-emitiendo lastBattle a nuevo cliente (${socket.id})`);
+      console.log(`[socket-join] Re-emitiendo lastBattle a ${socket.id}`);
       socket.emit("battle", s.lastBattle);
-      break; // solo la primera activa
+      break;
     }
   }
 });
