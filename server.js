@@ -1,8 +1,18 @@
 const { WebcastPushConnection } = require("tiktok-live-connector");
 const express = require("express");
 const http = require("http");
+const https = require("https");
 const { Server } = require("socket.io");
 const cors = require("cors");
+
+// ── Evitar crash por Promises no capturadas ──────────────────────────────────
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason?.message || reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err?.message || err);
+});
+
 
 const app = express();
 const server = http.createServer(app);
@@ -17,6 +27,27 @@ app.use(cors());
 app.use(express.json());
 
 const sessions = {};
+
+// ── Helper: fetch con https nativo (compatible Node 16+) ───────────────────────
+function fetchUrl(url, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const timeout = opts.timeout || 8000;
+    const req = https.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+        "Accept": "application/json, text/html",
+        "Accept-Language": "es-MX,es;q=0.9",
+        ...(opts.headers || {}),
+      }
+    }, (res) => {
+      let data = "";
+      res.on("data", chunk => data += chunk);
+      res.on("end", () => resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, text: () => Promise.resolve(data), json: () => Promise.resolve(JSON.parse(data)) }));
+    });
+    req.on("error", reject);
+    req.setTimeout(timeout, () => { req.destroy(); reject(new Error("timeout")); });
+  });
+}
 
 // ── Mapa global userId -> {uniqueId, nickname} ─────────────────────────────
 const userMap = {};
@@ -34,46 +65,47 @@ function registerUser(data) {
   if (uniqueId) userMap[uniqueId] = userMap[uid] || { uniqueId, nickname };
 }
 
-// ── Resolver userId numérico → uniqueId usando tiktok-live-connector ────────
-// Se conecta brevemente al live del usuario para obtener su uniqueId real.
-// Si el usuario no está en live, intentamos con la API pública de TikTok.
-const pendingResolve = new Set(); // evitar peticiones duplicadas
+// ── Resolver userId numérico → uniqueId ─────────────────────────────────────
+const pendingResolve = new Set();
 
 async function resolveUserId(numericId, emitCallback) {
-  if (!numericId || userMap[numericId]?.uniqueId) return; // ya lo tenemos
-  if (pendingResolve.has(numericId)) return;             // ya está en proceso
+  try {
+  if (!numericId || userMap[numericId]?.uniqueId) return;
+  if (pendingResolve.has(numericId)) return;
   pendingResolve.add(numericId);
 
   console.log(`[resolve] Buscando username para userId: ${numericId}`);
 
-  // Método 1: API pública de TikTok (no requiere autenticación para info básica)
+  // Método 1: API pública de TikTok via https nativo
   try {
-    const url = `https://www.tiktok.com/api/user/detail/?uniqueId=&secUid=&userId=${numericId}&msToken=&X-Bogus=&_signature=`;
-    // TikTok no tiene endpoint público por userId sin auth, intentar scraping básico
-    // Usamos el endpoint que usa el propio TikTok en su web
-    const res = await fetch(
-      `https://www.tiktok.com/node/share/user/@id:${numericId}`,
-      { headers: { "User-Agent": "Mozilla/5.0", "Accept": "application/json" }, signal: AbortSignal.timeout(5000) }
+    const res = await fetchUrl(
+      `https://www.tiktok.com/@id:${numericId}`,
+      { timeout: 8000 }
     );
     if (res.ok) {
       const text = await res.text();
-      const m = text.match(/"uniqueId":"([^"]+)"/);
-      if (m && m[1]) {
-        const uniqueId = m[1];
-        const nm = text.match(/"nickname":"([^"]+)"/);
-        const nickname = nm ? nm[1] : uniqueId;
-        console.log(`[resolve] ✅ Método web: ${numericId} → @${uniqueId}`);
-        userMap[numericId] = { uniqueId, nickname };
-        userMap[uniqueId]  = { uniqueId, nickname };
-        pendingResolve.delete(numericId);
-        if (emitCallback) emitCallback(numericId, uniqueId, nickname);
-        return;
+      const patterns = [
+        /"uniqueId":"([^"]{2,50})"/,
+        /"unique_id":"([^"]{2,50})"/,
+      ];
+      for (const pat of patterns) {
+        const m = text.match(pat);
+        if (m && m[1] && !/^\d+$/.test(m[1])) {
+          const uniqueId = m[1];
+          const nm = text.match(/"nickname":"([^"]+)"/);
+          const nickname = nm ? nm[1] : uniqueId;
+          console.log(`[resolve] ✅ Método web: ${numericId} → @${uniqueId}`);
+          userMap[numericId] = { uniqueId, nickname };
+          userMap[uniqueId]  = { uniqueId, nickname };
+          pendingResolve.delete(numericId);
+          if (emitCallback) emitCallback(numericId, uniqueId, nickname);
+          return;
+        }
       }
     }
   } catch(e) { console.log("[resolve] Método web falló:", e.message); }
 
-  // Método 2: Intentar conectar brevemente al live del contrincante por userId
-  // tiktok-live-connector acepta userId numérico como username en algunos casos
+  // Método 2: Intentar conectar brevemente al live del contrincante
   try {
     const conn = new WebcastPushConnection(numericId, {
       processInitialData: true,
@@ -84,7 +116,6 @@ async function resolveUserId(numericId, emitCallback) {
       conn.connect(),
       new Promise((_,rej) => setTimeout(() => rej(new Error("timeout")), 8000)),
     ]);
-    // El roomInfo contiene info del host
     const roomInfo = connectResult?.roomInfo || connectResult?.room_info || {};
     const owner    = roomInfo.owner || roomInfo.host || {};
     const uniqueId = owner.uniqueId || owner.displayId || owner.unique_id || "";
@@ -101,38 +132,23 @@ async function resolveUserId(numericId, emitCallback) {
     }
   } catch(e) { console.log("[resolve] Método live falló:", e.message); }
 
-  // Método 3: Buscar en la página de TikTok por userId via sigi_state
-  try {
-    const res = await fetch(
-      `https://www.tiktok.com/@id:${numericId}`,
-      { headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15", "Accept-Language": "es-MX" },
-        signal: AbortSignal.timeout(8000), redirect: "follow" }
-    );
-    const text = await res.text();
-    // Buscar uniqueId en el JSON embebido de la página
-    const patterns = [
-      /"uniqueId":"([^"]{2,50})"/,
-      /"unique_id":"([^"]{2,50})"/,
-      /"@([a-zA-Z0-9_.]{2,30})"/,
-    ];
-    for (const pat of patterns) {
-      const m = text.match(pat);
-      if (m && m[1] && !/^\d+$/.test(m[1])) {
-        const uniqueId = m[1];
-        const nm = text.match(/"nickname":"([^"]+)"/);
-        const nickname = nm ? nm[1] : uniqueId;
-        console.log(`[resolve] ✅ Método scrape: ${numericId} → @${uniqueId}`);
-        userMap[numericId] = { uniqueId, nickname };
-        userMap[uniqueId]  = { uniqueId, nickname };
-        pendingResolve.delete(numericId);
-        if (emitCallback) emitCallback(numericId, uniqueId, nickname);
-        return;
-      }
-    }
-  } catch(e) { console.log("[resolve] Método scrape falló:", e.message); }
-
   console.log(`[resolve] ❌ No se pudo resolver ${numericId}`);
   pendingResolve.delete(numericId);
+  } catch(outerErr) {
+    console.error("[resolveUserId] outer catch:", outerErr?.message || outerErr);
+    pendingResolve.delete(numericId);
+  }
+}
+
+function getSessionRecord(username) {
+  const raw = String(username || '').trim();
+  if (!raw) return null;
+  if (sessions[raw]) return sessions[raw];
+  const normalized = raw.replace(/^@/, '').toLowerCase();
+  for (const key of Object.keys(sessions)) {
+    if (String(key || '').replace(/^@/, '').toLowerCase() === normalized) return sessions[key];
+  }
+  return null;
 }
 
 function cleanSession(username) {
@@ -141,6 +157,15 @@ function cleanSession(username) {
     try { sessions[username].tiktok.disconnect(); } catch (e) {}
     delete sessions[username];
   }
+}
+
+// ── Normalizar puntos de batalla (estaba faltando esta función) ──────────────
+function normalizeBattlePoints(src) {
+  if (!src) return 0;
+  return Number(
+    src.battleScore || src.score || src.points || src.teamPoints ||
+    src.battlePoints || src.point || src.pts || 0
+  );
 }
 
 // Normalizar participante
@@ -153,7 +178,6 @@ function normalizeBattleUser(u) {
   return { hostName, hostNickname, points };
 }
 
-// Extraer equipos
 function resolveNameFromMap(userId) {
   if (!userId) return null;
   const key = String(userId);
@@ -164,22 +188,6 @@ function resolveNameFromMap(userId) {
   return null;
 }
 
-function resolvePName(p) {
-  const uid = p.uniqueId || p.displayId || "";
-  const nn  = p.nickname || p.displayName || p.name || "";
-  const userId = String(p.userId || p.id || "");
-  let hostName = (uid && !/^\d{8,}$/.test(uid)) ? uid : "";
-  let hostNickname = nn || uid || "";
-  if (!hostName) {
-    const resolved = resolveNameFromMap(userId);
-    if (resolved) { hostName = resolved.uniqueId; hostNickname = resolved.nickname; }
-    else hostName = userId || "?";
-  }
-  const pts = Number(p.points || p.battleScore || p.score || p.teamPoints || p.point || p.totalScore || 0);
-  return { hostName, hostNickname, userId, points: pts };
-}
-
-// ── Extrae nombre legible de un objeto usuario ──────────────────────────────
 function extractName(u) {
   if (!u) return { hostName: "", hostNickname: "", userId: "" };
   const uid    = String(u.uniqueId || u.displayId || "");
@@ -193,87 +201,111 @@ function extractName(u) {
 function extractTeams(data) {
   if (Array.isArray(data.battleArmies) && data.battleArmies.length > 0) {
 
-    // ── Registrar todos los usuarios visibles en userMap ──
+    // Registrar todos los usuarios conocidos para el mapa de resolución
     data.battleArmies.forEach(army => {
       if (army.hostUser) registerUser(army.hostUser);
       if (Array.isArray(army.participants)) army.participants.forEach(p => registerUser(p));
     });
 
-    // ── ESTRUCTURA REAL DE TIKTOK 2v2 ────────────────────────────────────────
-    // TikTok manda 1 army POR CADA ANFITRIÓN (no 1 army por equipo).
-    // Ejemplo 2v2: 4 armies, cada uno con su hostUserId/hostUser y sus puntos propios.
-    // Los "participants" dentro de cada army son los FANS/MVPs top que apoyan al anfitrión,
-    // NO son los anfitriones. El anfitrión está en army.hostUser o army.hostUserId.
-    //
-    // TikTok 1v1: 2 armies, misma estructura.
-    // TikTok 3-way: 3 armies, misma estructura.
-    //
-    // Para detectar si es 2v2 vs 1v1: se usa army.armyType, army.teamId,
-    // o simplemente el número de armies (4 = 2v2).
+    const result = [];
+    const seen = new Set();
 
-    const result = data.battleArmies.map((army, armyIdx) => {
-      const pts = Number(
+    data.battleArmies.forEach((army, armyIdx) => {
+      // Determinar teamIdx (equipo 0 o 1)
+      let teamIdx;
+      if (army.armyType !== undefined && army.armyType !== null) {
+        teamIdx = Number(army.armyType) % 2;
+      } else if (army.teamId !== undefined && army.teamId !== null) {
+        teamIdx = Number(army.teamId) % 2;
+      } else {
+        teamIdx = armyIdx % 2;
+      }
+
+      // Los puntos del army son los del ANFITRIÓN principal
+      const armyPoints = Number(
         army.points || army.teamScore || army.teamPoints ||
-        army.score  || army.battleScore || army.point ||
+        army.score || army.battleScore || army.point ||
         army.totalScore || army.totalPoints || 0
       );
 
-      // ── El anfitrión de este army ──────────────────────────────────────────
-      // Prioridad 1: army.hostUser (objeto usuario completo)
-      // Prioridad 2: army.hostUserId + buscar en participants o userMap
-      // Prioridad 3: army.hostUserId como fallback numérico
+      // El anfitrión principal: army.hostUser o buscar en participants por army.hostUserId
+      const hostUserId = String(army.hostUserId || army.hostId || "");
+      let hostEntry = army.hostUser || null;
 
-      let hostName = "";
-      let hostNickname = "";
-      let userId = "";
-
-      if (army.hostUser) {
-        const r = extractName(army.hostUser);
-        hostName     = r.hostName;
-        hostNickname = r.hostNickname;
-        userId       = r.userId || String(army.hostUser.userId || army.hostUser.id || "");
+      // Si no hay hostUser pero hay participants, buscar el que coincide con hostUserId
+      if (!hostEntry && hostUserId && Array.isArray(army.participants)) {
+        hostEntry = army.participants.find(p =>
+          String(p.userId || p.id || "") === hostUserId
+        ) || null;
+      }
+      // Si aún no, usar el primer participante como host
+      if (!hostEntry && Array.isArray(army.participants) && army.participants.length > 0) {
+        hostEntry = army.participants[0];
       }
 
-      // Si hostUser no tenía nombre legible, buscar por hostUserId
-      const rawHostId = String(army.hostUserId || army.hostId || "");
-      if ((!hostName || /^\d{8,}$/.test(hostName)) && rawHostId) {
-        userId = rawHostId;
-        // Buscar en participants si alguno coincide con el hostUserId
-        if (Array.isArray(army.participants)) {
-          const match = army.participants.find(p =>
-            String(p.userId || p.id || "") === rawHostId
-          );
-          if (match) {
-            const r = extractName(match);
-            if (r.hostName && !/^\d{8,}$/.test(r.hostName)) {
-              hostName     = r.hostName;
-              hostNickname = r.hostNickname;
-            }
+      // Crear entrada para el anfitrión con los puntos del army
+      if (hostEntry || hostUserId) {
+        const src = hostEntry || {};
+        const r = extractName(src);
+        const userId = String(src.userId || src.id || hostUserId || r.userId || "");
+        let hostName = r.hostName;
+        let hostNickname = r.hostNickname;
+
+        if (!hostName || /^\d{8,}$/.test(hostName)) {
+          const resolved = resolveNameFromMap(userId);
+          if (resolved) {
+            hostName = resolved.uniqueId;
+            hostNickname = resolved.nickname || hostNickname || resolved.uniqueId;
           }
         }
-        // Buscar en userMap
-        if (!hostName || /^\d{8,}$/.test(hostName)) {
-          const r = resolveNameFromMap(rawHostId);
-          if (r) { hostName = r.uniqueId; hostNickname = r.nickname; }
-          else { hostName = rawHostId; hostNickname = rawHostId; }
+        if (!hostName) hostName = userId || `host_${armyIdx}`;
+        if (!hostNickname) hostNickname = hostName;
+
+        const dedupeKey = String(userId || hostName);
+        if (dedupeKey && !seen.has(dedupeKey)) {
+          seen.add(dedupeKey);
+          result.push({ hostName, hostNickname, userId, points: armyPoints, teamIdx });
         }
       }
 
-      if (!userId) userId = rawHostId || hostName || "";
+      // Agregar otros participantes con sus puntos individuales (si tienen pts > 0)
+      if (Array.isArray(army.participants)) {
+        army.participants.forEach((p, partIdx) => {
+          const pId = String(p.userId || p.id || "");
+          const hostUserId2 = String(army.hostUserId || army.hostId || "");
+          // Saltar el que ya pusimos como host
+          if (pId && pId === hostUserId2) return;
+          if (result[0] && pId === String(result.find(r2 => r2.teamIdx === teamIdx)?.userId || "")) return;
 
-      // Determinar equipo: army.armyType, army.teamId, o paridad del índice
-      const teamIdx = army.armyType !== undefined ? Number(army.armyType) :
-                      army.teamId   !== undefined ? Number(army.teamId)   :
-                      armyIdx % 2; // fallback: alternancia 0,1,0,1
+          const pPoints = normalizeBattlePoints(p);
+          // Solo incluir participantes con puntos propios
+          if (pPoints <= 0) return;
 
-      return { hostName, hostNickname, userId, points: pts, teamIdx };
-    }).filter(t => t.hostName && t.hostName !== "");
+          const r = extractName(p);
+          const userId = pId || r.userId || "";
+          let hostName = r.hostName;
+          let hostNickname = r.hostNickname;
+
+          if (!hostName || /^\d{8,}$/.test(hostName)) {
+            const resolved = resolveNameFromMap(userId);
+            if (resolved) { hostName = resolved.uniqueId; hostNickname = resolved.nickname; }
+          }
+          if (!hostName) hostName = userId || `player_${armyIdx}_${partIdx}`;
+          if (!hostNickname) hostNickname = hostName;
+
+          const dedupeKey = String(userId || hostName);
+          if (!dedupeKey || seen.has(dedupeKey)) return;
+          seen.add(dedupeKey);
+          result.push({ hostName, hostNickname, userId, points: pPoints, teamIdx });
+        });
+      }
+    });
 
     if (result.length > 0) return result;
   }
 
   if (Array.isArray(data.battleUsers) && data.battleUsers.length > 0) {
-    return data.battleUsers.map(u => {
+    return data.battleUsers.map((u, idx) => {
       let hostName = u.uniqueId || u.displayId || "";
       let hostNickname = u.nickname || u.displayName || hostName;
       const userId = String(u.userId || u.id || "");
@@ -283,18 +315,22 @@ function extractTeams(data) {
         if (resolved) { hostName = resolved.uniqueId; hostNickname = resolved.nickname; }
         else hostName = userId || "?";
       }
-      return { hostName, hostNickname, userId, points: Number(u.battleScore || u.score || u.points || 0) };
+      return {
+        hostName, hostNickname, userId,
+        points: normalizeBattlePoints(u),
+        teamIdx: u.teamIdx !== undefined && u.teamIdx !== null ? Number(u.teamIdx) : (u.teamId !== undefined && u.teamId !== null ? Number(u.teamId) % 2 : idx % 2)
+      };
     }).filter(t => t.hostName !== "?");
   }
 
   const candidates = [data.battleItems, data.users, data.armies, data.items, data.teams].filter(Array.isArray);
   for (const arr of candidates) {
-    const teams = arr.map(item => {
+    const teams = arr.map((item, idx) => {
       const u    = item.hostUser || item.host || item.user || item;
       const base = normalizeBattleUser(u);
       if (!base) return null;
-      const pts  = Number(item.points || item.battleScore || item.score || base.points || 0);
-      return { ...base, userId: String(u.userId || u.id || ""), points: pts };
+      const pts  = normalizeBattlePoints(item) || base.points || 0;
+      return { ...base, userId: String(u.userId || u.id || ""), points: pts, teamIdx: item.teamIdx !== undefined && item.teamIdx !== null ? Number(item.teamIdx) : (item.teamId !== undefined && item.teamId !== null ? Number(item.teamId) % 2 : idx % 2) };
     }).filter(Boolean);
     if (teams.length > 0) return teams;
   }
@@ -302,7 +338,7 @@ function extractTeams(data) {
 }
 
 // Emitir batalla actualizada cuando se resuelva un ID
-function emitUpdatedBattle(ownerUsername, lastTeams, status) {
+function emitUpdatedBattle(username, ownerUsername, lastTeams, status) {
   return function(resolvedUserId, uniqueId, nickname) {
     const updated = lastTeams.map(t => {
       if (String(t.userId) === String(resolvedUserId) || t.hostName === resolvedUserId) {
@@ -310,7 +346,9 @@ function emitUpdatedBattle(ownerUsername, lastTeams, status) {
       }
       return t;
     });
-    io.emit("battle", { status, teams: updated, ownerUsername, timestamp: Date.now() });
+    const payload = { status, teams: updated, ownerUsername, timestamp: Date.now() };
+    if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : payload;
+    io.emit("battle", payload);
     console.log(`[battle-update] Re-emitido con @${uniqueId} resuelto`);
   };
 }
@@ -322,7 +360,6 @@ async function startTikTokConnection(username, sessionId) {
     enableWebsocketUpgrade: true,
     requestPollingIntervalMs: 2000,
   };
-  // sessionId permite conectar sin websocket upgrade (requerido por TikTok en algunos casos)
   if (sessionId && sessionId.trim()) {
     opts.sessionId = sessionId.trim();
   }
@@ -330,10 +367,9 @@ async function startTikTokConnection(username, sessionId) {
 
   await tiktok.connect();
   const ownerUsername = username.replace(/^@/, "").toLowerCase();
-  sessions[username]  = { tiktok, retryTimer: null, ownerUsername };
+  sessions[username]  = { tiktok, retryTimer: null, ownerUsername, lastBattle: null };
   console.log(`✅ Conectado a @${username}`);
 
-  // Mapa acumulado de todos los usuarios activos del live
   const activeUsersMap = new Map();
 
   tiktok.on("chat", (data) => {
@@ -369,7 +405,6 @@ async function startTikTokConnection(username, sessionId) {
         }
       });
     }
-    // Emitir: count real de TikTok + todos los usuarios acumulados
     const allAccumulated = [...activeUsersMap.values()]
       .sort((a,b) => (b.viewers||0) - (a.viewers||0));
     io.emit("viewers", {
@@ -382,7 +417,6 @@ async function startTikTokConnection(username, sessionId) {
     registerUser(data);
     const user     = data.uniqueId || data.displayId || "";
     const nickname = data.nickname || data.displayName || user;
-    // Solo emitir evento de entrada, NO afectar el top activos
     io.emit("member", { user, nickname, timestamp:Date.now() });
   });
 
@@ -393,15 +427,17 @@ async function startTikTokConnection(username, sessionId) {
 
     const teams  = extractTeams(data);
     const status = data.battleStatus || 1;
-    console.log("[linkMicBattle] teams:", JSON.stringify(teams));
+    console.log("[linkMicBattle] players:", teams.length, JSON.stringify(teams));
 
-    io.emit("battle", { status, teams, ownerUsername, timestamp: Date.now() });
+    const teamsSnap2 = teams.map(t => ({ ...t }));
+    const battlePayload = { status, teams: teamsSnap2, ownerUsername, timestamp: Date.now() };
+    if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : battlePayload;
+    io.emit("battle", battlePayload);
 
-    // Resolver IDs numéricos automáticamente
-    const cb = emitUpdatedBattle(ownerUsername, teams, status);
-    teams.forEach(t => {
-      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
-      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb);
+    const cb = emitUpdatedBattle(username, ownerUsername, teamsSnap2, status);
+    teamsSnap2.forEach(t => {
+      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb).catch(e => console.error("[resolve]", e?.message));
+      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb).catch(e => console.error("[resolve]", e?.message));
     });
   });
 
@@ -410,7 +446,6 @@ async function startTikTokConnection(username, sessionId) {
   let lastStatus = 1;
 
   tiktok.on("linkMicArmies", (data) => {
-    // Log COMPLETO — crucial para depurar estructura 2v2
     console.log("[linkMicArmies] RAW FULL:", JSON.stringify(data).slice(0, 4000));
     if (Array.isArray(data.battleArmies)) {
       data.battleArmies.forEach((army, i) => {
@@ -423,18 +458,18 @@ async function startTikTokConnection(username, sessionId) {
     }
 
     const teams = extractTeams(data);
+    console.log(`[linkMicArmies] individual players=${teams.length}`);
     if (teams.length === 0) return;
 
-    lastTeams  = teams;
-    lastStatus = 1;
+    const teamsSnap = teams.map(t => ({ ...t }));
+    const battlePayload = { status: 1, teams: teamsSnap, ownerUsername, timestamp: Date.now() };
+    if (sessions[username]) sessions[username].lastBattle = battlePayload;
+    io.emit("battle", battlePayload);
 
-    io.emit("battle", { status: 1, teams, ownerUsername, timestamp: Date.now() });
-
-    // Resolver IDs numéricos automáticamente en background
-    const cb = emitUpdatedBattle(ownerUsername, teams, 1);
-    teams.forEach(t => {
-      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
-      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb);
+    const cb = emitUpdatedBattle(username, ownerUsername, teamsSnap, 1);
+    teamsSnap.forEach(t => {
+      if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb).catch(e => console.error("[resolve]", e?.message));
+      if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb).catch(e => console.error("[resolve]", e?.message));
     });
   });
 
@@ -453,7 +488,10 @@ async function startTikTokConnection(username, sessionId) {
 }
 
 app.get("/", (req, res) => res.json({ status:"TikPanel Server ✅", connections:Object.keys(sessions).length, users:Object.keys(sessions) }));
-app.get("/status/:username", (req, res) => res.json({ connected: !!sessions[req.params.username]?.tiktok }));
+app.get("/status/:username", (req, res) => {
+  const s = getSessionRecord(req.params.username);
+  res.json({ connected: !!s?.tiktok, battle: s?.lastBattle || null });
+});
 
 app.post("/connect", async (req, res) => {
   const { username, sessionId } = req.body;
@@ -477,6 +515,18 @@ app.post("/disconnect", (req, res) => {
   const { username } = req.body;
   if (username) cleanSession(username);
   res.json({ success:true });
+});
+
+// ── Re-emitir lastBattle a nuevos clientes (fix recarga de página) ──────────
+io.on("connection", (socket) => {
+  for (const key of Object.keys(sessions)) {
+    const s = sessions[key];
+    if (s?.lastBattle) {
+      console.log(`[socket-join] Re-emitiendo lastBattle a ${socket.id}`);
+      socket.emit("battle", s.lastBattle);
+      break;
+    }
+  }
 });
 
 const PORT = process.env.PORT || 3001;
