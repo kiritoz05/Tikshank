@@ -241,7 +241,10 @@ function extractTeams(data) {
       if (!dedupeKey || seen.has(dedupeKey)) return;
       seen.add(dedupeKey);
 
-      result.push({ hostName, hostNickname, userId, points: finalPoints, teamIdx });
+      // Si no hay puntos en el ejército, buscar en hostUser directamente
+      const hostPoints = normalizeBattlePoints(hostRaw);
+      const bestPoints = finalPoints || hostPoints || 0;
+      result.push({ hostName, hostNickname, userId, points: bestPoints, teamIdx });
     });
 
     if (result.length > 0) return result;
