@@ -218,118 +218,103 @@ function resolveName(u) {
 // Para batalla 4 anfitriones (2v2): 2 armies, hostUser + coHostUser c/u → 4 tarjetas
 // ─────────────────────────────────────────────────────────────
 function extractTeams(data) {
-  var armies = data.battleArmies
-    || (data.linkMicBattleInfo && data.linkMicBattleInfo.battleArmies)
-    || [];
+  var armies = data.battleArmies || (data.linkMicBattleInfo && data.linkMicBattleInfo.battleArmies) || [];
   var results = [];
 
-  if (armies.length > 0) {
-    armies.forEach(function(army, armyIdx) {
-      // Equipo: 0 = izquierda/rojo, 1 = derecha/cyan
-      var teamIdx = army.armyType !== undefined ? Number(army.armyType) % 2
-                  : army.teamId   !== undefined ? Number(army.teamId)   % 2
-                  : armyIdx % 2;
-
-      // Puntos TOTALES del ejército (siempre válidos)
-      var armyPts = pickPoints(army);
-
-      // ── 1) ANFITRIÓN PRINCIPAL (hostUser) ──────────────────
-      var host = army.hostUser || null;
-      if (host) registerUser(host);
-
-      // ── 2) CO-ANFITRIÓN si existe (2v2) ───────────────────
-      // TikTok puede mandar el co-host en varios campos:
-      var coHost = army.linkedMicUser || army.coHostUser
-                || army.guestUser     || army.battleUser
-                || null;
-      if (coHost) registerUser(coHost);
-
-      // ── 3) Buscar co-host en participants (si son HOSTS)
-      // En 2v2 TikTok puede poner el co-anfitrión en participants[0]
-      // con un flag isHost/role, O en participants con el mismo userId que hostUserId
-      var coFromParts = null;
-      if (!coHost && Array.isArray(army.participants) && army.participants.length > 0) {
-        // El co-anfitrión en participants tiene role=host o isHost=true
-        // o tiene más puntos que un fan normal
-        army.participants.forEach(function(p) {
-          var u = (p && p.user) ? p.user : p;
-          if (!u) return;
-          var isHostRole = p.role === "host" || p.role === 1 || p.isHost === true
-                        || p.userRole === "host" || p.type === "host";
-          // Si tiene rol de host y NO es el mismo que hostUser
-          var sameAsHost = host && (
-            String(u.userId||u.id) === String(host.userId||host.id) ||
-            String(u.uniqueId||"") === String(host.uniqueId||"")
-          );
-          if (isHostRole && !sameAsHost && !coFromParts) {
-            registerUser(u);
-            coFromParts = u;
-          }
-        });
-      }
-
-      var finalCoHost = coHost || coFromParts;
-
-      // ── PUSH ANFITRIÓN PRINCIPAL ───────────────────────────
-      if (host) {
-        var r = resolveName(host);
-        var name = r.name || r.uid || ("host_" + armyIdx);
-        var nick = r.nick || name;
-        // Puntos: si hay co-host dividir, si no el total del ejército
-        var hostPts = finalCoHost
-          ? Math.floor(armyPts / 2)   // estimado — se actualizará
-          : armyPts;
-        // Intentar puntos individuales del hostUser
-        var hp = pickPoints(host);
-        if (hp > 0) hostPts = hp;
-
-        results.push({
-          hostName:     name,
-          hostNickname: nick,
-          userId:       r.uid || String(army.hostUserId || ""),
-          points:       hostPts,
-          teamIdx:      teamIdx,
-          isMainHost:   true
-        });
-      }
-
-      // ── PUSH CO-ANFITRIÓN si existe ────────────────────────
-      if (finalCoHost) {
-        var rc = resolveName(finalCoHost);
-        var cname = rc.name || rc.uid || ("cohost_" + armyIdx);
-        var cnick = rc.nick || cname;
-        var cp = pickPoints(finalCoHost);
-        if (cp === 0 && armyPts > 0) cp = Math.floor(armyPts / 2); // estimado
-
-        results.push({
-          hostName:     cname,
-          hostNickname: cnick,
-          userId:       rc.uid,
-          points:       cp,
-          teamIdx:      teamIdx,
-          isMainHost:   false
-        });
-      }
-    });
-
-    if (results.length > 0) return results;
+  function pushUnique(arr, item) {
+    if (!item) return;
+    var key = String(item.userId || item.hostName || '');
+    if (!key) return;
+    if (arr.some(function(x){ return String(x.userId || x.hostName || '') === key; })) return;
+    arr.push(item);
   }
 
-  // ── Fallback: battleUsers planos ──────────────────────────
-  var users = data.battleUsers || data.participants || [];
-  return users.slice(0, 4).map(function(u, i) {
-    if (!u) return null;
-    registerUser(u);
-    var r = resolveName(u);
-    return {
-      hostName:     r.name || r.uid || ("p" + i),
-      hostNickname: r.nick || r.name || r.uid,
-      userId:       r.uid,
-      points:       pickPoints(u),
-      teamIdx:      i % 2,
-      isMainHost:   i < 2
-    };
-  }).filter(Boolean);
+  if (Array.isArray(armies) && armies.length > 0) {
+    armies.forEach(function(army, armyIdx) {
+      var teamIdx = army.armyType !== undefined ? Number(army.armyType) % 2
+                  : army.teamId !== undefined ? Number(army.teamId) % 2
+                  : armyIdx % 2;
+      var armyPts = pickPoints(army);
+      var hosts = [];
+
+      function mkUser(u, isMainHost) {
+        if (!u) return null;
+        registerUser(u);
+        var r = resolveName(u);
+        var nm = r.name || r.uid || '';
+        if (!nm) return null;
+        return {
+          hostName: nm,
+          hostNickname: r.nick || nm,
+          userId: r.uid || String(u.userId || u.id || ''),
+          points: 0,
+          teamIdx: teamIdx,
+          isMainHost: !!isMainHost
+        };
+      }
+
+      pushUnique(hosts, mkUser(army.hostUser || null, true));
+      pushUnique(hosts, mkUser(army.linkedMicUser || army.coHostUser || army.guestUser || army.battleUser || army.invitedUser || null, false));
+
+      if (Array.isArray(army.participants)) {
+        army.participants.forEach(function(p) {
+          var u = p && p.user ? p.user : p;
+          if (!u) return;
+          var role = String((p && (p.role || p.userRole || p.type)) || '').toLowerCase();
+          var isHostLike = p && (p.isHost === true || role === 'host' || role === 'anchor' || role === 'cohost');
+          var sameAsHost = army.hostUser && (String(u.userId || u.id || '') === String(army.hostUser.userId || army.hostUser.id || '') || String(u.uniqueId || '') === String(army.hostUser.uniqueId || ''));
+          if (isHostLike && !sameAsHost) pushUnique(hosts, mkUser(u, false));
+        });
+      }
+
+      hosts = hosts.slice(0, 2);
+      if (hosts.length === 0) return;
+
+      if (hosts.length === 1) {
+        hosts[0].points = armyPts;
+      } else {
+        var found = 0;
+        if (Array.isArray(army.participants)) {
+          hosts.forEach(function(h) {
+            var matched = army.participants.find(function(p) {
+              var u = p && p.user ? p.user : p;
+              return String((u && (u.userId || u.id)) || '') === String(h.userId || '');
+            });
+            var pts = matched ? (pickPoints(matched) || pickPoints(matched.user || null)) : 0;
+            h.points = pts;
+            found += pts;
+          });
+        }
+        if (found <= 0) {
+          hosts[0].points = Math.ceil(armyPts / 2);
+          hosts[1].points = Math.floor(armyPts / 2);
+        } else if (armyPts > found) {
+          hosts[0].points += (armyPts - found);
+        }
+      }
+
+      hosts.forEach(function(h) { results.push(h); });
+    });
+  }
+
+  if (results.length === 0 && Array.isArray(data.battleUsers) && data.battleUsers.length > 0) {
+    results = data.battleUsers.slice(0, 2).map(function(u, i) {
+      registerUser(u);
+      var r = resolveName(u);
+      return {
+        hostName: r.name || r.uid || ('player_' + i),
+        hostNickname: r.nick || r.name || r.uid || ('player_' + i),
+        userId: r.uid || '',
+        points: pickPoints(u),
+        teamIdx: i % 2,
+        isMainHost: true
+      };
+    }).filter(Boolean);
+  }
+
+  var left = results.filter(function(x){ return x.teamIdx === 0; }).slice(0, 2);
+  var right = results.filter(function(x){ return x.teamIdx === 1; }).slice(0, 2);
+  return left.concat(right);
 }
 
 function getArmyPoints(army) {
@@ -468,7 +453,7 @@ async function startTikTokConnection(username, sessionId) {
 
     const teams = extractTeams(data);
     console.log(`[linkMicArmies] individual players=${teams.length}`);
-    // No hacer return si teams=0, quizás los datos vienen en otro formato
+    if (teams.length === 0) return;
 
     lastTeams  = teams;
     lastStatus = 1;

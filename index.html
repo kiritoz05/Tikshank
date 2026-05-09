@@ -192,19 +192,22 @@ function splitIntoChunks(text, maxLen) {
 
 function normalizeBattlePayload(d, ownerUser) {
   if (!d) return null;
-  const teams = Array.isArray(d.teams) ? d.teams : [];
-  const cleanTeams = teams.filter(Boolean).map((p, i) => ({
+  var teams = Array.isArray(d.teams) ? d.teams.filter(Boolean).map((p, i) => ({
     hostName: p.hostName || p.uniqueId || p.user || `player_${i}`,
     hostNickname: p.hostNickname || p.nickname || p.hostName || p.uniqueId || `player_${i}`,
     uniqueId: p.uniqueId || p.hostName || "",
     userId: p.userId || "",
-    points: Number(p.points || 0),
+    points: Math.max(0, Number(p.points || 0)),
     teamIdx: Number.isFinite(Number(p.teamIdx)) ? Number(p.teamIdx) : i % 2,
     isMainHost: p.isMainHost !== false
-  }));
+  })) : [];
+  var left = teams.filter((x) => x.teamIdx === 0).slice(0, 2);
+  var right = teams.filter((x) => x.teamIdx === 1).slice(0, 2);
+  teams = left.concat(right);
+  if (teams.length === 0) return null;
   return {
     status: Number(d.status || 1),
-    teams: cleanTeams,
+    teams,
     ownerUsername: String(d.ownerUsername || ownerUser || "").replace(/^@/, "").toLowerCase(),
     timestamp: d.timestamp || Date.now()
   };
