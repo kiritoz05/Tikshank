@@ -468,7 +468,7 @@ async function startTikTokConnection(username, sessionId) {
 
     const teams = extractTeams(data);
     console.log(`[linkMicArmies] individual players=${teams.length}`);
-    if (teams.length === 0) return;
+    // No hacer return si teams=0, quizás los datos vienen en otro formato
 
     lastTeams  = teams;
     lastStatus = 1;
@@ -502,6 +502,25 @@ async function startTikTokConnection(username, sessionId) {
 app.get("/battle/:username", (req, res) => {
   const s = getSessionRecord(req.params.username);
   res.json(s?.lastBattle || null);
+});
+
+// Endpoint para obtener cualquier batalla activa (sin saber el username)
+app.get("/battle-active", (req, res) => {
+  for (const [uname, sess] of Object.entries(sessions)) {
+    if (sess && sess.lastBattle) return res.json(sess.lastBattle);
+  }
+  res.json(null);
+});
+
+// Al conectar socket, re-enviar batalla activa inmediatamente
+io.on("connection", (socket) => {
+  for (const [uname, sess] of Object.entries(sessions)) {
+    if (sess && sess.lastBattle) {
+      socket.emit("battle", sess.lastBattle);
+      console.log(`[socket:connect] Re-enviando batalla activa @${uname}`);
+      break;
+    }
+  }
 });
 
 app.get("/", (req, res) => res.json({ status:"TikPanel Server ✅", connections:Object.keys(sessions).length, users:Object.keys(sessions) }));

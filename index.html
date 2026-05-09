@@ -190,6 +190,28 @@ function splitIntoChunks(text, maxLen) {
   return chunks.filter(Boolean);
 }
 
+function normalizeBattlePayload(d, ownerUser) {
+  if (!d) return null;
+  const teams = Array.isArray(d.teams) ? d.teams : [];
+  const cleanTeams = teams.filter(Boolean).map((p, i) => ({
+    hostName: p.hostName || p.uniqueId || p.user || `player_${i}`,
+    hostNickname: p.hostNickname || p.nickname || p.hostName || p.uniqueId || `player_${i}`,
+    uniqueId: p.uniqueId || p.hostName || "",
+    userId: p.userId || "",
+    points: Number(p.points || 0),
+    teamIdx: Number.isFinite(Number(p.teamIdx)) ? Number(p.teamIdx) : i % 2,
+    isMainHost: p.isMainHost !== false
+  }));
+  return {
+    status: Number(d.status || 1),
+    teams: cleanTeams,
+    ownerUsername: String(d.ownerUsername || ownerUser || "").replace(/^@/, "").toLowerCase(),
+    timestamp: d.timestamp || Date.now()
+  };
+}
+
+
+
 function speakNative(text, voiceId, vol) {
   return new Promise((res) => {
     if (!window.speechSynthesis) { res(); return; }
@@ -1421,6 +1443,15 @@ function App() {
     });
     return () => sock.disconnect();
   }, [fireAction]);
+
+  useEffect(() => {
+    fetch(`${SERVER}/battle-active`).then((r) => r.json()).then((d) => {
+      if (d && d.teams && d.teams.length > 0) {
+        setBattle(normalizeBattlePayload(d, ld("tuser", "")));
+      }
+    }).catch(() => {
+    });
+  }, []);
   useEffect(() => {
     const savedUser = ld("tuser", "");
     if (!savedUser) return;
