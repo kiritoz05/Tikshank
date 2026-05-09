@@ -655,6 +655,26 @@ function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, on
     onSave(__spreadValues({}, f));
   }, style: { flex: 2, background: "linear-gradient(135deg,#fe2c55,#ff6b81)", border: "none", borderRadius: 9, padding: "10px", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 12 } }, " Guardar Acci\xF3n"))));
 }
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: "" }; }
+  static getDerivedStateFromError(e) { return { hasError: true, error: e?.message || "Error desconocido" }; }
+  render() {
+    if (this.state.hasError) {
+      return React.createElement("div", { style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0a0a0f", padding: 20 } },
+        React.createElement("div", { style: { background: "#12121e", border: "1px solid rgba(254,44,85,.3)", borderRadius: 16, padding: 28, maxWidth: 360, width: "100%", textAlign: "center" } },
+          React.createElement("div", { style: { fontSize: 36, marginBottom: 12 } }, "⚠️"),
+          React.createElement("div", { style: { fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16, marginBottom: 8 } }, "Algo salió mal"),
+          React.createElement("div", { style: { color: "#555", fontSize: 12, marginBottom: 20, fontFamily: "monospace" } }, this.state.error),
+          React.createElement("button", {
+            onClick: () => { try { localStorage.clear(); } catch(e) {} window.location.reload(); },
+            style: { background: "linear-gradient(135deg,#fe2c55,#ff6b81)", border: "none", borderRadius: 10, padding: "11px 24px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" }
+          }, "Limpiar caché y recargar")
+        )
+      );
+    }
+    return this.props.children;
+  }
+}
 function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -678,7 +698,14 @@ function Login({ onLogin }) {
 }
 function App() {
   var _a, _b, _c;
-  const [user, setUser] = useState(() => ld("session", null));
+  const [user, setUser] = useState(() => {
+    try {
+      const s = ld("session", null);
+      if (s && typeof s === "object" && s.name && s.plan) return s;
+      localStorage.removeItem("tp_session");
+      return null;
+    } catch(e) { return null; }
+  });
   const [tab, setTab] = useState(() => ld("tab", "dashboard"));
   const [sb, setSb] = useState(false);
   const [battle, setBattle] = useState(null);
@@ -1657,7 +1684,9 @@ function App() {
     return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#555", flexShrink: 0 } }, (_a2 = (u.nickname || u.user)[0]) == null ? void 0 : _a2.toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, color: "#fff" } }, "@", u.nickname || u.user), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555" } }, new Date(u.joinTime).toLocaleTimeString()));
   })), vTab === "activos" && (topViewers.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin espectadores activos..." : "Conecta el LIVE") : topViewers.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 6, height: 6, borderRadius: "50%", background: "#25f4ee", flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, color: "#fff" } }, "@", u.nickname || u.user))))))))));
 }
-ReactDOM.createRoot(document.getElementById("root")).render(/* @__PURE__ */ React.createElement(App, null));
+ReactDOM.createRoot(document.getElementById("root")).render(
+  React.createElement(ErrorBoundary, null, React.createElement(App, null))
+);
 </script>
 </body>
 </html>
