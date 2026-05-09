@@ -176,113 +176,144 @@ function extractName(u) {
 }
 
 
-function getPersonPoints(p) {
-  if (!p) return 0;
-  var fs = [p.battleScore, p.score, p.points, p.teamPoints, p.groupScore,
-            p.totalScore, p.point, p.armyScore, p.matchScore, p.displayScore];
-  for (var i = 0; i < fs.length; i++) {
-    var n = Number(fs[i]);
-    if (Number.isFinite(n) && n >= 0) return n;
+// ─── Obtener puntos de cualquier objeto (usuario/participante/ejército)
+function pickPoints(obj) {
+  if (!obj) return 0;
+  var fields = [
+    obj.battleScore, obj.score, obj.points, obj.teamPoints,
+    obj.groupScore, obj.totalScore, obj.totalPoints, obj.point,
+    obj.armyScore, obj.matchScore, obj.displayScore, obj.voteCount
+  ];
+  for (var i = 0; i < fields.length; i++) {
+    var n = Number(fields[i]);
+    if (Number.isFinite(n) && n > 0) return n;
   }
   return 0;
 }
 
-function getPersonName(u) {
+// ─── Resolver nombre desde objeto usuario
+function resolveName(u) {
   if (!u) return { name: "", nick: "", uid: "" };
-  var uid  = String(u.uniqueId || u.displayId || "");
-  var nick = String(u.nickname || u.displayName || u.name || "");
-  var id   = String(u.userId || u.id || "");
-  // Si uid es numérico largo, buscar en userMap
-  var name = (uid && !/^\d{6,}$/.test(uid)) ? uid : (userMap[id]?.uniqueId || userMap[uid]?.uniqueId || uid || id);
-  var nn   = nick || userMap[id]?.nickname || userMap[uid]?.nickname || name;
-  return { name: name, nick: nn, uid: id || uid };
+  var uid  = String(u.uniqueId  || u.displayId  || "");
+  var nick = String(u.nickname  || u.displayName || u.name || "");
+  var id   = String(u.userId    || u.id          || "");
+  // Consultar mapa de usuarios ya vistos
+  var mapEntry = userMap[id] || userMap[uid] || null;
+  var resolvedUid  = (uid  && !/^\d{6,}$/.test(uid))  ? uid  : (mapEntry?.uniqueId  || "");
+  var resolvedNick = (nick && !/^\d{6,}$/.test(nick)) ? nick : (mapEntry?.nickname  || resolvedUid);
+  // Si aún no tenemos nombre, guardar id para resolver después
+  var finalName = resolvedUid  || uid  || id  || "";
+  var finalNick = resolvedNick || nick || finalName;
+  return { name: finalName, nick: finalNick, uid: id || uid };
 }
 
 function extractTeams(data) {
-  const armies = data.battleArmies || (data.linkMicBattleInfo && data.linkMicBattleInfo.battleArmies) || [];
+  var armies = data.battleArmies
+    || (data.linkMicBattleInfo && data.linkMicBattleInfo.battleArmies)
+    || [];
   var results = [];
 
   if (armies.length > 0) {
     armies.forEach(function(army, armyIdx) {
+      // Determinar equipo (0 = izquierda/rojo, 1 = derecha/cyan)
       var teamIdx = army.armyType !== undefined ? Number(army.armyType) % 2
                   : army.teamId  !== undefined ? Number(army.teamId)   % 2
                   : armyIdx % 2;
 
-      // ── Registrar host del ejército
+      // Registrar host para resolución de nombres
       if (army.hostUser) registerUser(army.hostUser);
 
-      // ── Sacar CADA participante como jugador individual
-      var participants = army.participants || [];
-      if (participants.length > 0) {
-        participants.forEach(function(p) {
-          if (!p) return;
-          var user = p.user || p;
-          registerUser(user);
-          var r = getPersonName(user);
-          var pts = getPersonPoints(p);
-          if (!r.name && !r.uid) return;
-          results.push({
-            hostName:     r.name || r.uid || ("player_" + results.length),
-            hostNickname: r.nick || r.name || r.uid,
-            userId:       r.uid,
-            points:       pts,
-            teamIdx:      teamIdx,
-            isHost:       false
-          });
+      // Puntos TOTALES del ejército
+      var armyPoints = pickPoints(army);
+
+      // Sacar lista de hosts/co-hosts del ejército
+      // TikTok puede mandar: army.hostUser + army.participants
+      // o solo army.participants donde el primer item es el host
+      var hostUser = army.hostUser || null;
+      var rawParts = Array.isArray(army.participants) ? army.participants : [];
+
+      // Registrar todos los participantes
+      rawParts.forEach(function(p) {
+        var u = (p && p.user) ? p.user : p;
+        if (u) registerUser(u);
+      });
+
+      // Si no hay participants, solo el host (batalla 1v1)
+      if (rawParts.length === 0) {
+        if (!hostUser) return;
+        var r = resolveName(hostUser);
+        if (!r.name && !r.uid) return;
+        results.push({
+          hostName:     r.name || r.uid,
+          hostNickname: r.nick || r.name || r.uid,
+          userId:       r.uid,
+          points:       armyPoints,
+          teamIdx:      teamIdx
         });
-      } else {
-        // Sin participants — usar hostUser solo
-        var host = army.hostUser || {};
-        registerUser(host);
-        var r2 = getPersonName(host);
-        var armyPts = getPersonPoints(army);
-        if (r2.name || r2.uid) {
-          results.push({
-            hostName:     r2.name || r2.uid || ("player_" + results.length),
-            hostNickname: r2.nick || r2.name || r2.uid,
-            userId:       r2.uid || String(army.hostUserId || ""),
-            points:       armyPts,
-            teamIdx:      teamIdx,
-            isHost:       true
-          });
-        }
+        return;
       }
+
+      // Hay participants — pueden ser 1 o 2 (batalla 1v1 o 2v2)
+      // Cada participant tiene sus propios puntos individuales
+      var validParts = rawParts.filter(function(p) { return p; });
+
+      validParts.forEach(function(p) {
+        var userObj = (p.user) ? p.user : p;
+        var r = resolveName(userObj);
+
+        // Puntos individuales del participante
+        var pts = pickPoints(p);
+
+        // Si el participante no tiene puntos propios pero el ejército sí,
+        // y solo hay 1 participante → asignar puntos del ejército
+        if (pts === 0 && validParts.length === 1) {
+          pts = armyPoints;
+        }
+
+        // Si hay 2 participantes y ambos tienen 0, repartir del ejército
+        // (TikTok a veces pone los pts en army.points, no en cada participant)
+        if (pts === 0 && validParts.length === 2 && armyPoints > 0) {
+          // Intentar sumar los dos para ver si alguno tiene puntos
+          var sumParts = validParts.reduce(function(s, pp) { return s + pickPoints(pp); }, 0);
+          if (sumParts === 0) {
+            // Ninguno tiene — dividir equitativamente (luego se actualiza)
+            pts = Math.floor(armyPoints / validParts.length);
+          }
+        }
+
+        var name = r.name || r.uid || ("player_" + results.length);
+        var nick = r.nick || name;
+        if (!name) return;
+
+        results.push({
+          hostName:     name,
+          hostNickname: nick,
+          userId:       r.uid,
+          points:       pts,
+          teamIdx:      teamIdx
+        });
+      });
     });
 
     if (results.length > 0) return results;
   }
 
-  // Fallback: battleUsers
+  // ── Fallback: battleUsers / participants planos
   var users = data.battleUsers || data.participants || [];
   return users.map(function(u, i) {
     registerUser(u);
-    var r = getPersonName(u);
+    var r = resolveName(u);
     return {
       hostName:     r.name || r.uid || ("p" + i),
       hostNickname: r.nick || r.name || r.uid,
       userId:       r.uid,
-      points:       getPersonPoints(u),
-      teamIdx:      i % 2,
-      isHost:       false
+      points:       pickPoints(u),
+      teamIdx:      i % 2
     };
   }).filter(function(t) { return t.hostName; });
 }
 
-function normalizeBattlePoints(u) {
-  if (!u) return 0;
-  // Buscar en TODOS los campos posibles donde TikTok puede poner los puntos
-  const fields = [
-    u.battleScore, u.score, u.points, u.teamPoints,
-    u.totalScore, u.totalPoints, u.point, u.groupScore,
-    u.armyScore, u.matchScore, u.coinCount, u.giftCount,
-    u.teamScore, u.displayScore, u.voteCount
-  ];
-  for (const v of fields) {
-    const n = Number(v);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return 0;
-}
+// normalizeBattlePoints → reemplazada por pickPoints
 
 function getArmyPoints(army) {
   if (!army) return 0;

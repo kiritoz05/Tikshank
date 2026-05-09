@@ -1662,8 +1662,9 @@ function App() {
     const total = pts0 + pts1 || 1;
     const pct0 = Math.round(pts0 / total * 100);
     const pct1 = 100 - pct0;
-    const leader0 = side0[0] || {};
-    const leader1 = side1[0] || {};
+    // Líder = el que tiene más puntos en su lado (o el primero si están igualados)
+    const leader0 = side0.slice().sort((a,b)=>(b.points||0)-(a.points||0))[0] || {};
+    const leader1 = side1.slice().sort((a,b)=>(b.points||0)-(a.points||0))[0] || {};
     const maxPoints = Math.max(1, ...cleanPlayers.map((p) => Number(p.points || 0)));
     const renderPlayer = (player, idx) => {
       const keyId = safeLc(player.userId || player.hostName || player.uniqueId || idx);
@@ -1680,7 +1681,7 @@ function App() {
           // LADO IZQUIERDO
           /* @__PURE__ */ React.createElement("div", { style: { flex: 1, textAlign: "left" } },
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#fe2c55", letterSpacing: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-              "@", (() => { const vs=[leader0.hostNickname,leader0.hostName,"Equipo 1"]; return vs.find(v=>v&&!/^\d{6,}$/.test(v))||vs[0]||"Equipo 1"; })()
+              "@", (() => { const vs=[leader0.hostNickname,leader0.hostName].filter(Boolean); return vs.find(v=>!/^\d{6,}$/.test(String(v)))||vs[0]||"Equipo A"; })()
             ),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#fe2c55", lineHeight: 1.1 } }, pts0.toLocaleString()),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#777" } }, "diamantes")
@@ -1695,7 +1696,7 @@ function App() {
           // LADO DERECHO
           /* @__PURE__ */ React.createElement("div", { style: { flex: 1, textAlign: "right" } },
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#25f4ee", letterSpacing: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-              "@", (() => { const vs=[leader1.hostNickname,leader1.hostName,"Equipo 2"]; return vs.find(v=>v&&!/^\d{6,}$/.test(v))||vs[0]||"Equipo 2"; })()
+              "@", (() => { const vs=[leader1.hostNickname,leader1.hostName].filter(Boolean); return vs.find(v=>!/^\d{6,}$/.test(String(v)))||vs[0]||"Equipo B"; })()
             ),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#25f4ee", lineHeight: 1.1 } }, pts1.toLocaleString()),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#777" } }, "diamantes")
@@ -1718,7 +1719,8 @@ function App() {
           /* @__PURE__ */ React.createElement("span", { style: { color: pts0 > pts1 ? "#fe2c55" : "#25f4ee", fontWeight: 700 } },
             "@", (() => {
               const lx = pts0>pts1 ? leader0 : leader1;
-              const vs2=[lx.hostNickname,lx.hostName]; return vs2.find(v=>v&&!/^\d{6,}$/.test(v))||vs2[0]||"?";
+              const vs2=[lx.hostNickname,lx.hostName].filter(Boolean);
+              return vs2.find(v=>!/^\d{6,}$/.test(String(v)))||vs2[0]||"?";
             })()
           ),
           " va ganando por ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#fff" } }, Math.abs(pts0 - pts1).toLocaleString())
@@ -1732,15 +1734,16 @@ function App() {
           const isOwner = safeLc(player.userId || player.hostName) === safeLc(battle.ownerUsername);
           const pct = total > 0 ? Math.round((player.points||0) / total * 100) : 0;
 
-          // Resolver nombre: priorizar nickname sobre nombre numérico
-          const _nn  = player.hostNickname || "";
-          const _hn  = player.hostName     || "";
-          const _uid = player.uniqueId     || "";
-          const pickName = (v) => v && !/^\d{6,}$/.test(v);
-          const displayName = pickName(_nn) ? _nn
-                            : pickName(_hn) ? _hn
-                            : pickName(_uid) ? _uid
-                            : (_nn || _hn || _uid || "Jugador");
+          // Nombre a mostrar: primer valor no-numérico disponible
+          const _candidates = [
+            player.hostNickname,
+            player.hostName,
+            player.uniqueId,
+            player.userId
+          ].filter(Boolean);
+          const displayName = _candidates.find(v => !/^\d{6,}$/.test(String(v)))
+                           || _candidates[0]
+                           || "Jugador";
 
           return /* @__PURE__ */ React.createElement("div", { key: idx, style: {
             background: "#12121e",
