@@ -1010,21 +1010,54 @@ function App() {
   }, [tUser]);
   useEffect(() => {
     if (!conn || !tUser) return;
-    const _pollIv = setInterval(async () => {
+    const u = (tUser || "").replace(/^@/, "");
+    if (!u) return;
+
+    // ── SSE: recibir updates de batalla en tiempo real ──────────────
+    let es = null;
+    let reconnectTimer = null;
+    let active = true;
+
+    function connectSSE() {
+      if (!active) return;
       try {
-        const r = await fetch(`${SERVER}/battle/${encodeURIComponent(tUser.replace(/^@/,""))}`);
-        if (r.ok) {
-          const d = await r.json();
-          if (!d || (d.status === 0)) {
-            // batalla terminada → limpiar
-            setBattle(null);
-          } else if (d && d.teams && d.teams.length > 0) {
-            setBattle(normalizeBattlePayload(d, tUser));
-          }
-        }
-      } catch(e) {}
-    }, 2000);
-    return () => clearInterval(_pollIv);
+        es = new EventSource(`${SERVER}/battle-stream/${encodeURIComponent(u)}`);
+        es.onmessage = (e) => {
+          try {
+            const d = JSON.parse(e.data);
+            if (!d || d.status === 0 || !d.teams || d.teams.length === 0) {
+              setBattle(null);
+            } else {
+              setBattle(normalizeBattlePayload(d, tUser));
+            }
+          } catch(err) {}
+        };
+        es.onerror = () => {
+          if (es) { es.close(); es = null; }
+          if (active) reconnectTimer = setTimeout(connectSSE, 3000);
+        };
+      } catch(e) {
+        // SSE no soportado, fallback a polling
+        const _iv = setInterval(async () => {
+          try {
+            const r = await fetch(`${SERVER}/battle/${encodeURIComponent(u)}`);
+            if (r.ok) {
+              const d = await r.json();
+              if (!d || d.status === 0) { setBattle(null); }
+              else if (d.teams && d.teams.length > 0) { setBattle(normalizeBattlePayload(d, tUser)); }
+            }
+          } catch(err) {}
+        }, 3000);
+        return () => clearInterval(_iv);
+      }
+    }
+
+    connectSSE();
+    return () => {
+      active = false;
+      if (es) { es.close(); es = null; }
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+    };
   }, [conn, tUser]);
   useEffect(() => {
     sv("sessid", sessId);
@@ -1688,144 +1721,169 @@ function App() {
       setSpotifyCustomUsers((p) => [...p, spotifyCustomInput.trim()]);
       setSpotifyCustomInput("");
     }
-  } }, "+ Agregar")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, spotifyCustomUsers.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { background: "#1a1a28", border: "1px solid #252535", borderRadius: 20, padding: "4px 10px", color: "#aaa", fontSize: 11, display: "flex", alignItems: "center", gap: 6 } }, u, /* @__PURE__ */ React.createElement("span", { style: { cursor: "pointer", color: "#fe2c55" }, onClick: () => setSpotifyCustomUsers((p) => p.filter((_, j) => j !== i)) }, "\xD7"))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#aaa", fontWeight: 600 } }, "Permitir saltar canci\xF3n"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#444", marginTop: 2 } }, "Habilita un comando para pasar a la siguiente")), /* @__PURE__ */ React.createElement(Toggle, { on: spotifyAllowSkip, onChange: () => setSpotifyAllowSkip(!spotifyAllowSkip), size: "sm", color: "#1DB954" })), spotifyAllowSkip && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "\xBFQui\xE9n puede saltar canciones?"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 7, marginTop: 8 } }, SPOTIFY_PERMS.map((p) => /* @__PURE__ */ React.createElement("button", { key: p, className: `perm-chip${spotifySkipPerm === p ? " sel" : ""}`, onClick: () => setSpotifySkipPerm(p) }, p))))), /* @__PURE__ */ React.createElement(SecHdr, { title: " COLA DE CANCIONES" }), /* @__PURE__ */ React.createElement("div", { style: C }, spotifyQueue.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", textAlign: "center", padding: "24px 0", fontSize: 12 } }, "Cola vac\xEDa \xB7 Los espectadores usan ", /* @__PURE__ */ React.createElement("span", { style: { color: "#1DB954" } }, spotifyCmd, " [canci\xF3n]"), " en el chat") : spotifyQueue.map((s, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "sq-item" }, /* @__PURE__ */ React.createElement("span", { style: { color: "#555", minWidth: 20, fontSize: 11 } }, i + 1, "."), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, s.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", marginTop: 1 } }, "@", s.user)), /* @__PURE__ */ React.createElement("button", { onClick: () => setSpotifyQueue((p) => p.filter((_, j) => j !== i)), style: { background: "transparent", border: "none", color: "#444", cursor: "pointer", fontSize: 14 } }, "\u2715"))), /* @__PURE__ */ React.createElement("button", { onClick: () => setSpotifyQueue((p) => [...p, { title: "Never Gonna Give You Up - Rick Astley", user: "viewer123" }]), style: { width: "100%", background: "rgba(29,185,84,.08)", border: "1px dashed rgba(29,185,84,.2)", borderRadius: 8, padding: "8px", color: "#1DB954", fontSize: 11, cursor: "pointer", marginTop: 8 } }, "+ Agregar canci\xF3n de prueba")))), tab === "ranking" && /* @__PURE__ */ React.createElement("div", { className: "ai" }, /* @__PURE__ */ React.createElement("div", { style: C }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fff", marginBottom: 12 } }, " Top Diamantes"), tapR.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin datos a\xFAn..." : "Conecta el LIVE") : tapR.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: u.user, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: i === 0 ? "#fbbf24" : i === 1 ? "#9ca3af" : i === 2 ? "#cd7c2f" : "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, flexShrink: 0 } }, i + 1), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "@", u.nickname || u.user), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#25f4ee", fontWeight: 700 } }, " ", u.diamonds), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555" } }, "\xD7", u.gifts)))), /* @__PURE__ */ React.createElement("div", { style: C }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fff", marginBottom: 12 } }, "\u2764\uFE0F Top Likes"), likeR.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin datos a\xFAn..." : "Conecta el LIVE") : likeR.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: u.user, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: i === 0 ? "#fbbf24" : i === 1 ? "#9ca3af" : i === 2 ? "#cd7c2f" : "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, flexShrink: 0 } }, i + 1), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "@", u.nickname || u.user), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#fe2c55", fontWeight: 700 } }, "\u2764\uFE0F ", u.count))))), tab === "chat" && /* @__PURE__ */ React.createElement("div", { className: "ai" }, /* @__PURE__ */ React.createElement("div", { style: C }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fff" } }, "Chat en vivo"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#555" } }, log.filter((l) => l.t === "msg").length, " msgs"), /* @__PURE__ */ React.createElement("button", { onClick: () => setLog([]), style: { background: "transparent", border: "1px solid #252535", borderRadius: 6, padding: "4px 10px", color: "#555", fontSize: 10, cursor: "pointer" } }, "Limpiar"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3, maxHeight: "65vh", overflowY: "auto" } }, log.filter((l) => l.t === "msg").length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "20px 0" } }, conn ? "Sin mensajes a\xFAn..." : "Conecta el LIVE") : log.filter((l) => l.t === "msg").map((item, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,.02)", borderLeft: "2px solid " + (["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#4ade80","#fb923c"][((item.nick||item.user||"").charCodeAt(0)||0)%6]||"#fe2c55") + "55" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: (["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#4ade80","#fb923c"][((item.nick||item.user||"").charCodeAt(0)||0)%6]||"#fe2c55") + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: (["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#4ade80","#fb923c"][((item.nick||item.user||"").charCodeAt(0)||0)%6]||"#fe2c55"), flexShrink: 0 } }, ((item.nick||item.user||"?")[0]||"?").toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, paddingTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: (["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#4ade80","#fb923c"][((item.nick||item.user||"").charCodeAt(0)||0)%6]||"#fe2c55") } }, "@", item.nick || item.user || ""), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#ccc", marginLeft: 5 } }, item.comment || ""))))))), tab === "batalla" && /* @__PURE__ */ React.createElement("div", { className: "ai" }, !battle ? /* @__PURE__ */ React.createElement("div", { style: __spreadProps(__spreadValues({}, C), { textAlign: "center", padding: "32px 16px" }) }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 32, marginBottom: 8 } }, "⚔️"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 6 } }, "Sin batalla activa"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#555" } }, "Los datos de batalla aparecerán aquí cuando estés en un VS LIVE")) : (() => {
-    const basePlayers = battle.players || battle.teams || battle.members || [];
-    const cleanPlayers = basePlayers.map((t, i) => __spreadProps(__spreadValues({}, t), { points: getBattlePoints(t), _idx: i })).filter((p) => p.hostName || p.hostNickname || p.userId || p.uniqueId);
-    // Separar en 2 lados para vista VS
-    const side0 = cleanPlayers.filter(p => p.teamIdx === 0 || (p.teamIdx === undefined && cleanPlayers.indexOf(p) % 2 === 0));
-    const side1 = cleanPlayers.filter(p => p.teamIdx === 1 || (p.teamIdx === undefined && cleanPlayers.indexOf(p) % 2 === 1));
-    const pts0 = side0.reduce((s,p) => s + (p.points||0), 0);
-    const pts1 = side1.reduce((s,p) => s + (p.points||0), 0);
-    const total = pts0 + pts1 || 1;
-    const pct0 = Math.round(pts0 / total * 100);
-    const pct1 = 100 - pct0;
-    const leader0 = side0[0] || {};
-    const leader1 = side1[0] || {};
-    const maxPoints = Math.max(1, ...cleanPlayers.map((p) => Number(p.points || 0)));
-    const renderPlayer = (player, idx) => {
-      const keyId = safeLc(player.userId || player.hostName || player.uniqueId || idx);
-      const isOwner = keyId === safeLc(battle.ownerUsername);
-      const accent = idx % 2 === 0 ? "#fe2c55" : "#25f4ee";
-      const pct = player.points > 0 ? Math.max(6, Math.round(player.points / maxPoints * 100)) : 0;
-      return /* @__PURE__ */ React.createElement("div", { key: `${keyId}_${idx}`, style: { background: "#12121e", border: `1px solid ${isOwner ? "rgba(254,44,85,.28)" : "#1e1e2e"}`, borderRadius: 14, padding: 12, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 8 } }, /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: accent, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" } }, "@", player.hostNickname || player.hostName || player.uniqueId || "Jugador"), isOwner && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: "#fe2c55", background: "rgba(254,44,85,.12)", padding: "1px 5px", borderRadius: 999 } }, "TÚ")), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#666", marginTop: 2 } }, "Puntaje individual en tiempo real")), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 20, fontWeight: 900, color: "#fff", lineHeight: 1 } }, Number(player.points || 0).toLocaleString()), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#777", marginTop: 2 } }, pct, "%"))), /* @__PURE__ */ React.createElement("div", { style: { height: 7, background: "#1e1e2e", borderRadius: 999, overflow: "hidden" } }, /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: `${pct}%`, background: isOwner ? "linear-gradient(90deg,#fe2c55,#ff6b81)" : `linear-gradient(90deg,${accent},${accent}bb)`, borderRadius: 999, transition: "width .25s ease" } })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 9, color: "#666" } }, /* @__PURE__ */ React.createElement("span", null, "Jugador individual"), /* @__PURE__ */ React.createElement("span", null, (player.userId || player.uniqueId) ? `ID: ${player.userId || player.uniqueId}` : "")));
-    };
-    // ─── Vista estilo batalla TikTok ───
-    return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } },
-      // ── BOTÓN REFRESH ──
-      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end" } },
-        /* @__PURE__ */ React.createElement("button", {
-          onClick: refreshBattle,
-          style: { background: "rgba(37,244,238,.08)", border: "1px solid rgba(37,244,238,.25)", borderRadius: 8, padding: "6px 14px", color: "#25f4ee", fontSize: 10, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }
-        }, "\u21BB Actualizar")
-      ),
-      // ── HEADER VS ──
-      /* @__PURE__ */ React.createElement("div", { style: { background: "#12121e", border: "1px solid #1e1e2e", borderRadius: 14, padding: "14px 14px 10px" } },
-        /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-          // LADO IZQUIERDO
-          /* @__PURE__ */ React.createElement("div", { style: { flex: 1, textAlign: "left" } },
-            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#fe2c55", letterSpacing: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-              "@", (leader0.hostNickname || leader0.hostName || "Equipo 1")
-            ),
-            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#fe2c55", lineHeight: 1.1 } }, pts0.toLocaleString()),
-            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#777" } }, "puntos")
-          ),
-          // VS BADGE
-          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 4 } },
-            /* @__PURE__ */ React.createElement("div", { style: { background: "#1e1e2e", border: "1px solid #252535", borderRadius: 8, padding: "4px 8px", fontSize: 10, fontWeight: 900, color: "#aaa" } }, "VS"),
-            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: pts0 > pts1 ? "#fe2c55" : pts1 > pts0 ? "#25f4ee" : "#555" } },
-              pts0 > pts1 ? "⚡" : pts1 > pts0 ? "⚡" : "="
-            )
-          ),
-          // LADO DERECHO
-          /* @__PURE__ */ React.createElement("div", { style: { flex: 1, textAlign: "right" } },
-            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#25f4ee", letterSpacing: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-              "@", (leader1.hostNickname || leader1.hostName || "Equipo 2")
-            ),
-            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#25f4ee", lineHeight: 1.1 } }, pts1.toLocaleString()),
-            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#777" } }, "puntos")
-          )
-        ),
-        // BARRA DE PROGRESO
-        /* @__PURE__ */ React.createElement("div", { style: { marginTop: 10 } },
-          /* @__PURE__ */ React.createElement("div", { style: { height: 8, borderRadius: 999, overflow: "hidden", display: "flex", background: "#1e1e2e" } },
-            /* @__PURE__ */ React.createElement("div", { style: { width: pct0 + "%", background: "linear-gradient(90deg,#fe2c55,#ff6b81)", transition: "width .4s ease" } }),
-            /* @__PURE__ */ React.createElement("div", { style: { flex: 1, background: "linear-gradient(90deg,#25f4ee,#00c8c8)" } })
-          ),
-          /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginTop: 4, fontSize: 9, color: "#666" } },
-            /* @__PURE__ */ React.createElement("span", { style: { color: "#fe2c55" } }, pct0, "%"),
-            /* @__PURE__ */ React.createElement("span", null, (pts0 + pts1).toLocaleString(), " total"),
-            /* @__PURE__ */ React.createElement("span", { style: { color: "#25f4ee" } }, pct1, "%")
-          )
-        ),
-        // QUIÉN VA GANANDO
-        pts0 !== pts1 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 6, fontSize: 10, color: "#555" } },
-          /* @__PURE__ */ React.createElement("span", { style: { color: pts0 > pts1 ? "#fe2c55" : "#25f4ee", fontWeight: 700 } },
-            "@", (() => {
-              const src = pts0 > pts1 ? leader0 : leader1;
-              return src.hostNickname || src.hostName || "?";
-            })()
-          ),
-          " va ganando por ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#fff" } }, Math.abs(pts0 - pts1).toLocaleString())
+  } }, "+ Agregar")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, spotifyCustomUsers.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { background: "#1a1a28", border: "1px solid #252535", borderRadius: 20, padding: "4px 10px", color: "#aaa", fontSize: 11, display: "flex", alignItems: "center", gap: 6 } }, u, /* @__PURE__ */ React.createElement("span", { style: { cursor: "pointer", color: "#fe2c55" }, onClick: () => setSpotifyCustomUsers((p) => p.filter((_, j) => j !== i)) }, "\xD7"))))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: "#aaa", fontWeight: 600 } }, "Permitir saltar canci\xF3n"), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#444", marginTop: 2 } }, "Habilita un comando para pasar a la siguiente")), /* @__PURE__ */ React.createElement(Toggle, { on: spotifyAllowSkip, onChange: () => setSpotifyAllowSkip(!spotifyAllowSkip), size: "sm", color: "#1DB954" })), spotifyAllowSkip && /* @__PURE__ */ React.createElement("div", { style: { marginTop: 12 } }, /* @__PURE__ */ React.createElement("label", { style: lbl }, "\xBFQui\xE9n puede saltar canciones?"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 7, marginTop: 8 } }, SPOTIFY_PERMS.map((p) => /* @__PURE__ */ React.createElement("button", { key: p, className: `perm-chip${spotifySkipPerm === p ? " sel" : ""}`, onClick: () => setSpotifySkipPerm(p) }, p))))), /* @__PURE__ */ React.createElement(SecHdr, { title: " COLA DE CANCIONES" }), /* @__PURE__ */ React.createElement("div", { style: C }, spotifyQueue.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", textAlign: "center", padding: "24px 0", fontSize: 12 } }, "Cola vac\xEDa \xB7 Los espectadores usan ", /* @__PURE__ */ React.createElement("span", { style: { color: "#1DB954" } }, spotifyCmd, " [canci\xF3n]"), " en el chat") : spotifyQueue.map((s, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "sq-item" }, /* @__PURE__ */ React.createElement("span", { style: { color: "#555", minWidth: 20, fontSize: 11 } }, i + 1, "."), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, s.title), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555", marginTop: 1 } }, "@", s.user)), /* @__PURE__ */ React.createElement("button", { onClick: () => setSpotifyQueue((p) => p.filter((_, j) => j !== i)), style: { background: "transparent", border: "none", color: "#444", cursor: "pointer", fontSize: 14 } }, "\u2715"))), /* @__PURE__ */ React.createElement("button", { onClick: () => setSpotifyQueue((p) => [...p, { title: "Never Gonna Give You Up - Rick Astley", user: "viewer123" }]), style: { width: "100%", background: "rgba(29,185,84,.08)", border: "1px dashed rgba(29,185,84,.2)", borderRadius: 8, padding: "8px", color: "#1DB954", fontSize: 11, cursor: "pointer", marginTop: 8 } }, "+ Agregar canci\xF3n de prueba")))), tab === "ranking" && /* @__PURE__ */ React.createElement("div", { className: "ai" }, /* @__PURE__ */ React.createElement("div", { style: C }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fff", marginBottom: 12 } }, " Top Diamantes"), tapR.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin datos a\xFAn..." : "Conecta el LIVE") : tapR.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: u.user, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: i === 0 ? "#fbbf24" : i === 1 ? "#9ca3af" : i === 2 ? "#cd7c2f" : "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, flexShrink: 0 } }, i + 1), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "@", u.nickname || u.user), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#25f4ee", fontWeight: 700 } }, " ", u.diamonds), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, color: "#555" } }, "\xD7", u.gifts)))), /* @__PURE__ */ React.createElement("div", { style: C }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fff", marginBottom: 12 } }, "\u2764\uFE0F Top Likes"), likeR.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin datos a\xFAn..." : "Conecta el LIVE") : likeR.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: u.user, style: { display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: i === 0 ? "#fbbf24" : i === 1 ? "#9ca3af" : i === 2 ? "#cd7c2f" : "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, flexShrink: 0 } }, i + 1), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, fontWeight: 600, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "@", u.nickname || u.user), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#fe2c55", fontWeight: 700 } }, "\u2764\uFE0F ", u.count))))), tab === "chat" && /* @__PURE__ */ React.createElement("div", { className: "ai" }, /* @__PURE__ */ React.createElement("div", { style: C }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 } }, /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 700, color: "#fff" } }, "Chat en vivo"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 9, color: "#555" } }, log.filter((l) => l.t === "msg").length, " msgs"), /* @__PURE__ */ React.createElement("button", { onClick: () => setLog([]), style: { background: "transparent", border: "1px solid #252535", borderRadius: 6, padding: "4px 10px", color: "#555", fontSize: 10, cursor: "pointer" } }, "Limpiar"))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 3, maxHeight: "65vh", overflowY: "auto" } }, log.filter((l) => l.t === "msg").length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "20px 0" } }, conn ? "Sin mensajes a\xFAn..." : "Conecta el LIVE") : log.filter((l) => l.t === "msg").map((item, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,.02)", borderLeft: "2px solid " + (["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#4ade80","#fb923c"][((item.nick||item.user||"").charCodeAt(0)||0)%6]||"#fe2c55") + "55" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 26, height: 26, borderRadius: "50%", background: (["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#4ade80","#fb923c"][((item.nick||item.user||"").charCodeAt(0)||0)%6]||"#fe2c55") + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: (["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#4ade80","#fb923c"][((item.nick||item.user||"").charCodeAt(0)||0)%6]||"#fe2c55"), flexShrink: 0 } }, ((item.nick||item.user||"?")[0]||"?").toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, paddingTop: 2 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 700, color: (["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#4ade80","#fb923c"][((item.nick||item.user||"").charCodeAt(0)||0)%6]||"#fe2c55") } }, "@", item.nick || item.user || ""), /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, color: "#ccc", marginLeft: 5 } }, item.comment || ""))))))), tab === "batalla" && /* @__PURE__ */ React.createElement(React.Fragment, null,
+  /* Botón actualizar manual */
+  /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 8 } },
+    /* @__PURE__ */ React.createElement("button", {
+      onClick: refreshBattle,
+      style: { background: "rgba(37,244,238,.1)", border: "1px solid rgba(37,244,238,.3)", borderRadius: 8, padding: "6px 16px", color: "#25f4ee", fontSize: 11, fontWeight: 700, cursor: "pointer", letterSpacing: 0.5 }
+    }, "\u21BB Actualizar")
+  ),
+  !battle
+    ? /* @__PURE__ */ React.createElement("div", { style: { ...C, textAlign: "center", padding: "40px 16px" } },
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 40, marginBottom: 10 } }, "\u2694\uFE0F"),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14, fontWeight: 800, color: "#fff", marginBottom: 6 } }, "Sin batalla activa"),
+        /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, color: "#555", lineHeight: 1.6 } },
+          "Los datos aparecen automáticamente", /* @__PURE__ */ React.createElement("br", null),
+          "cuando inicies un VS LIVE."
         )
-      ),
-      // ── PARTICIPANTES (todos) ──
-      cleanPlayers.length > 0 && /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 } },
-        cleanPlayers.map((player, idx) => {
-          const isLeft = player.teamIdx === 0 || (player.teamIdx === undefined && idx % 2 === 0);
-          const accent = isLeft ? "#fe2c55" : "#25f4ee";
-          const isOwner = safeLc(player.userId || player.hostName) === safeLc(battle.ownerUsername);
-          const pct = total > 0 ? Math.round((player.points||0) / total * 100) : 0;
+      )
+    : (() => {
+        // ── Procesar jugadores ──────────────────────────────────────────
+        const rawPlayers = battle.players || battle.teams || [];
+        const players = rawPlayers.map((p, i) => ({
+          ...p,
+          points: getBattlePoints(p),
+          _i: i,
+          // teamIdx: 0 = equipo A (rojo), 1 = equipo B (cyan)
+          side: (p.teamIdx === 0 || p.teamIdx === 1) ? p.teamIdx : (i % 2),
+        }));
 
-          // hostName ya viene resuelto desde normalizeBattlePayload
-          const displayName = player.hostNickname || player.hostName || "Jugador";
+        const totalPts = players.reduce((s, p) => s + p.points, 0);
+        const teamA    = players.filter(p => p.side === 0);
+        const teamB    = players.filter(p => p.side === 1);
+        const ptsA     = teamA.reduce((s, p) => s + p.points, 0);
+        const ptsB     = teamB.reduce((s, p) => s + p.points, 0);
+        const total    = ptsA + ptsB || 1;
+        const pctA     = Math.round(ptsA / total * 100);
+        const pctB     = 100 - pctA;
+        const leaderA  = teamA[0] || {};
+        const leaderB  = teamB[0] || {};
+        const isBattle4 = players.length >= 3;
 
-          return /* @__PURE__ */ React.createElement("div", { key: idx, style: {
-            background: "#12121e",
-            border: "1px solid " + (isOwner ? "rgba(254,44,85,.4)" : (isLeft ? "rgba(254,44,85,.15)" : "rgba(37,244,238,.15)")),
-            borderRadius: 12,
-            padding: "10px 10px 8px"
-          }},
-            // Nombre + puntos
-            /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 } },
-              /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } },
-                /* @__PURE__ */ React.createElement("div", { style: {
-                  fontSize: 11, fontWeight: 800, color: accent,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
-                }}, "@", displayName),
-                isOwner && /* @__PURE__ */ React.createElement("span", { style: {
-                  fontSize: 8, color: "#fe2c55", background: "rgba(254,44,85,.12)",
-                  padding: "1px 5px", borderRadius: 999
-                }}, "TÚ")
-              ),
-              /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0, marginLeft: 6 } },
-                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, fontWeight: 900, color: "#fff", lineHeight: 1 } },
-                  (player.points||0).toLocaleString()
+        // Nombre limpio
+        const cleanName = (p) => p.hostNickname || p.hostName || "?";
+
+        // Barra de progreso individual relativa al total
+        const barPct = (pts) => totalPts > 0 ? Math.max(pts > 0 ? 3 : 0, Math.round(pts / totalPts * 100)) : 0;
+
+        // Color por equipo
+        const colorA = "#fe2c55";
+        const colorB = "#25f4ee";
+
+        return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } },
+
+          // ── MARCADOR PRINCIPAL ──────────────────────────────────────
+          /* @__PURE__ */ React.createElement("div", { style: { background: "linear-gradient(135deg,#12121e,#0d0d18)", border: "1px solid #1e1e2e", borderRadius: 16, padding: "16px 14px 12px" } },
+
+            // Nombres + puntos equipo
+            /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 } },
+
+              // Lado A
+              /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: colorA, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 } },
+                  "@", cleanName(leaderA)
                 ),
-                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#666", marginTop: 1 } }, pct, "%")
+                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 28, fontWeight: 900, color: colorA, lineHeight: 1, fontFamily: "'Syne',sans-serif" } },
+                  ptsA.toLocaleString()
+                ),
+                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#666", marginTop: 2 } }, "puntos")
+              ),
+
+              // VS badge
+              /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 3, flexShrink: 0 } },
+                /* @__PURE__ */ React.createElement("div", { style: { background: "#1a1a2e", border: "1px solid #252540", borderRadius: 8, padding: "5px 9px", fontSize: 11, fontWeight: 900, color: "#aaa" } }, "VS"),
+                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 14 } },
+                  ptsA > ptsB ? "\u26a1" : ptsB > ptsA ? "\u26a1" : "="
+                )
+              ),
+
+              // Lado B
+              /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0, textAlign: "right" } },
+                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: colorB, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 2 } },
+                  "@", cleanName(leaderB)
+                ),
+                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 28, fontWeight: 900, color: colorB, lineHeight: 1, fontFamily: "'Syne',sans-serif" } },
+                  ptsB.toLocaleString()
+                ),
+                /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#666", marginTop: 2 } }, "puntos")
               )
             ),
-            // Barra individual
-            /* @__PURE__ */ React.createElement("div", { style: { height: 5, background: "#1e1e2e", borderRadius: 999, overflow: "hidden", marginTop: 4 } },
-              /* @__PURE__ */ React.createElement("div", { style: {
-                height: "100%",
-                width: pct + "%",
-                background: isLeft
-                  ? "linear-gradient(90deg,#fe2c55,#ff6b81)"
-                  : "linear-gradient(90deg,#25f4ee,#00d4cc)",
-                borderRadius: 999,
-                transition: "width .35s ease"
-              }})
+
+            // Barra progreso
+            /* @__PURE__ */ React.createElement("div", { style: { height: 10, borderRadius: 999, overflow: "hidden", display: "flex", background: "#1e1e2e", marginBottom: 6 } },
+              /* @__PURE__ */ React.createElement("div", { style: { width: pctA + "%", background: "linear-gradient(90deg,#fe2c55,#ff6b81)", transition: "width .5s ease" } }),
+              /* @__PURE__ */ React.createElement("div", { style: { flex: 1, background: "linear-gradient(90deg,#25f4ee,#00c8c8)" } })
             ),
-            // Label diamantes
-            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", marginTop: 4 } },
-              "puntos · equipo ", isLeft ? "A" : "B"
+            /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", fontSize: 9, color: "#666" } },
+              /* @__PURE__ */ React.createElement("span", { style: { color: colorA, fontWeight: 700 } }, pctA, "%"),
+              /* @__PURE__ */ React.createElement("span", null, total === 1 ? "0 total" : (ptsA + ptsB).toLocaleString() + " total"),
+              /* @__PURE__ */ React.createElement("span", { style: { color: colorB, fontWeight: 700 } }, pctB, "%")
+            ),
+
+            // Quien va ganando
+            ptsA !== ptsB && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 8, fontSize: 11 } },
+              /* @__PURE__ */ React.createElement("span", { style: { color: ptsA > ptsB ? colorA : colorB, fontWeight: 800 } },
+                "@", cleanName(ptsA > ptsB ? leaderA : leaderB)
+              ),
+              /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, " va ganando por "),
+              /* @__PURE__ */ React.createElement("strong", { style: { color: "#fff" } }, Math.abs(ptsA - ptsB).toLocaleString())
             )
-          );
-        })
-      )
-    );
-  })()),
-  tab === "espect" && /* @__PURE__ */ React.createElement("div", { className: "ai" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, ["historial", "activos"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, className: `mode-btn${vTab === t ? " act" : ""}`, onClick: () => setVTab(t) }, t === "historial" ? " Historial" : "\uFE0F Activos ahora"))), /* @__PURE__ */ React.createElement("div", { style: C }, vTab === "historial" && (viewR.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin entradas a\xFAn..." : "Conecta el LIVE") : viewR.map((u, i) => {
+          ),
+
+          // ── JUGADORES INDIVIDUALES ──────────────────────────────────
+          /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } },
+            players.map((player, idx) => {
+              const color   = player.side === 0 ? colorA : colorB;
+              const isOwner = safeLc(player.userId || player.hostName) === safeLc(battle.ownerUsername);
+              const bp      = barPct(player.points);
+              const indPct  = totalPts > 0 && player.points > 0 ? Math.round(player.points / totalPts * 100) : 0;
+              const name    = cleanName(player);
+
+              return /* @__PURE__ */ React.createElement("div", {
+                key: player.userId || player.hostName || idx,
+                style: {
+                  background: "#0e0e1a",
+                  border: "1px solid " + (isOwner ? "rgba(254,44,85,.45)" : (player.side === 0 ? "rgba(254,44,85,.18)" : "rgba(37,244,238,.18)")),
+                  borderRadius: 12,
+                  padding: "10px 10px 8px",
+                  position: "relative",
+                  overflow: "hidden"
+                }
+              },
+                // Fondo sutil del color del equipo
+                /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: 0, left: 0, right: 0, height: 2, background: color, opacity: 0.6 } }),
+
+                // Fila nombre + pts
+                /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6, marginBottom: 6 } },
+                  /* @__PURE__ */ React.createElement("div", { style: { minWidth: 0, flex: 1 } },
+                    /* @__PURE__ */ React.createElement("div", { style: { fontSize: 11, fontWeight: 800, color: color, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
+                      "@", name
+                    ),
+                    isOwner && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: colorA, background: "rgba(254,44,85,.12)", padding: "1px 5px", borderRadius: 999, marginTop: 2, display: "inline-block" } }, "TÚ"),
+                    /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#555", marginTop: 1 } },
+                      player.side === 0 ? "Equipo A" : "Equipo B"
+                    )
+                  ),
+                  /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } },
+                    /* @__PURE__ */ React.createElement("div", { style: { fontSize: 18, fontWeight: 900, color: "#fff", lineHeight: 1, fontFamily: "'Syne',sans-serif" } },
+                      player.points.toLocaleString()
+                    ),
+                    /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#666", marginTop: 1 } }, indPct, "%")
+                  )
+                ),
+
+                // Barra individual
+                /* @__PURE__ */ React.createElement("div", { style: { height: 5, background: "#1a1a2e", borderRadius: 999, overflow: "hidden" } },
+                  /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: bp + "%", background: player.side === 0 ? "linear-gradient(90deg,#fe2c55,#ff6b81)" : "linear-gradient(90deg,#25f4ee,#00d4cc)", borderRadius: 999, transition: "width .4s ease" } })
+                )
+              );
+            })
+          )
+        );
+      })()
+),
+tab === "espect" && /* @__PURE__ */ React.createElement("div", { className: "ai" }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, marginBottom: 10 } }, ["historial", "activos"].map((t) => /* @__PURE__ */ React.createElement("button", { key: t, className: `mode-btn${vTab === t ? " act" : ""}`, onClick: () => setVTab(t) }, t === "historial" ? " Historial" : "\uFE0F Activos ahora"))), /* @__PURE__ */ React.createElement("div", { style: C }, vTab === "historial" && (viewR.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin entradas a\xFAn..." : "Conecta el LIVE") : viewR.map((u, i) => {
     var _a2;
     return /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 22, height: 22, borderRadius: "50%", background: "#1e1e2e", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#555", flexShrink: 0 } }, (_a2 = (u.nickname || u.user)[0]) == null ? void 0 : _a2.toUpperCase()), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, color: "#fff" } }, "@", u.nickname || u.user), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555" } }, new Date(u.joinTime).toLocaleTimeString()));
   })), vTab === "activos" && (topViewers.length === 0 ? /* @__PURE__ */ React.createElement("div", { style: { color: "#444", fontSize: 11, textAlign: "center", padding: "16px 0" } }, conn ? "Sin espectadores activos..." : "Conecta el LIVE") : topViewers.map((u, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid #0f0f1a" } }, /* @__PURE__ */ React.createElement("div", { style: { width: 6, height: 6, borderRadius: "50%", background: "#25f4ee", flexShrink: 0 } }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, fontSize: 11, color: "#fff" } }, "@", u.nickname || u.user)))))))));

@@ -173,8 +173,12 @@ function extractTeams(data) {
       var uid      = host.uniqueId || host.displayId || String(army.hostUserId || "");
       var nn       = host.nickname || host.displayName || uid;
       var userId   = String(host.userId || host.id || army.hostUserId || "");
-      var hostName = (uid && !/^\d{8,}$/.test(uid)) ? uid : (userId || ("player_" + idx));
-      var hostNickname = nn || hostName;
+      // Intentar resolver ID numérico desde userMap ya poblado
+      var resolved = (uid && /^\d{8,}$/.test(uid) && userMap[uid]) ? userMap[uid]
+                   : (userId && userMap[userId]) ? userMap[userId]
+                   : null;
+      var hostName     = resolved?.uniqueId || (uid && !/^\d{8,}$/.test(uid) ? uid : (userId || ("player_" + idx)));
+      var hostNickname = resolved?.nickname  || nn || hostName;
 
       // Puntos directos del army
       var points = extractPoints(army);
@@ -383,6 +387,7 @@ async function startTikTokConnection(username, sessionId) {
     const payload = { status: 1, teams, ownerUsername, timestamp: Date.now() };
     if (sessions[username]) sessions[username].lastBattle = payload;
     io.emit("battle", payload);
+    io.emit("battle_internal", payload);
 
     const cb = emitUpdatedBattle(username, ownerUsername, teams, 1);
     teams.forEach(t => {
@@ -404,6 +409,41 @@ async function startTikTokConnection(username, sessionId) {
 
   return tiktok;
 }
+
+// ── SSE: stream de batalla en tiempo real ─────────────────────────────────
+app.get("/battle-stream/:username", (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.flushHeaders();
+
+  const username = req.params.username;
+
+  const sendData = (data) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  // Enviar estado actual inmediatamente
+  const s = getSessionRecord(username);
+  sendData(s?.lastBattle || { status: 0, teams: [], timestamp: Date.now() });
+
+  // Suscribirse a actualizaciones via socket interno
+  const onBattle = (payload) => {
+    const own = getSessionRecord(username);
+    if (!own) return;
+    if (payload.ownerUsername === own.ownerUsername) sendData(payload);
+  };
+  io.on("battle_internal", onBattle);
+
+  // Ping cada 15s para mantener conexión viva
+  const ping = setInterval(() => res.write(": ping\n\n"), 15000);
+
+  req.on("close", () => {
+    clearInterval(ping);
+    io.off("battle_internal", onBattle);
+  });
+});
 
 app.get("/battle/:username", (req, res) => {
   const s = getSessionRecord(req.params.username);
