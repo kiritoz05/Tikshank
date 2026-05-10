@@ -214,7 +214,8 @@ function speakNative(text, voiceId, vol) {
 
       const finishAll = () => {
         if (!globalDone) { globalDone = true; res(); }
-      };
+        } catch(e) { console.warn("refreshBattle error", e); }
+  };
 
       const speakChunk = () => {
         if (chunkIdx >= chunks.length || globalDone) { finishAll(); return; }
@@ -1427,7 +1428,7 @@ function App() {
     }
   }, []);
   useEffect(() => {
-    const sock = io(SERVER, { transports: ["websocket"], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 1500, reconnectionDelayMax: 8e3, timeout: 12e3, auth: { token: _authToken } });
+    const sock = io(SERVER, { transports: ["websocket","polling"], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 1500, reconnectionDelayMax: 8e3, timeout: 12e3, auth: { token: _authToken } });
     sock.on("connect", () => console.log("Socket conectado:", sock.id));
     sock.on("connect_error", (e) => console.warn("Socket error:", e.message));
     sock.on("event", (d) => {
@@ -1495,10 +1496,13 @@ function App() {
       });
     });
     sock.on("battle", (d) => {
-      if (!d || d.status === 0 || !d.teams || d.teams.length === 0) {
-        setBattle(null); // batalla terminada
+      if (!d || d.status === 0) {
+        setBattle(null);
       } else {
-        setBattle(normalizeBattlePayload(d, tUser || ld("tuser", "") || ""));
+        const normalized = normalizeBattlePayload(d, tUser || ld("tuser", "") || "");
+        if (normalized && ((normalized.players && normalized.players.length) || (normalized.teams && normalized.teams.length))) {
+          setBattle(normalized);
+        }
       }
     });
     sock.on("tiktok_disconnected", (d) => {

@@ -35,15 +35,17 @@ if (!process.env.EL_KEY)         console.warn("⚠️  EL_KEY no configurado —
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
-  cors: { origin: ALLOWED_ORIGIN, methods: ["GET","POST"] },
-  pingInterval: 10000,
-  pingTimeout:  5000,
+  cors: { origin: ALLOWED_ORIGIN === "*" ? true : ALLOWED_ORIGIN, methods: ["GET","POST"], credentials: true },
+  pingInterval: 25000,
+  pingTimeout:  20000,
+  upgradeTimeout: 10000,
+  allowEIO3: true,
   connectTimeout: 15000,
   maxHttpBufferSize: 1e5, // 100KB max por mensaje
 });
 
 // ── Middlewares de seguridad ──────────────────────────────────────────────────
-app.use(cors({ origin: ALLOWED_ORIGIN }));
+app.use(cors({ origin: ALLOWED_ORIGIN === "*" ? true : ALLOWED_ORIGIN, credentials: true }));
 app.use(express.json({ limit: "20kb" })); // Límite de payload
 
 // Rate limiting — previene abuso de endpoints
@@ -437,7 +439,7 @@ async function startTikTokConnection(username, sessionId, ownerUsername) {
   const opts = {
     processInitialData: false,
     enableExtendedGiftInfo: true,
-    enableWebsocketUpgrade: true,
+    enableWebsocketUpgrade: false,
     requestPollingIntervalMs: 2000,
     ...(sessionId && sessionId.length > 5 ? { sessionId } : {}),
   };
@@ -556,7 +558,8 @@ app.get("/battle-stream/:username", authMiddleware, (req, res) => {
   res.setHeader("Content-Type","text/event-stream");
   res.setHeader("Cache-Control","no-cache");
   res.setHeader("Connection","keep-alive");
-  res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+  res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN === "*" ? "*" : ALLOWED_ORIGIN);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
   res.flushHeaders();
 
   const username = req.params.username;
@@ -605,6 +608,13 @@ app.post("/disconnect", authMiddleware, (req, res) => {
 // ── Socket.io events ──────────────────────────────────────────────────────────
 io.on("connection", (socket) => {
   console.log(`Socket conectado: user#${socket.user?.id}`);
+  // Send current state immediately on connect
+  const activeSessions = Object.entries(sessions).filter(([,s]) => s?.tiktok);
+  if (activeSessions.length > 0) {
+    const [username, s] = activeSessions[0];
+    socket.emit("tiktok_status", { connected: true, username });
+    if (s.lastBattle) socket.emit("battle", s.lastBattle);
+  }
   socket.on("disconnect", () => console.log(`Socket desconectado: user#${socket.user?.id}`));
 });
 
