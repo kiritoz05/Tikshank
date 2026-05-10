@@ -48,18 +48,21 @@ app.use(express.json({ limit: "20kb" })); // Límite de payload
 
 // Rate limiting — previene abuso de endpoints
 const limiter = rateLimit({
-  windowMs: 60 * 1000,  // 1 minuto
+  windowMs: 60 * 1000,
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false },
   message: { error: "Demasiadas solicitudes, espera un momento" }
 });
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
+  windowMs: 15 * 60 * 1000,
   max: 10,
+  validate: { xForwardedForHeader: false },
   message: { error: "Demasiados intentos de login" }
 });
 
+app.set("trust proxy", 1);
 app.use(limiter);
 
 // Headers de seguridad básicos
