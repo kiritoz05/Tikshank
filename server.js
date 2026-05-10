@@ -19,7 +19,7 @@ app.use(express.json());
 
 const sessions = {};
 
-// ── Helper: fetch con https nativo (compatible Node 16+) ───────────────────────
+// ── Helper: fetch con https nativo ────────────────────────────────────────────
 function fetchUrl(url, opts = {}) {
   return new Promise((resolve, reject) => {
     const timeout = opts.timeout || 8000;
@@ -66,18 +66,11 @@ async function resolveUserId(numericId, emitCallback) {
 
   console.log(`[resolve] Buscando username para userId: ${numericId}`);
 
-  // Método 1: API pública de TikTok via https nativo
   try {
-    const res = await fetchUrl(
-      `https://www.tiktok.com/@id:${numericId}`,
-      { timeout: 8000 }
-    );
+    const res = await fetchUrl(`https://www.tiktok.com/@id:${numericId}`, { timeout: 8000 });
     if (res.ok) {
       const text = await res.text();
-      const patterns = [
-        /"uniqueId":"([^"]{2,50})"/,
-        /"unique_id":"([^"]{2,50})"/,
-      ];
+      const patterns = [/"uniqueId":"([^"]{2,50})"/, /"unique_id":"([^"]{2,50})"/];
       for (const pat of patterns) {
         const m = text.match(pat);
         if (m && m[1] && !/^\d+$/.test(m[1])) {
@@ -95,7 +88,6 @@ async function resolveUserId(numericId, emitCallback) {
     }
   } catch(e) { console.log("[resolve] Método web falló:", e.message); }
 
-  // Método 2: Intentar conectar brevemente al live del contrincante
   try {
     const conn = new WebcastPushConnection(numericId, {
       processInitialData: true,
@@ -145,16 +137,6 @@ function cleanSession(username) {
   }
 }
 
-// Normalizar participante
-function normalizeBattleUser(u) {
-  if (!u) return null;
-  const hostName     = u.uniqueId || u.displayId || u.userId || u.id || "?";
-  const hostNickname = u.nickname || u.displayName || u.name || hostName;
-  const points       = Number(u.battleScore || u.score || u.points || u.teamPoints || 0);
-  if (hostName === "?") return null;
-  return { hostName, hostNickname, points };
-}
-
 function resolveNameFromMap(userId) {
   if (!userId) return null;
   const key = String(userId);
@@ -165,57 +147,55 @@ function resolveNameFromMap(userId) {
   return null;
 }
 
-function extractName(u) {
-  if (!u) return { hostName: "", hostNickname: "", userId: "" };
-  const uid    = String(u.uniqueId || u.displayId || "");
-  const nn     = String(u.nickname || u.displayName || u.name || "");
-  const userId = String(u.userId   || u.id || "");
-  const hostName     = (uid && !/^\d{8,}$/.test(uid)) ? uid : (resolveNameFromMap(userId)?.uniqueId || userId || "?");
-  const hostNickname = nn || resolveNameFromMap(userId)?.nickname || uid || hostName;
-  return { hostName, hostNickname, userId };
+// ── Extrae puntos de un army/participant de TikTok ─────────────────────────
+function extractPoints(obj) {
+  if (!obj) return 0;
+  const fields = [
+    obj.points, obj.teamPoints, obj.score, obj.battleScore,
+    obj.point,  obj.totalScore, obj.totalPoints, obj.teamScore,
+    obj.armyScore, obj.matchScore, obj.groupScore, obj.displayScore,
+    obj.voteCount, obj.coinCount
+  ];
+  for (const v of fields) {
+    const n = Number(v);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
 }
 
-
+// ── Extrae teams del payload de batalla ────────────────────────────────────
 function extractTeams(data) {
   const armies = data.battleArmies || (data.linkMicBattleInfo && data.linkMicBattleInfo.battleArmies) || [];
 
   if (armies.length > 0) {
     return armies.map(function(army, idx) {
-      var host   = army.hostUser || {};
-      var uid    = host.uniqueId || host.displayId || String(army.hostUserId || "");
-      var nn     = host.nickname || host.displayName || uid;
-      var userId = String(host.userId || host.id || army.hostUserId || "");
-      var hostName     = (uid && !/^\d{8,}$/.test(uid)) ? uid : (userId || ("player_" + idx));
+      var host     = army.hostUser || {};
+      var uid      = host.uniqueId || host.displayId || String(army.hostUserId || "");
+      var nn       = host.nickname || host.displayName || uid;
+      var userId   = String(host.userId || host.id || army.hostUserId || "");
+      var hostName = (uid && !/^\d{8,}$/.test(uid)) ? uid : (userId || ("player_" + idx));
       var hostNickname = nn || hostName;
 
-      // Buscar puntos en TODOS los campos posibles
-      var points = 0;
-      var directFields = [
-        army.points, army.teamPoints, army.score, army.battleScore,
-        army.point,  army.totalScore, army.totalPoints, army.teamScore,
-        army.armyScore, army.matchScore, army.groupScore, army.displayScore
-      ];
-      for (var i = 0; i < directFields.length; i++) {
-        var n = Number(directFields[i]);
-        if (Number.isFinite(n) && n > 0) { points = n; break; }
-      }
+      // Puntos directos del army
+      var points = extractPoints(army);
+
       // Sumar participantes si no hay puntos directos
-      if (points === 0 && Array.isArray(army.participants)) {
+      if (points === 0 && Array.isArray(army.participants) && army.participants.length > 0) {
         points = army.participants.reduce(function(sum, p) {
-          var pf = [p.battleScore, p.score, p.points, p.teamPoints, p.groupScore, p.totalScore];
-          for (var j = 0; j < pf.length; j++) {
-            var pn = Number(pf[j]);
-            if (Number.isFinite(pn) && pn > 0) return sum + pn;
-          }
-          return sum;
+          return sum + extractPoints(p);
         }, 0);
+      }
+
+      // Intentar hostUser como último recurso
+      if (points === 0 && army.hostUser) {
+        points = extractPoints(army.hostUser);
       }
 
       var teamIdx = army.armyType !== undefined ? Number(army.armyType) % 2
                   : army.teamId  !== undefined ? Number(army.teamId)   % 2
                   : idx % 2;
 
-      return { hostName: hostName, hostNickname: hostNickname, userId: userId, points: points, teamIdx: teamIdx };
+      return { hostName, hostNickname, userId, points, teamIdx };
     }).filter(function(t) { return t.hostName && t.hostName !== "?"; });
   }
 
@@ -226,54 +206,13 @@ function extractTeams(data) {
       hostName:     u.uniqueId || u.displayId || String(u.userId || i),
       hostNickname: u.nickname || u.displayName || u.uniqueId || "",
       userId:       String(u.userId || u.id || ""),
-      points:       Number(u.battleScore || u.score || u.points || 0),
+      points:       extractPoints(u),
       teamIdx:      i % 2,
     };
   }).filter(function(t) { return t.hostName; });
 }
 
-function normalizeBattlePoints(u) {
-  if (!u) return 0;
-  // Buscar en TODOS los campos posibles donde TikTok puede poner los puntos
-  const fields = [
-    u.battleScore, u.score, u.points, u.teamPoints,
-    u.totalScore, u.totalPoints, u.point, u.groupScore,
-    u.armyScore, u.matchScore, u.coinCount, u.giftCount,
-    u.teamScore, u.displayScore, u.voteCount
-  ];
-  for (const v of fields) {
-    const n = Number(v);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return 0;
-}
-
-function getArmyPoints(army) {
-  if (!army) return 0;
-  // Buscar puntos del ejército en TODOS los campos posibles
-  const direct = [
-    army.points, army.teamPoints, army.score, army.battleScore,
-    army.point, army.totalScore, army.totalPoints, army.teamScore,
-    army.armyScore, army.matchScore, army.groupScore, army.displayScore
-  ];
-  for (const v of direct) {
-    const n = Number(v);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  // Sumar puntos de todos los participantes
-  if (Array.isArray(army.participants) && army.participants.length > 0) {
-    const sum = army.participants.reduce((acc, p) => acc + normalizeBattlePoints(p), 0);
-    if (sum > 0) return sum;
-  }
-  // Intentar hostUser
-  if (army.hostUser) {
-    const hp = normalizeBattlePoints(army.hostUser);
-    if (hp > 0) return hp;
-  }
-  return 0;
-}
-
-// Emitir batalla actualizada cuando se resuelva un ID
+// ── Emitir batalla actualizada cuando se resuelva un ID ───────────────────
 function emitUpdatedBattle(username, ownerUsername, lastTeams, status) {
   return function(resolvedUserId, uniqueId, nickname) {
     const updated = lastTeams.map(t => {
@@ -308,15 +247,53 @@ async function startTikTokConnection(username, sessionId) {
 
   const activeUsersMap = new Map();
 
+  // ── ACUMULADOR PERSISTENTE DE PUNTOS DE BATALLA ───────────────────────────
+  // Clave: userId o hostName del jugador
+  // Valor: máximo de puntos vistos (nunca baja, solo sube)
+  // Esto soluciona que TikTok a veces manda 0 aunque ya había puntos antes.
+  const peakPoints = {};  // { key: maxPoints }
+
+  function applyPeakPoints(teams) {
+    return teams.map(t => {
+      const key = t.userId || t.hostName;
+      const prev = peakPoints[key] || 0;
+      const cur  = t.points || 0;
+      const best = Math.max(prev, cur);
+      if (best > 0) peakPoints[key] = best;
+      return { ...t, points: best };
+    });
+  }
+
+  function resetPeakPoints() {
+    Object.keys(peakPoints).forEach(k => delete peakPoints[k]);
+  }
+
+  // ── EVENTO GIFT: Acumular diamantes al equipo del owner ───────────────────
+  tiktok.on("gift", (data) => {
+    registerUser(data);
+    if (data.giftType === 1 && !data.repeatEnd) return; // combo sin terminar
+    io.emit("event", { type:"gift", user:data.uniqueId, nickname:data.nickname||data.uniqueId, giftName:data.giftName||"", giftId:data.giftId||0, giftCount:data.repeatCount||1, diamondCount:data.diamondCount||0, timestamp:Date.now() });
+
+    // Si hay batalla activa, acumular diamantes recibidos como puntos del owner
+    const lastBattle = sessions[username]?.lastBattle;
+    if (!lastBattle) return;
+    const diamonds = Number(data.diamondCount || 0) * Number(data.repeatCount || 1);
+    if (diamonds <= 0) return;
+    const ownerKey = ownerUsername;
+    const prev = peakPoints[ownerKey] || 0;
+    peakPoints[ownerKey] = prev + diamonds;
+    console.log(`[gift→battle] +${diamonds} para ${ownerKey} → total=${peakPoints[ownerKey]}`);
+
+    // Re-emitir batalla con puntos actualizados
+    const updatedTeams = applyPeakPoints(lastBattle.teams);
+    const updated = { ...lastBattle, teams: updatedTeams, timestamp: Date.now() };
+    sessions[username].lastBattle = updated;
+    io.emit("battle", updated);
+  });
+
   tiktok.on("chat", (data) => {
     registerUser(data);
     io.emit("event", { type:"chat", user:data.uniqueId, nickname:data.nickname||data.uniqueId, comment:data.comment, timestamp:Date.now() });
-  });
-
-  tiktok.on("gift", (data) => {
-    registerUser(data);
-    if (data.giftType === 1 && !data.repeatEnd) return;
-    io.emit("event", { type:"gift", user:data.uniqueId, nickname:data.nickname||data.uniqueId, giftName:data.giftName||"", giftId:data.giftId||0, giftCount:data.repeatCount||1, diamondCount:data.diamondCount||0, timestamp:Date.now() });
   });
 
   tiktok.on("follow",    (data) => { registerUser(data); io.emit("event", { type:"follow",  user:data.uniqueId, nickname:data.nickname||data.uniqueId, timestamp:Date.now() }); });
@@ -341,12 +318,8 @@ async function startTikTokConnection(username, sessionId) {
         }
       });
     }
-    const allAccumulated = [...activeUsersMap.values()]
-      .sort((a,b) => (b.viewers||0) - (a.viewers||0));
-    io.emit("viewers", {
-      count: data.viewerCount || 0,
-      topViewers: allAccumulated,
-    });
+    const allAccumulated = [...activeUsersMap.values()].sort((a,b) => (b.viewers||0) - (a.viewers||0));
+    io.emit("viewers", { count: data.viewerCount || 0, topViewers: allAccumulated });
   });
 
   tiktok.on("member", (data) => {
@@ -356,24 +329,30 @@ async function startTikTokConnection(username, sessionId) {
     io.emit("member", { user, nickname, timestamp:Date.now() });
   });
 
-  // ── linkMicBattle ──────────────────────────────────────────────────────
+  // ── linkMicBattle: inicio/fin de batalla ─────────────────────────────────
   tiktok.on("linkMicBattle", (data) => {
     if (Array.isArray(data.battleUsers)) data.battleUsers.forEach(u => registerUser(u));
     console.log("[linkMicBattle] raw:", JSON.stringify(data).slice(0, 600));
 
-    const teams  = extractTeams(data);
-    const status = data.battleStatus || 1;
-    console.log("[linkMicBattle] players:", teams.length, JSON.stringify(teams));
+    const status = data.battleStatus !== undefined ? Number(data.battleStatus) : 1;
 
-    const battlePayload = { status, teams, ownerUsername, timestamp: Date.now() };
-    if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : battlePayload;
-    io.emit("battle", battlePayload);
     if (status === 0) {
-      // Limpiar puntos acumulados al terminar la batalla
-      Object.keys(battleGiftPoints).forEach(k => delete battleGiftPoints[k]);
+      // Batalla terminada
+      console.log("[linkMicBattle] Batalla TERMINADA, limpiando puntos acumulados");
+      resetPeakPoints();
+      if (sessions[username]) sessions[username].lastBattle = null;
+      io.emit("battle", { status: 0, teams: [], ownerUsername, timestamp: Date.now() });
+      return;
     }
 
-    if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : { status, teams, ownerUsername, timestamp: Date.now() };
+    const rawTeams = extractTeams(data);
+    const teams    = applyPeakPoints(rawTeams);
+    console.log("[linkMicBattle] players:", teams.length, JSON.stringify(teams));
+
+    const payload = { status, teams, ownerUsername, timestamp: Date.now() };
+    if (sessions[username]) sessions[username].lastBattle = payload;
+    io.emit("battle", payload);
+
     const cb = emitUpdatedBattle(username, ownerUsername, teams, status);
     teams.forEach(t => {
       if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
@@ -381,74 +360,30 @@ async function startTikTokConnection(username, sessionId) {
     });
   });
 
-  // ── Acumulador de puntos por regalos durante batalla ──────────────────
-  // TikTok a veces no manda los puntos en linkMicArmies, así que los
-  // acumulamos manualmente a partir de los regalos recibidos.
-  // key: hostName (userId o uniqueId del streamer del equipo)
-  const battleGiftPoints = {};  // { userId/uniqueId: totalDiamonds }
-
-  tiktok.on("gift", (giftData) => {
-    // Solo acumular si hay batalla activa
-    if (!sessions[username]?.lastBattle) return;
-    registerUser(giftData);
-    if (giftData.giftType === 1 && !giftData.repeatEnd) return; // combo sin terminar
-    const diamonds = Number(giftData.diamondCount || 0) * Number(giftData.repeatCount || 1);
-    if (diamonds <= 0) return;
-    // Sumar al equipo del owner (el streamer que recibe el regalo es el owner)
-    const ownerKey = ownerUsername;
-    battleGiftPoints[ownerKey] = (battleGiftPoints[ownerKey] || 0) + diamonds;
-    console.log(`[gift-battle] +${diamonds} para ${ownerKey} → total=${battleGiftPoints[ownerKey]}`);
-  });
-
-  // ── linkMicArmies ──────────────────────────────────────────────────────
-  let lastTeams  = [];
-  let lastStatus = 1;
-
+  // ── linkMicArmies: actualización de puntos en tiempo real ─────────────────
   tiktok.on("linkMicArmies", (data) => {
-    console.log("[linkMicArmies] RAW FULL:", JSON.stringify(data).slice(0, 8000));
-    // Log específico de puntos para debug
+    console.log("[linkMicArmies] RAW:", JSON.stringify(data).slice(0, 3000));
+
     if (Array.isArray(data.battleArmies)) {
       data.battleArmies.forEach((army, i) => {
-        const pts = getArmyPoints(army);
-        console.log(`[army ${i} POINTS] getArmyPoints=${pts} raw={points:${army.points},teamPoints:${army.teamPoints},score:${army.score},battleScore:${army.battleScore},armyScore:${army.armyScore}}`);
-        (army.participants||[]).slice(0,2).forEach((p,j) => {
-          console.log(`  [participant ${j}] bs=${p.battleScore} s=${p.score} pts=${p.points} tp=${p.teamPoints} gs=${p.groupScore}`);
-        });
-      });
-    }
-    if (Array.isArray(data.battleArmies)) {
-      data.battleArmies.forEach((army, i) => {
-        console.log(`[army ${i}] hostUserId=${army.hostUserId} armyType=${army.armyType} teamId=${army.teamId} points=${army.points||army.teamPoints||army.score||0}`);
-        if (army.hostUser) console.log(`[army ${i}] hostUser: uid=${army.hostUser.uniqueId} nn=${army.hostUser.nickname} id=${army.hostUser.userId||army.hostUser.id}`);
-        else console.log(`[army ${i}] hostUser: (vacío)`);
-        const parts = (army.participants||[]).slice(0,3).map(p=>({uid:p.uniqueId,nn:p.nickname,id:p.userId||p.id,pts:p.battleScore||p.score||p.points||0}));
-        console.log(`[army ${i}] participants[0..2]:`, JSON.stringify(parts));
+        const pts = extractPoints(army);
+        const participantPts = (army.participants||[]).reduce((s,p) => s + extractPoints(p), 0);
+        console.log(`[army ${i}] hostUserId=${army.hostUserId} uid=${army.hostUser?.uniqueId} pts=${pts} participantSum=${participantPts}`);
       });
     }
 
-    let teams = extractTeams(data);
-    console.log(`[linkMicArmies] individual players=${teams.length}`);
-    if (teams.length === 0) return;
+    const rawTeams = extractTeams(data);
+    if (rawTeams.length === 0) return;
 
-    // Fallback: si los puntos vienen en 0, usar los acumulados por regalos
-    const totalGiftPts = Object.values(battleGiftPoints).reduce((s, v) => s + v, 0);
-    if (totalGiftPts > 0) {
-      teams = teams.map(t => {
-        if ((t.points || 0) > 0) return t; // ya tiene puntos reales
-        const key = t.userId || t.hostName;
-        const giftPts = battleGiftPoints[key] || battleGiftPoints[ownerUsername] || 0;
-        return { ...t, points: giftPts };
-      });
-    }
+    // Aplicar peak: nunca dejar que un jugador baje de sus puntos máximos vistos
+    const teams = applyPeakPoints(rawTeams);
 
-    lastTeams  = teams;
-    lastStatus = 1;
+    console.log(`[linkMicArmies] ${teams.length} jugadores con puntos:`, teams.map(t => `${t.hostName}=${t.points}`).join(", "));
 
-    const battlePayload = { status: 1, teams, ownerUsername, timestamp: Date.now() };
-    if (sessions[username]) sessions[username].lastBattle = battlePayload;
-    io.emit("battle", battlePayload);
+    const payload = { status: 1, teams, ownerUsername, timestamp: Date.now() };
+    if (sessions[username]) sessions[username].lastBattle = payload;
+    io.emit("battle", payload);
 
-    if (sessions[username]) sessions[username].lastBattle = { status: 1, teams, ownerUsername, timestamp: Date.now() };
     const cb = emitUpdatedBattle(username, ownerUsername, teams, 1);
     teams.forEach(t => {
       if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
