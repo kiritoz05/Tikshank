@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>TikPanel — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#fff;font-family:'DM Sans',sans-serif;min-height:100vh}
+input,select,button,textarea{font-family:'DM Sans',sans-serif}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#0a0a0f}::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:2px}
+
+/* ── Animations ── */
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes popIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai{animation:fadeIn .22s ease forwards}
+
+/* ── Layout ── */
+.layout{display:flex;min-height:100vh}
+.sidebar{width:210px;background:#0d0d18;border-right:1px solid #1a1a28;display:flex;flex-direction:column;padding:13px 10px;position:fixed;top:0;bottom:0;left:0;z-index:50}
+.main{flex:1;margin-left:210px;display:flex;flex-direction:column;min-height:100vh}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:9px 16px;border-bottom:1px solid #1a1a28;background:#0a0a0f;position:sticky;top:0;z-index:30}
+.content{flex:1;padding:16px;overflow-y:auto}
+
+/* ── Logo ── */
+.logo{display:flex;align-items:center;gap:7px;margin-bottom:14px;padding-left:2px}
+.logo-icon{width:27px;height:27px;border-radius:7px;background:linear-gradient(135deg,#fe2c55,#25f4ee);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:900;font-size:13px}
+.logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;letter-spacing:-0.5px}
+.logo-text span{color:#fe2c55}
+
+/* ── Nav ── */
+.nav-section{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#333;padding:10px 8px 5px}
+.nav-btn{display:flex;align-items:center;gap:7px;padding:8px 8px;border-radius:8px;border:1px solid transparent;background:transparent;color:#555;cursor:pointer;font-size:11px;font-weight:500;text-align:left;width:100%;transition:all .15s}
+.nav-btn:hover{color:#888;background:rgba(255,255,255,.02)}
+.nav-btn.active{background:rgba(254,44,85,.1);border-color:rgba(254,44,85,.18);color:#fff;font-weight:700}
+.nav-badge{margin-left:auto;background:rgba(254,44,85,.2);color:#fe2c55;border-radius:20px;padding:1px 6px;font-size:9px;font-weight:800}
+
+/* ── Admin badge ── */
+.admin-chip{display:flex;align-items:center;gap:5px;background:rgba(254,44,85,.08);border:1px solid rgba(254,44,85,.2);border-radius:20px;padding:3px 9px;font-size:9px;color:#fe2c55;font-weight:700;margin-bottom:10px}
+
+/* ── Cards ── */
+.card{background:#12121e;border:1px solid #1e1e2e;border-radius:14px;padding:15px;margin-bottom:12px}
+.card-sm{background:#12121e;border:1px solid #1e1e2e;border-radius:12px;padding:12px}
+
+/* ── Stats grid ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.stat-card{background:#12121e;border:1px solid #1e1e2e;border-radius:12px;padding:13px}
+.stat-val{font-family:'Syne',sans-serif;font-weight:900;font-size:26px;line-height:1;margin-bottom:3px}
+.stat-lbl{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#444}
+
+/* ── Table ── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+.th{color:#363655;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid #1a1a28;text-align:left;white-space:nowrap}
+.tr-row{border-bottom:1px solid #0f0f1a;transition:background .1s}
+.tr-row:last-child{border-bottom:none}
+.tr-row:hover{background:rgba(255,255,255,.013)}
+td{padding:9px 10px;font-size:12px;vertical-align:middle}
+
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:9px;font-weight:700;white-space:nowrap}
+.badge-pro{background:rgba(254,44,85,.12);color:#fe2c55;border:1px solid rgba(254,44,85,.25)}
+.badge-free{background:rgba(255,255,255,.05);color:#666;border:1px solid rgba(255,255,255,.1)}
+.badge-admin{background:rgba(245,197,24,.1);color:#f5c518;border:1px solid rgba(245,197,24,.2)}
+.badge-trial{background:rgba(37,244,238,.08);color:#25f4ee;border:1px solid rgba(37,244,238,.18)}
+.badge-blocked{background:rgba(139,92,246,.1);color:#8b5cf6;border:1px solid rgba(139,92,246,.2)}
+
+/* ── Toggle ── */
+.it{width:28px;height:16px;border-radius:8px;cursor:pointer;position:relative;border:none;flex-shrink:0;background:#1e1e2e;transition:background .2s;outline:none}
+.it.on{background:#fe2c55}
+.it::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.it.on::after{left:14px}
+
+/* ── Buttons ── */
+.btn{padding:7px 14px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;border:none;transition:all .15s}
+.btn-primary{background:rgba(254,44,85,.15);border:1px solid rgba(254,44,85,.3);color:#fe2c55}
+.btn-primary:hover{background:rgba(254,44,85,.25)}
+.btn-cyan{background:rgba(37,244,238,.1);border:1px solid rgba(37,244,238,.2);color:#25f4ee}
+.btn-cyan:hover{background:rgba(37,244,238,.2)}
+.btn-ghost{background:transparent;border:1px solid #252535;color:#555}
+.btn-ghost:hover{border-color:#444;color:#888}
+.btn-danger{background:rgba(254,44,85,.12);border:1px solid rgba(254,44,85,.25);color:#fe2c55}
+.btn-sm{padding:4px 10px;font-size:10px;border-radius:6px}
+
+/* ── Input ── */
+.inp{width:100%;background:#0a0a0f;border:1px solid #252535;border-radius:8px;padding:9px 12px;color:#fff;font-size:12px;outline:none;transition:border-color .15s}
+.inp:focus{border-color:rgba(254,44,85,.4)}
+.lbl{display:block;color:#556;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;margin-bottom:5px}
+
+/* ── Modal ── */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px)}
+@media(min-width:580px){.mo{align-items:center;padding:16px}}
+.mb{background:#12121e;border:1px solid #252535;border-radius:20px 20px 0 0;padding:22px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;animation:slideUp .25s ease}
+@media(min-width:580px){.mb{border-radius:18px;animation:popIn .2s ease}}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f2010;border:1px solid #2a5a2a;border-radius:10px;padding:9px 18px;color:#4ade80;font-size:12px;font-weight:700;z-index:999;white-space:nowrap;animation:popIn .2s ease}
+.toast-err{background:#1a0a0f;border-color:#5a2a2a;color:#fe2c55}
+
+/* ── Plan features list ── */
+.feat-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #0f0f1a;font-size:11px}
+.feat-row:last-child{border-bottom:none}
+.feat-name{flex:1;color:#aaa}
+.feat-free{width:60px;text-align:center;color:#555;font-size:10px}
+.feat-pro{width:60px;text-align:center;color:#fe2c55;font-size:10px;font-weight:700}
+
+/* ── Search ── */
+.search-wrap{position:relative;margin-bottom:12px}
+.search-wrap input{padding-left:30px}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;color:#444;pointer-events:none}
+
+/* ── Section header ── */
+.sec-hdr{display:flex;align-items:center;gap:7px;margin-bottom:12px}
+.sec-dot{width:7px;height:7px;border-radius:50%;background:linear-gradient(135deg,#fe2c55,#25f4ee);flex-shrink:0}
+.sec-lbl{color:#fe2c55;font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase}
+
+/* ── Tab pills ── */
+.tab-pills{display:flex;gap:5px;background:#0d0d18;border:1px solid #1a1a28;border-radius:10px;padding:4px;margin-bottom:14px}
+.tab-pill{flex:1;padding:6px;border:none;border-radius:7px;background:transparent;color:#444;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s;text-align:center}
+.tab-pill.active{background:rgba(254,44,85,.12);border:1px solid rgba(254,44,85,.25);color:#fff}
+
+/* ── Responsive ── */
+@media(max-width:700px){
+  .sidebar{display:none}
+  .main{margin-left:0}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+/* ── Login screen ── */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:#12121e;border:1px solid #1e1e2e;border-radius:20px;padding:30px;width:100%;max-width:360px}
+
+/* ── Spinner ── */
+.spinner{width:14px;height:14px;border:2px solid #333;border-top-color:#fe2c55;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+
+/* ── Expiry pill ── */
+.exp-ok{color:#4ade80;font-size:10px}
+.exp-soon{color:#f5c518;font-size:10px}
+.exp-exp{color:#fe2c55;font-size:10px}
+
+/* ── Avatar ── */
+.avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#fe2c55,#25f4ee);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+// ══════════════════════════════════════════
+//  BASE DE DATOS EN MEMORIA (reemplaza con API/backend real)
+// ══════════════════════════════════════════
+
+const ADMIN_PASS = "tikadmin2026"; // Cambia esto
+
+// Función helpers de localStorage con try/catch seguro
+function lsGet(k, d) {
+  try { const v = localStorage.getItem("ta_" + k); return v !== null ? JSON.parse(v) : d; } catch(e) { return d; }
+}
+function lsSet(k, v) {
+  try { localStorage.setItem("ta_" + k, JSON.stringify(v)); } catch(e) {}
+}
+
+// ── Base de usuarios ──
+const DEFAULT_USERS = [
+  { id: 1, email: "admin@tikpanel.com",   name: "Admin",       avatar: "A", plan: "admin", active: true,  created: "2025-01-10", expiry: null,        lastLogin: "2026-05-10", tools: { tts: true,  musica: true,  ranking: true,  batalla: true,  chat: true,  espect: true  } },
+  { id: 2, email: "luzalva@tikpanel.com", name: "Luz Álva",    avatar: "L", plan: "pro",   active: true,  created: "2025-03-15", expiry: "2026-08-15", lastLogin: "2026-05-09", tools: { tts: true,  musica: true,  ranking: true,  batalla: true,  chat: true,  espect: true  } },
+  { id: 3, email: "usuario@tikpanel.com", name: "Streamer123",  avatar: "S", plan: "free",  active: true,  created: "2026-04-01", expiry: null,        lastLogin: "2026-05-08", tools: { tts: false, musica: false, ranking: true,  batalla: false, chat: true,  espect: false } },
+  { id: 4, email: "tiktoker@gmail.com",   name: "TikToker",    avatar: "T", plan: "trial", active: true,  created: "2026-05-01", expiry: "2026-05-15", lastLogin: "2026-05-10", tools: { tts: true,  musica: false, ranking: true,  batalla: false, chat: true,  espect: false } },
+  { id: 5, email: "bloqueado@mail.com",   name: "Spammer",     avatar: "B", plan: "free",  active: false, created: "2026-02-10", expiry: null,        lastLogin: "2026-03-01", tools: { tts: false, musica: false, ranking: false, batalla: false, chat: false, espect: false } },
+];
+
+const TOOLS = [
+  { id: "tts",     label: "Voz & TTS",      icon: "🎙️", proOnly: true  },
+  { id: "musica",  label: "Música",          icon: "🎵", proOnly: true  },
+  { id: "ranking", label: "Ranking",         icon: "🏆", proOnly: false },
+  { id: "batalla", label: "Batalla",         icon: "⚔️", proOnly: true  },
+  { id: "chat",    label: "Chat Live",       icon: "💬", proOnly: false },
+  { id: "espect",  label: "Espectadores",   icon: "👥", proOnly: true  },
+];
+
+const PLAN_LIMITS = {
+  free:  { acciones: 5,  tts: 0,  musica: 0,  label: "Free" },
+  trial: { acciones: 15, tts: 50, musica: 20, label: "Trial 14d" },
+  pro:   { acciones: -1, tts: -1, musica: -1, label: "Pro" },
+  admin: { acciones: -1, tts: -1, musica: -1, label: "Admin" },
+};
+
+// ══════════════════════════════════════════
+//  STATE GLOBAL
+// ══════════════════════════════════════════
+let state = {
+  loggedIn: lsGet("auth", false),
+  page: "usuarios",
+  users: lsGet("users", DEFAULT_USERS),
+  toast: null,
+  toastType: "ok",
+  modal: null,         // { type: "edit"|"add"|"tools"|"delete", user }
+  search: "",
+  filterPlan: "all",
+  planTab: "free",
+};
+
+function setState(partial) {
+  state = { ...state, ...partial };
+  render();
+}
+
+function showToast(msg, type = "ok") {
+  setState({ toast: msg, toastType: type });
+  setTimeout(() => setState({ toast: null }), 2800);
+}
+
+// ══════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  const diff = new Date(dateStr) - new Date();
+  return Math.ceil(diff / 86400000);
+}
+
+function expiryLabel(user) {
+  if (!user.expiry) return user.plan === "pro" ? '<span class="exp-ok">∞ Vitalicio</span>' : '<span style="color:#444;font-size:10px">—</span>';
+  const d = daysUntil(user.expiry);
+  if (d < 0)  return `<span class="exp-exp">Expiró</span>`;
+  if (d <= 7)  return `<span class="exp-soon">⚠ ${d}d restantes</span>`;
+  return `<span class="exp-ok">${user.expiry}</span>`;
+}
+
+function planBadge(plan) {
+  const map = { pro: "badge-pro", free: "badge-free", admin: "badge-admin", trial: "badge-trial" };
+  const labels = { pro: "⭐ Pro", free: "Free", admin: "👑 Admin", trial: "🔬 Trial" };
+  return `<span class="badge ${map[plan] || 'badge-free'}">${labels[plan] || plan}</span>`;
+}
+
+function filteredUsers() {
+  return state.users.filter(u => {
+    const matchSearch = !state.search || u.name.toLowerCase().includes(state.search.toLowerCase()) || u.email.toLowerCase().includes(state.search.toLowerCase());
+    const matchPlan = state.filterPlan === "all" || u.plan === state.filterPlan;
+    return matchSearch && matchPlan;
+  });
+}
+
+function saveUsers(users) {
+  lsSet("users", users);
+}
+
+// ══════════════════════════════════════════
+//  ACCIONES CRUD
+// ══════════════════════════════════════════
+function toggleActive(id) {
+  const users = state.users.map(u => u.id === id ? { ...u, active: !u.active } : u);
+  saveUsers(users);
+  setState({ users });
+  const u = users.find(x => x.id === id);
+  showToast(u.active ? `${u.name} activado` : `${u.name} bloqueado`);
+}
+
+function changePlan(id, plan) {
+  const users = state.users.map(u => u.id === id ? {
+    ...u, plan,
+    tools: plan === "pro" || plan === "admin"
+      ? { tts: true, musica: true, ranking: true, batalla: true, chat: true, espect: true }
+      : plan === "trial"
+      ? { tts: true, musica: false, ranking: true, batalla: false, chat: true, espect: false }
+      : { tts: false, musica: false, ranking: true, batalla: false, chat: true, espect: false }
+  } : u);
+  saveUsers(users);
+  setState({ users, modal: null });
+  showToast(`Plan cambiado a ${PLAN_LIMITS[plan]?.label || plan}`);
+}
+
+function saveEditUser(id, data) {
+  const users = state.users.map(u => u.id === id ? { ...u, ...data } : u);
+  saveUsers(users);
+  setState({ users, modal: null });
+  showToast("Usuario actualizado ✓");
+}
+
+function addUser(data) {
+  const id = Math.max(...state.users.map(u => u.id)) + 1;
+  const tools = data.plan === "pro" || data.plan === "admin"
+    ? { tts: true, musica: true, ranking: true, batalla: true, chat: true, espect: true }
+    : { tts: false, musica: false, ranking: true, batalla: false, chat: true, espect: false };
+  const users = [...state.users, { id, ...data, tools, active: true, created: new Date().toISOString().slice(0,10), lastLogin: "—" }];
+  saveUsers(users);
+  setState({ users, modal: null });
+  showToast("Usuario creado ✓");
+}
+
+function deleteUser(id) {
+  const users = state.users.filter(u => u.id !== id);
+  saveUsers(users);
+  setState({ users, modal: null });
+  showToast("Usuario eliminado");
+}
+
+function saveToolAccess(id, tools) {
+  const users = state.users.map(u => u.id === id ? { ...u, tools } : u);
+  saveUsers(users);
+  setState({ users, modal: null });
+  showToast("Accesos actualizados ✓");
+}
+
+// ══════════════════════════════════════════
+//  RENDER FUNCTIONS
+// ══════════════════════════════════════════
+
+function renderLogin() {
+  return `
+  <div class="login-wrap">
+    <div class="login-box ai">
+      <div style="text-align:center;margin-bottom:22px">
+        <div class="logo" style="justify-content:center;margin-bottom:10px">
+          <div class="logo-icon">T</div>
+          <span class="logo-text">Tik<span>Panel</span></span>
+        </div>
+        <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#444;font-weight:700">Panel de Administración</div>
+      </div>
+      <label class="lbl">Contraseña Admin</label>
+      <input id="login-pass" class="inp" type="password" placeholder="••••••••" style="margin-bottom:14px" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <button class="btn btn-primary" style="width:100%;padding:11px;font-size:12px" onclick="doLogin()">
+        Ingresar al Panel
+      </button>
+      <div style="text-align:center;margin-top:14px;font-size:10px;color:#333">
+        Solo acceso autorizado
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderSidebar() {
+  const pages = [
+    { id: "usuarios",  icon: "👤", label: "Usuarios",    badge: state.users.filter(u => u.plan === "pro").length },
+    { id: "planes",    icon: "⭐", label: "Planes & Límites", badge: null },
+    { id: "herramientas", icon: "🔧", label: "Herramientas",  badge: null },
+    { id: "estadisticas", icon: "📊", label: "Estadísticas",  badge: null },
+  ];
+  return `
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">T</div>
+      <span class="logo-text">Tik<span>Panel</span></span>
+    </div>
+    <div class="admin-chip">👑 Admin Panel</div>
+    <nav style="display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto">
+      ${pages.map(p => `
+        <button class="nav-btn ${state.page === p.id ? 'active' : ''}" onclick="setState({page:'${p.id}'})">
+          <span style="font-size:13px">${p.icon}</span>
+          <span>${p.label}</span>
+          ${p.badge ? `<span class="nav-badge">${p.badge}</span>` : ""}
+        </button>
+      `).join("")}
+    </nav>
+    <div style="border-top:1px solid #1a1a28;padding-top:10px;margin-top:8px">
+      <a href="index.html" target="_blank" class="nav-btn" style="display:flex">
+        <span style="font-size:12px">↗</span>
+        <span>Ir al TikPanel</span>
+      </a>
+      <button class="nav-btn" onclick="logout()" style="color:#fe2c55">
+        <span>✕</span> Cerrar sesión
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderTopbar() {
+  const titles = { usuarios: "👤 Usuarios", planes: "⭐ Planes & Límites", herramientas: "🔧 Herramientas", estadisticas: "📊 Estadísticas" };
+  return `
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:13px;font-weight:700">${titles[state.page] || ""}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:9px;color:#444;font-family:'JetBrains Mono',monospace">${new Date().toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'})}</span>
+      <button class="btn btn-primary btn-sm" onclick="setState({modal:{type:'add',user:null}})">+ Nuevo usuario</button>
+    </div>
+  </div>`;
+}
+
+// ── PAGE: Usuarios ──
+function renderUsuarios() {
+  const users = filteredUsers();
+  const planOpts = ["all","free","trial","pro","admin"];
+  return `
+  <div class="ai">
+    <!-- Stats rápidas -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-val" style="color:#fe2c55">${state.users.filter(u=>u.plan==="pro").length}</div>
+        <div class="stat-lbl">Usuarios Pro</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:#25f4ee">${state.users.filter(u=>u.plan==="trial").length}</div>
+        <div class="stat-lbl">En Trial</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:#666">${state.users.filter(u=>u.plan==="free").length}</div>
+        <div class="stat-lbl">Free</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:#f5c518">${state.users.filter(u=>!u.active).length}</div>
+        <div class="stat-lbl">Bloqueados</div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <!-- Filtros -->
+      <div style="display:flex;align-items:center;gap:8px;padding:12px;border-bottom:1px solid #1a1a28;flex-wrap:wrap">
+        <div class="search-wrap" style="flex:1;min-width:160px;margin-bottom:0">
+          <span class="search-icon">🔍</span>
+          <input class="inp search-wrap" id="search-inp" style="padding-left:30px" placeholder="Buscar usuario..." value="${state.search}" oninput="setState({search:this.value})" />
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${planOpts.map(p => `
+            <button class="btn btn-sm ${state.filterPlan===p?'btn-primary':'btn-ghost'}" onclick="setState({filterPlan:'${p}'})" style="text-transform:capitalize">
+              ${p === 'all' ? 'Todos' : p}
+            </button>
+          `).join("")}
+        </div>
+      </div>
+      <!-- Tabla -->
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="th">Usuario</th>
+              <th class="th">Plan</th>
+              <th class="th">Vencimiento</th>
+              <th class="th">Último acceso</th>
+              <th class="th">Estado</th>
+              <th class="th">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${users.length === 0 ? `<tr><td colspan="6" style="text-align:center;color:#333;padding:30px;font-size:12px">Sin resultados</td></tr>` : ""}
+            ${users.map(u => `
+              <tr class="tr-row ${!u.active ? 'dis' : ''}" style="${!u.active ? 'opacity:.4' : ''}">
+                <td>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <div class="avatar">${u.avatar}</div>
+                    <div>
+                      <div style="font-size:12px;font-weight:600">${u.name}</div>
+                      <div style="font-size:9px;color:#444;font-family:'JetBrains Mono',monospace">${u.email}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>${planBadge(u.plan)}</td>
+                <td>${expiryLabel(u)}</td>
+                <td style="font-size:10px;color:#555">${u.lastLogin}</td>
+                <td>
+                  <button class="it ${u.active ? 'on' : ''}" onclick="toggleActive(${u.id})" title="${u.active ? 'Activo - click para bloquear' : 'Bloqueado - click para activar'}"></button>
+                </td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="btn btn-ghost btn-sm" onclick="setState({modal:{type:'edit',user:${JSON.stringify(u).replace(/"/g,'&quot;')}}})">✏️</button>
+                    <button class="btn btn-cyan btn-sm" onclick="setState({modal:{type:'tools',user:${JSON.stringify(u).replace(/"/g,'&quot;')}}})">🔧</button>
+                    <button class="btn btn-danger btn-sm" onclick="setState({modal:{type:'delete',user:${JSON.stringify(u).replace(/"/g,'&quot;')}}})">🗑</button>
+                  </div>
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── PAGE: Planes ──
+function renderPlanes() {
+  return `
+  <div class="ai">
+    <div class="tab-pills">
+      ${["free","trial","pro"].map(p => `<button class="tab-pill ${state.planTab===p?'active':''}" onclick="setState({planTab:'${p}'})">${PLAN_LIMITS[p].label}</button>`).join("")}
+    </div>
+
+    ${state.planTab === "free" ? `
+    <div class="card">
+      <div class="sec-hdr"><div class="sec-dot"></div><div class="sec-lbl">Plan Free — Límites</div></div>
+      <p style="font-size:11px;color:#555;margin-bottom:14px">Usuarios sin suscripción. Acceso limitado a herramientas básicas.</p>
+      <div>
+        ${TOOLS.map(t => `
+          <div class="feat-row">
+            <span style="font-size:14px">${t.icon}</span>
+            <span class="feat-name">${t.label}</span>
+            <span class="feat-free">${t.proOnly ? '<span style="color:#fe2c55;font-size:13px">✕</span>' : '<span style="color:#4ade80;font-size:13px">✓</span>'}</span>
+          </div>
+        `).join("")}
+        <div class="feat-row">
+          <span style="font-size:14px">⚡</span>
+          <span class="feat-name">Acciones automáticas</span>
+          <span class="feat-free" style="color:#f5c518">Máx 5</span>
+        </div>
+      </div>
+    </div>
+    ` : state.planTab === "trial" ? `
+    <div class="card">
+      <div class="sec-hdr"><div class="sec-dot"></div><div class="sec-lbl">Plan Trial — 14 días</div></div>
+      <p style="font-size:11px;color:#555;margin-bottom:14px">Acceso de prueba por 14 días. Se convierte en Free al vencer.</p>
+      <div>
+        ${TOOLS.map(t => `
+          <div class="feat-row">
+            <span style="font-size:14px">${t.icon}</span>
+            <span class="feat-name">${t.label}</span>
+            <span class="feat-pro">${t.id === "musica" || t.id === "batalla" || t.id === "espect" ? '<span style="color:#f5c518;font-size:10px">Parcial</span>' : '<span style="color:#4ade80;font-size:13px">✓</span>'}</span>
+          </div>
+        `).join("")}
+        <div class="feat-row">
+          <span style="font-size:14px">⚡</span>
+          <span class="feat-name">Acciones automáticas</span>
+          <span class="feat-pro" style="color:#25f4ee">Máx 15</span>
+        </div>
+      </div>
+    </div>
+    ` : `
+    <div class="card">
+      <div class="sec-hdr"><div class="sec-dot"></div><div class="sec-lbl">Plan Pro — Ilimitado</div></div>
+      <p style="font-size:11px;color:#555;margin-bottom:14px">Acceso completo a todas las herramientas sin límites.</p>
+      <div>
+        ${TOOLS.map(t => `
+          <div class="feat-row">
+            <span style="font-size:14px">${t.icon}</span>
+            <span class="feat-name">${t.label}</span>
+            <span class="feat-pro"><span style="color:#4ade80;font-size:13px">✓</span></span>
+          </div>
+        `).join("")}
+        <div class="feat-row">
+          <span style="font-size:14px">⚡</span>
+          <span class="feat-name">Acciones automáticas</span>
+          <span class="feat-pro">∞ Ilimitadas</span>
+        </div>
+        <div class="feat-row">
+          <span style="font-size:14px">🎙️</span>
+          <span class="feat-name">TTS ElevenLabs</span>
+          <span class="feat-pro">∞ Ilimitado</span>
+        </div>
+      </div>
+    </div>
+    `}
+
+    <!-- Comparativa rápida -->
+    <div class="card">
+      <div class="sec-hdr"><div class="sec-dot"></div><div class="sec-lbl">Comparativa de planes</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="th">Herramienta</th>
+              <th class="th">Free</th>
+              <th class="th">Trial</th>
+              <th class="th">Pro</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${TOOLS.map(t => `
+              <tr class="tr-row">
+                <td style="font-size:11px">${t.icon} ${t.label}</td>
+                <td style="text-align:center">${t.proOnly ? '<span style="color:#fe2c55">✕</span>' : '<span style="color:#4ade80">✓</span>'}</td>
+                <td style="text-align:center">${t.id === "musica" || t.id === "batalla" || t.id === "espect" ? '<span style="color:#f5c518;font-size:10px">Parcial</span>' : '<span style="color:#4ade80">✓</span>'}</td>
+                <td style="text-align:center"><span style="color:#fe2c55">✓</span></td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── PAGE: Herramientas ──
+function renderHerramientas() {
+  return `
+  <div class="ai">
+    <div class="card">
+      <div class="sec-hdr"><div class="sec-dot"></div><div class="sec-lbl">Categorías del Panel</div></div>
+      <p style="font-size:11px;color:#555;margin-bottom:14px">Descripción de cada sección del TikPanel y qué plan requiere.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">
+        ${[
+          { icon:"⚡", name:"Dashboard", desc:"Conectar al LIVE de TikTok", plan:"free" },
+          { icon:"🎯", name:"Acciones",  desc:"Triggers automáticos por evento", plan:"free", limit:"5 free / ∞ pro" },
+          { icon:"🎙️", name:"Voz & TTS", desc:"Text-to-speech ElevenLabs/nativo", plan:"pro" },
+          { icon:"🎵", name:"Música",    desc:"Control Spotify en tiempo real", plan:"pro" },
+          { icon:"🏆", name:"Ranking",   desc:"Top seguidores y regalos", plan:"free" },
+          { icon:"💬", name:"Chat Live", desc:"Chat en tiempo real filtrado", plan:"free" },
+          { icon:"⚔️", name:"Batalla",   desc:"Modo batalla TikTok LIVE", plan:"pro" },
+          { icon:"👥", name:"Espectadores","desc":"Lista de viewers activos", plan:"pro" },
+        ].map(t => `
+          <div class="card-sm" style="border:1px solid ${t.plan==='pro'?'rgba(254,44,85,.15)':'#1e1e2e'}">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+              <span style="font-size:18px">${t.icon}</span>
+              <span style="font-size:12px;font-weight:700">${t.name}</span>
+              ${planBadge(t.plan)}
+            </div>
+            <p style="font-size:10px;color:#555">${t.desc}</p>
+            ${t.limit ? `<p style="font-size:9px;color:#333;margin-top:4px;font-family:'JetBrains Mono',monospace">${t.limit}</p>` : ""}
+          </div>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="sec-hdr"><div class="sec-dot"></div><div class="sec-lbl">Acceso rápido por usuario</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="th">Usuario</th>
+              ${TOOLS.map(t => `<th class="th" style="text-align:center">${t.icon}</th>`).join("")}
+              <th class="th">Editar</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.users.filter(u => u.active).map(u => `
+              <tr class="tr-row">
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div class="avatar" style="width:22px;height:22px;font-size:9px">${u.avatar}</div>
+                    <span style="font-size:11px">${u.name}</span>
+                  </div>
+                </td>
+                ${TOOLS.map(t => `
+                  <td style="text-align:center">
+                    ${u.tools[t.id]
+                      ? '<span style="color:#4ade80;font-size:13px">✓</span>'
+                      : '<span style="color:#2a2a3a;font-size:13px">✕</span>'}
+                  </td>
+                `).join("")}
+                <td>
+                  <button class="btn btn-cyan btn-sm" onclick="setState({modal:{type:'tools',user:${JSON.stringify(u).replace(/"/g,'&quot;')}}})">Editar</button>
+                </td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── PAGE: Estadísticas ──
+function renderEstadisticas() {
+  const total = state.users.length;
+  const pro = state.users.filter(u => u.plan === "pro").length;
+  const trial = state.users.filter(u => u.plan === "trial").length;
+  const free = state.users.filter(u => u.plan === "free").length;
+  const blocked = state.users.filter(u => !u.active).length;
+  return `
+  <div class="ai">
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-lbl">Total usuarios</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#fe2c55">${pro}</div><div class="stat-lbl">Pro activos</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#25f4ee">${trial}</div><div class="stat-lbl">En Trial</div></div>
+      <div class="stat-card"><div class="stat-val" style="color:#666">${free}</div><div class="stat-lbl">Free</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div class="card">
+        <div class="sec-hdr"><div class="sec-dot"></div><div class="sec-lbl">Distribución de planes</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+          ${[
+            { label:"Pro",   val: pro,   total, color:"#fe2c55" },
+            { label:"Free",  val: free,  total, color:"#555" },
+            { label:"Trial", val: trial, total, color:"#25f4ee" },
+          ].map(r => `
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px">
+                <span style="color:#888">${r.label}</span>
+                <span style="color:${r.color};font-weight:700">${r.val}</span>
+              </div>
+              <div style="background:#1a1a28;border-radius:20px;height:5px;overflow:hidden">
+                <div style="background:${r.color};height:100%;width:${total>0?Math.round(r.val/r.total*100):0}%;border-radius:20px;transition:width .5s"></div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+      <div class="card">
+        <div class="sec-hdr"><div class="sec-dot"></div><div class="sec-lbl">Estado de cuentas</div></div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+            <span style="color:#888">✅ Cuentas activas</span>
+            <span style="color:#4ade80;font-weight:700">${state.users.filter(u=>u.active).length}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+            <span style="color:#888">🔒 Bloqueadas</span>
+            <span style="color:#fe2c55;font-weight:700">${blocked}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+            <span style="color:#888">⚠️ Trial por vencer (7d)</span>
+            <span style="color:#f5c518;font-weight:700">${state.users.filter(u=>u.plan==="trial"&&daysUntil(u.expiry)!==null&&daysUntil(u.expiry)<=7&&daysUntil(u.expiry)>=0).length}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px">
+            <span style="color:#888">❌ Trials expirados</span>
+            <span style="color:#fe2c55;font-weight:700">${state.users.filter(u=>u.plan==="trial"&&daysUntil(u.expiry)!==null&&daysUntil(u.expiry)<0).length}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sec-hdr"><div class="sec-dot"></div><div class="sec-lbl">Usuarios Pro (detalle)</div></div>
+      ${state.users.filter(u=>u.plan==="pro"||u.plan==="trial").length === 0
+        ? `<p style="color:#333;font-size:12px;text-align:center;padding:20px">Sin usuarios Pro o Trial</p>`
+        : `<div class="table-wrap"><table>
+          <thead><tr>
+            <th class="th">Usuario</th><th class="th">Plan</th><th class="th">Vencimiento</th><th class="th">Días restantes</th>
+          </tr></thead>
+          <tbody>
+          ${state.users.filter(u=>u.plan==="pro"||u.plan==="trial").map(u => {
+            const d = daysUntil(u.expiry);
+            return `<tr class="tr-row">
+              <td><div style="display:flex;align-items:center;gap:7px"><div class="avatar">${u.avatar}</div><div style="font-size:11px;font-weight:600">${u.name}</div></div></td>
+              <td>${planBadge(u.plan)}</td>
+              <td style="font-size:10px">${expiryLabel(u)}</td>
+              <td style="font-size:10px;color:${d===null?'#4ade80':d<0?'#fe2c55':d<=7?'#f5c518':'#4ade80'}">${d===null?'∞':d<0?'Expirado':`${d} días`}</td>
+            </tr>`;
+          }).join("")}
+          </tbody></table></div>`
+      }
+    </div>
+  </div>`;
+}
+
+// ── MODALES ──
+function renderModal() {
+  if (!state.modal) return "";
+  const { type, user } = state.modal;
+
+  if (type === "delete") return `
+  <div class="mo" onclick="setState({modal:null})">
+    <div class="mb" style="max-width:320px" onclick="event.stopPropagation()">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:32px;margin-bottom:8px">🗑️</div>
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;margin-bottom:6px">Eliminar usuario</div>
+        <div style="color:#555;font-size:12px">¿Eliminar a <span style="color:#fff;font-weight:700">${user.name}</span>? Esta acción no se puede deshacer.</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" style="flex:1;padding:10px" onclick="setState({modal:null})">Cancelar</button>
+        <button class="btn btn-danger" style="flex:1;padding:10px" onclick="deleteUser(${user.id})">Sí, eliminar</button>
+      </div>
+    </div>
+  </div>`;
+
+  if (type === "tools") return `
+  <div class="mo" onclick="setState({modal:null})">
+    <div class="mb" style="max-width:440px" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:16px">
+        <div class="avatar">${user.avatar}</div>
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:14px">${user.name}</div>
+          <div style="font-size:9px;color:#444">${user.email}</div>
+        </div>
+        <div style="margin-left:auto">${planBadge(user.plan)}</div>
+      </div>
+      <div class="sec-hdr"><div class="sec-dot"></div><div class="sec-lbl">Acceso a herramientas</div></div>
+      <div id="tool-toggles">
+        ${TOOLS.map(t => `
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #0f0f1a">
+            <span style="font-size:15px">${t.icon}</span>
+            <span style="flex:1;font-size:12px">${t.label}</span>
+            ${t.proOnly ? '<span style="font-size:9px;color:#444;background:#1a1a28;padding:2px 6px;border-radius:20px">Pro</span>' : ""}
+            <button class="it ${user.tools[t.id] ? 'on' : ''}" id="tool-${t.id}" onclick="this.classList.toggle('on')"></button>
+          </div>
+        `).join("")}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-ghost" style="flex:1;padding:10px" onclick="setState({modal:null})">Cancelar</button>
+        <button class="btn btn-primary" style="flex:1;padding:10px" onclick="saveToolsFromModal(${user.id})">Guardar accesos</button>
+      </div>
+    </div>
+  </div>`;
+
+  if (type === "edit" || type === "add") {
+    const isEdit = type === "edit";
+    const u = user || { name:"", email:"", plan:"free", avatar:"N", expiry:"", password:"" };
+    return `
+    <div class="mo" onclick="setState({modal:null})">
+      <div class="mb" style="max-width:440px" onclick="event.stopPropagation()">
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;margin-bottom:16px">
+          ${isEdit ? "✏️ Editar usuario" : "➕ Nuevo usuario"}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div>
+            <label class="lbl">Nombre</label>
+            <input class="inp" id="m-name" value="${u.name}" placeholder="Nombre del streamer"/>
+          </div>
+          <div>
+            <label class="lbl">Avatar (letra)</label>
+            <input class="inp" id="m-avatar" value="${u.avatar}" maxlength="1" placeholder="A"/>
+          </div>
+        </div>
+        <div style="margin-bottom:10px">
+          <label class="lbl">Email</label>
+          <input class="inp" id="m-email" value="${u.email}" placeholder="usuario@email.com" type="email"/>
+        </div>
+        <div style="margin-bottom:10px">
+          <label class="lbl">Contraseña ${isEdit?"(dejar vacío = no cambiar)":""}</label>
+          <input class="inp" id="m-pass" value="" placeholder="••••••••" type="password"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div>
+            <label class="lbl">Plan</label>
+            <select class="inp" id="m-plan">
+              <option value="free"  ${u.plan==="free" ?"selected":""}>Free</option>
+              <option value="trial" ${u.plan==="trial"?"selected":""}>Trial (14d)</option>
+              <option value="pro"   ${u.plan==="pro"  ?"selected":""}>Pro</option>
+              <option value="admin" ${u.plan==="admin" ?"selected":""}>Admin</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Vencimiento (Pro/Trial)</label>
+            <input class="inp" id="m-expiry" type="date" value="${u.expiry || ""}"/>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost" style="flex:1;padding:10px" onclick="setState({modal:null})">Cancelar</button>
+          <button class="btn btn-primary" style="flex:1;padding:10px" onclick="${isEdit ? `saveEdit(${u.id})` : "addNew()"}">
+            ${isEdit ? "Guardar cambios" : "Crear usuario"}
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }
+  return "";
+}
+
+// ══════════════════════════════════════════
+//  ACCIONES DESDE MODALES (DOM)
+// ══════════════════════════════════════════
+function saveToolsFromModal(id) {
+  const tools = {};
+  TOOLS.forEach(t => {
+    const btn = document.getElementById("tool-" + t.id);
+    tools[t.id] = btn ? btn.classList.contains("on") : false;
+  });
+  saveToolAccess(id, tools);
+}
+
+function saveEdit(id) {
+  const name   = document.getElementById("m-name")?.value?.trim();
+  const email  = document.getElementById("m-email")?.value?.trim();
+  const plan   = document.getElementById("m-plan")?.value;
+  const expiry = document.getElementById("m-expiry")?.value || null;
+  const avatar = document.getElementById("m-avatar")?.value?.trim() || name[0]?.toUpperCase() || "?";
+  if (!name || !email) { showToast("Nombre y email son requeridos", "err"); return; }
+  saveEditUser(id, { name, email, plan, expiry: expiry||null, avatar });
+}
+
+function addNew() {
+  const name   = document.getElementById("m-name")?.value?.trim();
+  const email  = document.getElementById("m-email")?.value?.trim();
+  const plan   = document.getElementById("m-plan")?.value;
+  const expiry = document.getElementById("m-expiry")?.value || null;
+  const pass   = document.getElementById("m-pass")?.value?.trim();
+  const avatar = document.getElementById("m-avatar")?.value?.trim() || name?.[0]?.toUpperCase() || "?";
+  if (!name || !email) { showToast("Nombre y email son requeridos", "err"); return; }
+  if (!pass) { showToast("La contraseña es requerida", "err"); return; }
+  addUser({ name, email, plan, expiry: expiry||null, avatar, password: pass });
+}
+
+function doLogin() {
+  const pass = document.getElementById("login-pass")?.value;
+  if (pass === ADMIN_PASS) {
+    lsSet("auth", true);
+    setState({ loggedIn: true });
+  } else {
+    const el = document.getElementById("login-pass");
+    if (el) { el.style.borderColor = "#fe2c55"; setTimeout(() => el.style.borderColor = "", 1000); }
+    showToast("Contraseña incorrecta", "err");
+  }
+}
+
+function logout() {
+  lsSet("auth", false);
+  setState({ loggedIn: false });
+}
+
+// ══════════════════════════════════════════
+//  RENDER PRINCIPAL
+// ══════════════════════════════════════════
+function render() {
+  const app = document.getElementById("app");
+  if (!app) return;
+
+  if (!state.loggedIn) {
+    app.innerHTML = renderLogin() + (state.toast ? `<div class="toast ${state.toastType==='err'?'toast-err':''}">${state.toast}</div>` : "");
+    return;
+  }
+
+  const pageContent = {
+    usuarios:     renderUsuarios,
+    planes:       renderPlanes,
+    herramientas: renderHerramientas,
+    estadisticas: renderEstadisticas,
+  }[state.page]?.() || "";
+
+  app.innerHTML = `
+  <div class="layout">
+    ${renderSidebar()}
+    <div class="main">
+      ${renderTopbar()}
+      <div class="content">
+        ${pageContent}
+      </div>
+    </div>
+  </div>
+  ${renderModal()}
+  ${state.toast ? `<div class="toast ${state.toastType==='err'?'toast-err':''}">${state.toast}</div>` : ""}
+  `;
+}
+
+// Arrancar
+render();
+</script>
+</body>
+</html>
