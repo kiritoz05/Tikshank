@@ -1,11 +1,10 @@
 {
-  "name": "tikshank",
-  "version": "5.0.0",
-  "description": "Panel de control para streamers de TikTok Live",
+  "name": "tikshank-server",
+  "version": "5.1.0",
+  "description": "TikShank Backend WebSocket",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "NODE_ENV=development node server.js"
+    "start": "node server.js"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -16,6 +15,5 @@
     "tiktok-live-connector": "^1.2.0",
     "ws": "^8.16.0"
   },
-  "keywords": ["tiktok", "live", "streaming", "panel"],
   "license": "MIT"
 }
