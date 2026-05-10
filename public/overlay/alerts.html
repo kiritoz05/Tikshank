@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>TikShank — Alerts Overlay</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background: transparent;
+    font-family: 'Syne', sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+  #alerts {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 420px;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 10px;
+    z-index: 100;
+  }
+  .alert {
+    background: rgba(13, 17, 23, 0.92);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    animation: popIn .5s cubic-bezier(.34,1.56,.64,1) forwards;
+    box-shadow: 0 20px 60px rgba(0,0,0,.6);
+    position: relative;
+    overflow: hidden;
+  }
+  .alert::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 2px;
+    background: var(--glow);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: destination-out;
+    mask-composite: exclude;
+    opacity: .5;
+  }
+  .alert.gift      { --glow: linear-gradient(135deg, #ffc14d, #ff6b35); }
+  .alert.follow    { --glow: linear-gradient(135deg, #0dff8c, #00bcd4); }
+  .alert.subscribe { --glow: linear-gradient(135deg, #a855f7, #ec4899); }
+  .alert.share     { --glow: linear-gradient(135deg, #3b82f6, #06b6d4); }
+
+  @keyframes popIn {
+    from { opacity:0; transform: translateX(60px) scale(.9); }
+    to   { opacity:1; transform: translateX(0) scale(1); }
+  }
+  @keyframes popOut {
+    to { opacity:0; transform: translateX(60px) scale(.9); max-height:0; margin:0; padding:0; }
+  }
+
+  .a-icon { font-size: 40px; flex-shrink:0; line-height:1; }
+  .a-body { flex:1; min-width:0; }
+  .a-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .a-sub { font-size: 13px; color: rgba(255,255,255,.6); margin-top: 3px; }
+  .a-coins {
+    font-family: 'DM Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: #ffc14d;
+    flex-shrink:0;
+  }
+
+  /* Progress bar */
+  .a-bar {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 3px;
+    background: var(--bar-color, #ffc14d);
+    border-radius: 0 0 14px 14px;
+    animation: shrink var(--dur, 6s) linear forwards;
+    transform-origin: left;
+  }
+  @keyframes shrink { from { scaleX: 1; } to { scaleX: 0; } }
+</style>
+</head>
+<body>
+<div id="alerts"></div>
+<script>
+const socket = io();
+const container = document.getElementById('alerts');
+let alertDuration = 6000;
+
+socket.on('state:full', d => { if (d.config?.alertDuration) alertDuration = d.config.alertDuration; });
+socket.on('config:update', c => { if (c.alertDuration) alertDuration = c.alertDuration; });
+
+socket.on('alert:new', a => showAlert(a));
+
+function showAlert(a) {
+  const types = { gift:'gift', follow:'follow', subscribe:'subscribe', share:'share' };
+  const cls = types[a.alertType] || 'follow';
+
+  const barColors = { gift:'#ffc14d', follow:'#0dff8c', subscribe:'#a855f7', share:'#3b82f6' };
+  const barColor = barColors[a.alertType] || '#0dff8c';
+
+  let icon='🔔', title='', sub='', coins='';
+  if (a.alertType==='gift') {
+    icon  = a.emoji || '🎁';
+    title = `${a.nickname} regaló ${a.giftName}!`;
+    sub   = `${a.count||1}× regalo`;
+    coins = `🪙 ${a.totalCoins||0}`;
+  } else if (a.alertType==='follow') {
+    icon  = '👤';
+    title = `¡${a.nickname} te siguió!`;
+    sub   = 'Nuevo seguidor';
+  } else if (a.alertType==='subscribe') {
+    icon  = '⭐';
+    title = `¡${a.nickname} se suscribió!`;
+    sub   = 'Nueva suscripción';
+  } else if (a.alertType==='share') {
+    icon  = '📤';
+    title = `${a.nickname} compartió el live`;
+    sub   = 'Compartido';
+  }
+
+  const el = document.createElement('div');
+  el.className = `alert ${cls}`;
+  el.style.setProperty('--dur', alertDuration + 'ms');
+  el.innerHTML = `
+    <div class="a-icon">${icon}</div>
+    <div class="a-body">
+      <div class="a-title">${esc(title)}</div>
+      <div class="a-sub">${esc(sub)}</div>
+    </div>
+    ${coins ? `<div class="a-coins">${coins}</div>` : ''}
+    <div class="a-bar" style="--bar-color:${barColor};--dur:${alertDuration}ms"></div>
+  `;
+
+  container.insertBefore(el, container.firstChild);
+  setTimeout(() => {
+    el.style.animation = 'popOut .4s ease forwards';
+    setTimeout(() => el.remove(), 400);
+  }, alertDuration);
+
+  while (container.children.length > 4) container.removeChild(container.lastChild);
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
