@@ -1,226 +1,302 @@
-/**
- * TikPanel Server v3 — Railway ready
- * Fixes:
- *  - package.json ahora incluye tiktok-live-connector + express + socket.io
- *  - Variables de entorno opcionales (no crashea si faltan)
- *  - Reconexión automática con backoff
- *  - Manejo de errores global (uncaughtException / unhandledRejection)
- *  - Endpoint /status/:username para que el frontend sepa si sigue conectado
- *  - CORS configurable via env ALLOWED_ORIGIN
- */
-
 "use strict";
+
+/**
+ * TikPanel Server v4 — Railway
+ * 
+ * Dependencias: express, socket.io, cors, axios, ws
+ * NO usa tiktok-live-connector (causaba SIGTERM en Railway)
+ * Conecta a TikTok LIVE via su API pública + WebSocket nativo
+ */
 
 const express    = require("express");
 const http       = require("http");
 const { Server } = require("socket.io");
-const { WebcastPushConnection } = require("tiktok-live-connector");
 const cors       = require("cors");
+const WebSocket  = require("ws");
+const https      = require("https");
 
-/* ─── Configuración ────────────────────────────── */
+/* ─── Config ──────────────────────────────────── */
 const PORT           = process.env.PORT || 8080;
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "*";
-const SESSION_SECRET = process.env.SESSION_SECRET || null;   // opcional
 
-if (!SESSION_SECRET) {
-  console.warn("⚠️  SESSION_SECRET no configurado — conexión sin sessionId (puede fallar en cuentas privadas)");
-}
-
-/* ─── Express + Socket.IO ──────────────────────── */
+/* ─── App ─────────────────────────────────────── */
 const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
   cors: { origin: ALLOWED_ORIGIN, methods: ["GET","POST"] },
-  pingTimeout: 20000,
-  pingInterval: 10000,
+  pingTimeout: 30000,
+  pingInterval: 15000,
 });
 
 app.use(cors({ origin: ALLOWED_ORIGIN }));
 app.use(express.json());
 
-/* ─── Estado en memoria ────────────────────────── */
-// username → { connection, viewers, topViewers, retryTimer }
+/* ─── Estado ──────────────────────────────────── */
+// username → { ws, roomId, connected, viewers, retryTimer, retryCount }
 const sessions = new Map();
 
-/* ─── Helpers ──────────────────────────────────── */
-function log(...args) {
-  console.log(new Date().toISOString().slice(11,19), ...args);
+function log(...a) { console.log(new Date().toISOString().slice(11,19), ...a); }
+
+/* ─────────────────────────────────────────────── 
+   HELPERS: obtener roomId y WebSocket URL de TikTok
+   ─────────────────────────────────────────────── */
+
+function httpsGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const opts = {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9",
+        ...headers,
+      },
+    };
+    https.get(url, opts, (res) => {
+      let data = "";
+      res.on("data", c => data += c);
+      res.on("end", () => resolve({ status: res.statusCode, body: data, headers: res.headers }));
+    }).on("error", reject);
+  });
 }
 
-function broadcastToAll(event, data) {
-  io.emit("event", { type: event, ...data });
+async function getRoomId(username, sessionId) {
+  // 1. Intentar con la página del live
+  const url = `https://www.tiktok.com/@${username}/live`;
+  const headers = {};
+  if (sessionId) headers["Cookie"] = `sessionid=${sessionId}`;
+
+  const res = await httpsGet(url, headers);
+  if (res.status !== 200) throw new Error(`TikTok respondió ${res.status}`);
+
+  // Buscar roomId en el HTML
+  const patterns = [
+    /"roomId"\s*:\s*"(\d+)"/,
+    /roomId=(\d+)/,
+    /"room_id"\s*:\s*"(\d+)"/,
+    /liveRoomId"\s*:\s*"(\d+)"/,
+  ];
+
+  for (const p of patterns) {
+    const m = res.body.match(p);
+    if (m?.[1]) return m[1];
+  }
+
+  // ¿Está en live?
+  if (res.body.includes("LIVE_NOT_STARTED") || res.body.includes("liveNotStarted")) {
+    throw new Error("El usuario no está en LIVE ahora mismo");
+  }
+  if (res.body.includes("user not found") || res.body.includes("userNotFound")) {
+    throw new Error("Usuario no encontrado en TikTok");
+  }
+
+  throw new Error("No se pudo obtener el roomId — ¿el usuario está en LIVE?");
 }
 
-/* ─── Conectar a TikTok LIVE ───────────────────── */
+async function getWebSocketInfo(username, roomId, sessionId) {
+  const headers = {};
+  if (sessionId) headers["Cookie"] = `sessionid=${sessionId}`;
+
+  const url = `https://webcast.tiktok.com/webcast/room/enter/?aid=1988&app_language=en-US&device_platform=web&room_id=${roomId}&sig_hash=undefined`;
+  const res = await httpsGet(url, headers);
+
+  try {
+    const json = JSON.parse(res.body);
+    const wsUrl = json?.data?.pushserver?.push_url || json?.data?.wsUrl;
+    if (wsUrl) return wsUrl;
+  } catch (_) {}
+
+  // Fallback: construir URL directa
+  return `wss://webcast.tiktok.com/webcast/im/push/v2/?app_name=tiktok_web&version_code=180800&webcast_sdk_version=1.3.0&device_platform=web&aid=1988&room_id=${roomId}`;
+}
+
+/* ─── Parsear mensaje WebSocket de TikTok ──────── */
+function parseTikTokMessage(rawData) {
+  // TikTok envía protobuf, pero también mensajes JSON en algunos casos
+  // Intentamos parsear como JSON primero
+  try {
+    const text = rawData.toString("utf8");
+    if (text.startsWith("{")) {
+      return JSON.parse(text);
+    }
+  } catch (_) {}
+  return null;
+}
+
+/* ─── Conectar WebSocket a sala de TikTok ──────── */
 async function connectTikTok(username, sessionId) {
-  // Si ya hay sesión activa para este usuario, desconectar primero
+  // Desconectar sesión previa
   if (sessions.has(username)) {
     const old = sessions.get(username);
     clearTimeout(old.retryTimer);
-    try { old.connection.disconnect(); } catch(_) {}
+    if (old.ws) { try { old.ws.terminate(); } catch (_) {} }
     sessions.delete(username);
   }
 
-  const opts = {
-    processInitialData: false,
-    enableExtendedGiftInfo: true,
-    enableWebsocketUpgrade: true,
-    requestPollingIntervalMs: 2000,
-    clientParams: { app_language: "es", device_platform: "web" },
-  };
-
-  // sessionId permite conectar aunque la cuenta no sea pública
-  if (sessionId) opts.sessionId = sessionId;
-
-  const tiktok = new WebcastPushConnection(username, opts);
-
-  /* Guardar en mapa antes de conectar */
   const state = {
-    connection: tiktok,
+    ws: null,
+    roomId: null,
     username,
-    viewers: 0,
-    topViewers: [],       // [{ user, nickname, count }]
-    giftMap: new Map(),   // user → diamonds
-    likeMap: new Map(),   // user → likes
-    retryTimer: null,
+    sessionId,
     connected: false,
+    viewers: 0,
+    topViewers: [],
+    retryTimer: null,
+    retryCount: 0,
   };
   sessions.set(username, state);
 
-  /* ── Eventos TikTok ─── */
+  // Obtener roomId
+  log(`🔍 Buscando roomId de @${username}...`);
+  state.roomId = await getRoomId(username, sessionId);
+  log(`✅ roomId encontrado: ${state.roomId}`);
 
-  tiktok.on("chat", d => {
+  // Obtener URL del WebSocket
+  const wsUrl = await getWebSocketInfo(username, state.roomId, sessionId);
+  log(`🔗 Conectando WebSocket...`);
+
+  const ws = new WebSocket(wsUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
+      "Origin": "https://www.tiktok.com",
+      ...(sessionId ? { "Cookie": `sessionid=${sessionId}` } : {}),
+    },
+  });
+
+  state.ws = ws;
+
+  ws.on("open", () => {
+    state.connected = true;
+    state.retryCount = 0;
+    log(`✅ WebSocket conectado a @${username}`);
+    io.emit("tiktok_connected", { username });
+  });
+
+  ws.on("message", (data) => {
+    handleTikTokEvent(username, data);
+  });
+
+  ws.on("close", (code, reason) => {
+    const wasConnected = state.connected;
+    state.connected = false;
+    log(`❌ WS cerrado @${username} code=${code}`);
+
+    if (wasConnected) {
+      io.emit("tiktok_disconnected", { username });
+    }
+
+    // Reintento con backoff exponencial (máx 60s)
+    if (state.retryCount < 10) {
+      const delay = Math.min(5000 * Math.pow(1.5, state.retryCount), 60000);
+      state.retryCount++;
+      log(`🔄 Reintento #${state.retryCount} en ${Math.round(delay/1000)}s @${username}`);
+      state.retryTimer = setTimeout(() => {
+        connectTikTok(username, sessionId).catch(e => {
+          log(`❌ Reintento fallido: ${e.message}`);
+        });
+      }, delay);
+    }
+  });
+
+  ws.on("error", (err) => {
+    log(`⚠️ WS error @${username}:`, err.message);
+    io.emit("tiktok_error", { username, message: err.message });
+  });
+
+  // Ping periódico para mantener conexión viva
+  const pingInterval = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.ping();
+    } else {
+      clearInterval(pingInterval);
+    }
+  }, 10000);
+
+  return state;
+}
+
+/* ─── Manejar eventos de TikTok ─────────────────── */
+function handleTikTokEvent(username, rawData) {
+  const msg = parseTikTokMessage(rawData);
+  if (!msg) return; // protobuf sin parsear — ignorar por ahora
+
+  const type = msg.type || msg.event;
+
+  if (type === "chat" || msg.comment) {
     io.emit("event", {
       type: "chat",
-      user: d.uniqueId,
-      nickname: d.nickname,
-      comment: d.comment,
+      user: msg.uniqueId || msg.userId || "?",
+      nickname: msg.nickname || msg.displayId || "?",
+      comment: msg.comment || msg.content || "",
     });
-  });
-
-  tiktok.on("gift", d => {
-    const diamonds = (d.diamondCount || 0) * (d.giftCount || 1);
-    const st = sessions.get(username);
-    if (st) {
-      const prev = st.giftMap.get(d.uniqueId) || 0;
-      st.giftMap.set(d.uniqueId, prev + diamonds);
-    }
+  } else if (type === "gift" || msg.giftId) {
+    const diamonds = (msg.diamondCount || 0) * (msg.giftCount || 1);
     io.emit("event", {
       type: "gift",
-      user: d.uniqueId,
-      nickname: d.nickname,
-      giftName: d.giftName,
-      giftCount: d.giftCount || 1,
+      user: msg.uniqueId || "?",
+      nickname: msg.nickname || "?",
+      giftName: msg.giftName || msg.gift?.name || "Regalo",
+      giftCount: msg.giftCount || 1,
       diamondCount: diamonds,
     });
-  });
-
-  tiktok.on("follow", d => {
+  } else if (type === "follow" || msg.displayType === "pm_mt_guidance_viewer_follow_live") {
     io.emit("event", {
       type: "follow",
-      user: d.uniqueId,
-      nickname: d.nickname,
+      user: msg.uniqueId || "?",
+      nickname: msg.nickname || "?",
     });
-  });
-
-  tiktok.on("like", d => {
+  } else if (type === "like") {
     io.emit("event", {
       type: "like",
-      user: d.uniqueId,
-      nickname: d.nickname,
-      likeCount: d.likeCount || 1,
-      totalLikeCount: d.totalLikeCount || 0,
+      user: msg.uniqueId || "?",
+      nickname: msg.nickname || "?",
+      likeCount: msg.likeCount || 1,
+      totalLikeCount: msg.totalLikeCount || 0,
     });
-  });
-
-  tiktok.on("subscribe", d => {
+  } else if (type === "subscribe" || type === "sub") {
     io.emit("event", {
       type: "sub",
-      user: d.uniqueId,
-      nickname: d.nickname,
+      user: msg.uniqueId || "?",
+      nickname: msg.nickname || "?",
     });
-  });
-
-  tiktok.on("share", d => {
+  } else if (type === "share") {
     io.emit("event", {
       type: "share",
-      user: d.uniqueId,
-      nickname: d.nickname,
+      user: msg.uniqueId || "?",
+      nickname: msg.nickname || "?",
     });
-  });
-
-  tiktok.on("member", d => {
-    io.emit("member", {
-      user: d.uniqueId,
-      nickname: d.nickname,
-      timestamp: Date.now(),
-    });
-  });
-
-  tiktok.on("roomUser", d => {
-    const st = sessions.get(username);
-    if (!st) return;
-    st.viewers = d.viewerCount || 0;
-    // topViewers si viene en el payload
-    if (Array.isArray(d.topViewers)) {
-      st.topViewers = d.topViewers.map(v => ({
-        user: v.user?.uniqueId || "?",
-        nickname: v.user?.nickname || v.user?.uniqueId || "?",
-        count: v.coinCount || 0,
-      })).filter(v => v.user !== "?");
-    }
-    io.emit("viewers", { count: st.viewers, topViewers: st.topViewers });
-  });
-
-  tiktok.on("battle", d => {
-    io.emit("battle", d);
-  });
-
-  tiktok.on("streamEnd", () => {
-    log(`🔴 LIVE terminado @${username}`);
-    io.emit("tiktok_disconnected", { username });
-    const st = sessions.get(username);
-    if (st) st.connected = false;
-  });
-
-  tiktok.on("disconnected", () => {
-    log(`❌ Desconectado de @${username}`);
-    io.emit("tiktok_disconnected", { username });
+  } else if (type === "roomUser" || msg.viewerCount !== undefined) {
     const st = sessions.get(username);
     if (st) {
-      st.connected = false;
-      // Reintento automático cada 15 segundos
-      st.retryTimer = setTimeout(() => {
-        log(`🔄 Reintentando conexión a @${username}...`);
-        connectTikTok(username, sessionId).catch(e => {
-          log(`❌ Reintento fallido @${username}:`, e.message);
-        });
-      }, 15000);
+      st.viewers = msg.viewerCount || 0;
+      io.emit("viewers", { count: st.viewers, topViewers: st.topViewers || [] });
     }
-  });
-
-  tiktok.on("error", err => {
-    log(`⚠️  Error TikTok @${username}:`, err.message || err);
-    io.emit("tiktok_error", { username, message: err.message || String(err) });
-  });
-
-  /* ── Conectar ─── */
-  const info = await tiktok.connect();
-  state.connected = true;
-  log(`✅ Conectado a @${username} — viewers: ${info?.roomInfo?.userCount || 0}`);
-  return info;
+  } else if (type === "member") {
+    io.emit("member", {
+      user: msg.uniqueId || "?",
+      nickname: msg.nickname || "?",
+      timestamp: Date.now(),
+    });
+  }
 }
 
 /* ─── REST API ─────────────────────────────────── */
 
 app.get("/", (_req, res) => {
-  res.json({ ok: true, service: "TikPanel Server v3", sessions: sessions.size });
+  res.json({
+    ok: true,
+    service: "TikPanel Server v4",
+    sessions: sessions.size,
+    uptime: Math.floor(process.uptime()),
+  });
 });
 
 app.get("/status/:username", (req, res) => {
   const username = req.params.username.replace(/^@/, "").toLowerCase();
   const st = sessions.get(username);
-  res.json({ connected: !!(st && st.connected), viewers: st?.viewers || 0 });
+  res.json({
+    connected: !!(st?.connected),
+    viewers: st?.viewers || 0,
+    roomId: st?.roomId || null,
+  });
 });
 
 app.post("/connect", async (req, res) => {
@@ -230,20 +306,23 @@ app.post("/connect", async (req, res) => {
   username = username.replace(/^@/, "").toLowerCase().trim();
 
   try {
-    await connectTikTok(username, sessionId || SESSION_SECRET || undefined);
+    await connectTikTok(username, sessionId || undefined);
     res.json({ success: true, username });
   } catch (err) {
-    log(`❌ /connect error @${username}:`, err.message);
+    log(`❌ /connect @${username}:`, err.message);
+
     let msg = err.message || "Error desconocido";
-    // Mensajes amigables
-    if (msg.includes("LIVE") || msg.includes("live"))      msg = "El usuario no está en LIVE ahora mismo";
-    if (msg.includes("not found") || msg.includes("404"))  msg = "Usuario no encontrado en TikTok";
-    if (msg.includes("429") || msg.includes("rate"))       msg = "Demasiadas conexiones, espera un momento";
+    if (msg.includes("respondió 4")) msg = "No se pudo acceder al LIVE — ¿el usuario está en LIVE?";
+    if (msg.includes("LIVE"))        msg = "El usuario no está en LIVE ahora mismo";
+    if (msg.includes("encontrado"))  msg = "Usuario no encontrado en TikTok";
+    if (msg.includes("429"))         msg = "TikTok bloqueó la solicitud. Espera unos segundos";
+    if (msg.includes("roomId"))      msg = "¿El usuario está en LIVE? No se encontró la sala";
+
     res.json({ success: false, error: msg });
   }
 });
 
-app.post("/disconnect", async (req, res) => {
+app.post("/disconnect", (req, res) => {
   let { username } = req.body || {};
   if (!username) return res.status(400).json({ success: false, error: "Falta username" });
 
@@ -251,30 +330,32 @@ app.post("/disconnect", async (req, res) => {
   const st = sessions.get(username);
   if (st) {
     clearTimeout(st.retryTimer);
-    try { st.connection.disconnect(); } catch(_) {}
+    if (st.ws) { try { st.ws.terminate(); } catch (_) {} }
     sessions.delete(username);
-    log(`🔌 Desconectado manualmente @${username}`);
+    log(`🔌 Desconectado @${username}`);
   }
   res.json({ success: true });
 });
 
 /* ─── Socket.IO ─────────────────────────────────── */
 io.on("connection", sock => {
-  log(`Socket conectado: ${sock.id}`);
-  sock.on("disconnect", () => log(`Socket desconectado: ${sock.id}`));
+  log(`Socket: ${sock.id} conectado`);
+  sock.on("disconnect", () => log(`Socket: ${sock.id} desconectado`));
 });
 
 /* ─── Manejo global de errores ──────────────────── */
 process.on("uncaughtException", err => {
   console.error("💥 uncaughtException:", err.message);
-  // NO salir — Railway lo reinicia de todas formas y perderíamos las sesiones activas
+  // No salir — Railway lo mataría y perdería sesiones
 });
 
-process.on("unhandledRejection", (reason) => {
+process.on("unhandledRejection", reason => {
   console.error("💥 unhandledRejection:", reason?.message || reason);
 });
 
-/* ─── Iniciar servidor ──────────────────────────── */
+/* ─── Iniciar ────────────────────────────────────── */
 server.listen(PORT, () => {
-  log(`🚀 TikPanel Server v3 en puerto ${PORT}`);
+  log(`🚀 TikPanel Server v4 en puerto ${PORT}`);
+  log(`   CORS: ${ALLOWED_ORIGIN}`);
+  log(`   Node: ${process.version}`);
 });
