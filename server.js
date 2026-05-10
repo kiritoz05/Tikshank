@@ -214,6 +214,33 @@ app.post("/api/tts", authMiddleware, async (req, res) => {
   }
 });
 
+// ── TTS: listar voces disponibles ────────────────────────────────────────────
+app.get("/api/tts/voices", authMiddleware, async (req, res) => {
+  if (!EL_KEY) return res.json({ voices: [] });
+  try {
+    const r = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: "api.elevenlabs.io",
+        path: "/v1/voices",
+        method: "GET",
+        headers: { "xi-api-key": EL_KEY }
+      };
+      const req2 = https.request(options, (r2) => {
+        let data = "";
+        r2.on("data", c => data += c);
+        r2.on("end", () => resolve({ status: r2.statusCode, data }));
+      });
+      req2.on("error", reject);
+      req2.setTimeout(8000, () => { req2.destroy(); reject(new Error("timeout")); });
+      req2.end();
+    });
+    if (r.status !== 200) return res.json({ voices: [] });
+    res.json(JSON.parse(r.data));
+  } catch(e) {
+    res.json({ voices: [] });
+  }
+});
+
 // ── Admin: listar usuarios ────────────────────────────────────────────────────
 app.get("/admin/users", adminMiddleware, (req, res) => {
   const users = Object.entries(USERS_DB).map(([email, u]) => ({
@@ -405,9 +432,9 @@ async function startTikTokConnection(username, sessionId, ownerUsername) {
   const opts = {
     processInitialData: false,
     enableExtendedGiftInfo: true,
-    enableWebsocketUpgrade: true,
-    requestPollingIntervalMs: 2000,
-    sessionId: sessionId || undefined,
+    enableWebsocketUpgrade: false,      // ← Desactivado: TikTok ya no soporta WS upgrade sin sessionId
+    requestPollingIntervalMs: 1500,     // ← Polling cada 1.5s
+    ...(sessionId ? { sessionId } : {}),// ← Solo incluir sessionId si existe
   };
 
   const tiktok = new WebcastPushConnection(username, opts);
@@ -550,18 +577,18 @@ app.post("/connect", authMiddleware, async (req, res) => {
   if (!clean) return res.status(400).json({ error:"Username inválido" });
 
   cleanSession(clean);
-  let lastErr = "";
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      await startTikTokConnection(clean, sessionId, req.user.name);
-      return res.json({ success:true, message:`Conectado a @${clean}` });
-    } catch(err) {
-      lastErr = err.message||"Error desconocido";
-      console.warn(`Intento ${attempt}/3 fallido para @${clean}: ${lastErr}`);
-      if (attempt < 3) await new Promise(r => setTimeout(r, 2000 * attempt));
+  try {
+    await startTikTokConnection(clean, sessionId || null, req.user.name);
+    return res.json({ success:true, message:`Conectado a @${clean}` });
+  } catch(err) {
+    const msg = err.message || "Error desconocido";
+    console.warn(`Conexión fallida para @${clean}: ${msg}`);
+    // Si el error es de websocket upgrade, dar mensaje claro
+    if (msg.includes("websocket upgrade") || msg.includes("sessionId")) {
+      return res.status(500).json({ error: "¿Estás en LIVE? Si tu cuenta es privada, ingresa tu Session ID." });
     }
+    res.status(500).json({ error: msg || "No se pudo conectar. ¿Estás en LIVE?" });
   }
-  res.status(500).json({ error: lastErr||"No se pudo conectar. ¿Estás en LIVE?" });
 });
 
 app.post("/disconnect", authMiddleware, (req, res) => {
