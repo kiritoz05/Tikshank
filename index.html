@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TikShank – Panel Streamer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+/* ─── RESET & VARS ─────────────────────────────────────────── */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#08080f;
+  --bg2:#0f0f1a;
+  --bg3:#14141f;
+  --bg4:#1a1a2a;
+  --border:#1e1e30;
+  --border2:#252535;
+  --tt:#fe2c55;
+  --tt2:#25f4ee;
+  --tt3:#ff6b81;
+  --green:#1DB954;
+  --purple:#a78bfa;
+  --gold:#fbbf24;
+  --text:#e8e8f0;
+  --muted:#888;
+  --dim:#444;
+  --r:14px;
+  --r2:10px;
+  --font:'Space Grotesk',sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+html{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+button{font-family:var(--font);cursor:pointer;border:none;outline:none}
+input,select,textarea{font-family:var(--font);outline:none}
+a{color:inherit;text-decoration:none}
+
+/* ─── SCROLLBAR ──────────────────────────────────────────────── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ─── LOGIN ──────────────────────────────────────────────────── */
+#login-screen{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;position:relative;overflow:hidden;
+}
+.login-glow{
+  position:absolute;width:700px;height:700px;border-radius:50%;
+  background:radial-gradient(circle,rgba(254,44,85,.12) 0%,transparent 65%);
+  top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;
+}
+.login-glow2{
+  position:absolute;width:400px;height:400px;border-radius:50%;
+  background:radial-gradient(circle,rgba(37,244,238,.07) 0%,transparent 65%);
+  top:20%;left:70%;pointer-events:none;
+}
+.login-card{
+  background:var(--bg3);border:1px solid var(--border2);border-radius:24px;
+  padding:52px 44px;width:100%;max-width:430px;
+  box-shadow:0 40px 100px rgba(0,0,0,.7);position:relative;z-index:1;
+}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.logo-x{
+  font-size:38px;font-weight:900;
+  background:linear-gradient(135deg,var(--tt),var(--tt2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  line-height:1;
+}
+.logo-text{color:#fff;font-size:30px;font-weight:800;letter-spacing:-1px}
+.login-sub{color:var(--muted);font-size:14px;margin-bottom:24px;margin-top:6px}
+.login-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(254,44,85,.08);border:1px solid rgba(254,44,85,.2);
+  color:var(--tt);border-radius:20px;padding:5px 14px;font-size:12px;
+  font-weight:600;letter-spacing:.3px;margin-bottom:32px;
+}
+.field{margin-bottom:18px}
+.field label{display:block;color:var(--muted);font-size:11px;font-weight:700;
+  letter-spacing:1px;margin-bottom:8px;text-transform:uppercase}
+.field input{
+  width:100%;background:var(--bg);border:1px solid var(--border2);
+  border-radius:var(--r2);padding:13px 16px;color:#fff;font-size:14px;
+  transition:border-color .2s;
+}
+.field input:focus{border-color:var(--tt)}
+.login-error{
+  background:rgba(254,44,85,.08);border:1px solid rgba(254,44,85,.25);
+  border-radius:8px;padding:10px 14px;color:var(--tt);font-size:13px;margin-bottom:16px;
+}
+.btn-login{
+  width:100%;background:linear-gradient(135deg,var(--tt),var(--tt3));
+  border-radius:var(--r2);padding:15px;color:#fff;font-size:15px;
+  font-weight:700;transition:opacity .2s,transform .1s;margin-top:4px;
+}
+.btn-login:hover{opacity:.9}
+.btn-login:active{transform:scale(.98)}
+.login-hint{color:var(--dim);font-size:12px;text-align:center;margin-top:22px;
+  font-family:var(--mono)}
+
+/* ─── APP LAYOUT ─────────────────────────────────────────────── */
+#app-screen{display:none;height:100vh;overflow:hidden}
+.app-layout{display:flex;height:100%}
+
+/* ─── SIDEBAR ────────────────────────────────────────────────── */
+.sidebar{
+  width:230px;background:var(--bg2);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:20px 14px;
+  flex-shrink:0;overflow-y:auto;
+}
+.sb-logo{display:flex;align-items:center;gap:8px;padding:4px 8px;margin-bottom:20px}
+.sb-logo .logo-x{font-size:26px}
+.sb-logo .logo-text{font-size:20px}
+.sb-user{
+  background:var(--bg4);border-radius:var(--r2);padding:12px;
+  display:flex;align-items:center;gap:10px;margin-bottom:14px;
+}
+.sb-avatar{
+  width:36px;height:36px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--tt),var(--tt2));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:15px;color:#fff;
+}
+.sb-name{font-size:13px;font-weight:700;color:#fff}
+.sb-plan{font-size:11px;color:var(--tt);font-weight:600;margin-top:2px}
+.sb-status{
+  display:flex;align-items:center;gap:8px;border-radius:20px;
+  padding:7px 13px;font-size:12px;margin-bottom:22px;
+  border:1px solid var(--border2);color:var(--muted);
+  transition:all .3s;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+}
+.sb-status.live{
+  background:rgba(37,244,238,.07);border-color:rgba(37,244,238,.25);
+  color:var(--tt2);
+}
+.status-dot{
+  width:7px;height:7px;border-radius:50%;background:var(--dim);flex-shrink:0;
+  transition:all .3s;
+}
+.sb-status.live .status-dot{
+  background:var(--tt2);box-shadow:0 0 8px var(--tt2);
+}
+.nav-section{font-size:10px;font-weight:700;color:var(--dim);letter-spacing:1.5px;
+  padding:0 8px;margin-bottom:8px;margin-top:4px;text-transform:uppercase}
+.nav{display:flex;flex-direction:column;gap:3px;flex:1}
+.nav-btn{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;
+  border-radius:var(--r2);color:var(--muted);font-size:13px;
+  font-weight:500;background:transparent;border:1px solid transparent;
+  transition:all .15s;text-align:left;
+}
+.nav-btn:hover{color:var(--text);background:var(--bg4)}
+.nav-btn.active{
+  color:#fff;background:rgba(254,44,85,.1);
+  border-color:rgba(254,44,85,.2);font-weight:700;
+}
+.nav-btn .nav-icon{font-size:16px;width:20px;text-align:center}
+.sb-bottom{margin-top:auto;padding-top:12px}
+.btn-logout{
+  width:100%;background:transparent;border:1px solid var(--border2);
+  border-radius:var(--r2);padding:10px;color:var(--muted);
+  font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:all .2s;
+}
+.btn-logout:hover{border-color:var(--tt);color:var(--tt)}
+
+/* ─── MAIN AREA ──────────────────────────────────────────────── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 28px 16px;border-bottom:1px solid var(--border);
+  flex-shrink:0;background:var(--bg2);
+}
+.page-title{font-size:20px;font-weight:800;letter-spacing:-.5px;color:#fff}
+.page-sub{color:var(--muted);font-size:12px;margin-top:3px}
+.live-badge{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(254,44,85,.1);border:1px solid rgba(254,44,85,.25);
+  border-radius:20px;padding:6px 16px;color:var(--tt);
+  font-size:11px;font-weight:800;letter-spacing:1.5px;
+}
+.live-dot{
+  width:8px;height:8px;border-radius:50%;background:var(--tt);
+  box-shadow:0 0 10px var(--tt);animation:pulse 1.5s infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.content{flex:1;overflow-y:auto;padding:24px 28px}
+
+/* ─── CARDS ──────────────────────────────────────────────────── */
+.card{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);padding:22px;margin-bottom:14px;
+}
+.card-title{font-size:14px;font-weight:700;color:#fff;margin-bottom:18px}
+.sec-hdr{
+  display:flex;align-items:center;gap:8px;margin-bottom:10px;margin-top:2px;
+}
+.sec-hdr-dot{
+  width:7px;height:7px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,var(--tt),var(--tt2));
+}
+.sec-hdr-txt{color:var(--tt);font-size:10px;font-weight:800;letter-spacing:2px;
+  text-transform:uppercase}
+
+/* ─── STATS GRID ─────────────────────────────────────────────── */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+.stat-card{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:var(--r);padding:18px;text-align:center;
+}
+.stat-icon{font-size:22px;margin-bottom:8px}
+.stat-val{font-size:26px;font-weight:900;line-height:1;letter-spacing:-1px}
+.stat-lbl{color:var(--muted);font-size:10px;font-weight:700;
+  letter-spacing:.8px;margin-top:5px;text-transform:uppercase}
+
+/* ─── INPUTS ─────────────────────────────────────────────────── */
+.inp{
+  width:100%;background:var(--bg);border:1px solid var(--border2);
+  border-radius:var(--r2);padding:11px 14px;color:#fff;font-size:13px;
+  transition:border-color .2s;
+}
+.inp:focus{border-color:var(--tt)}
+.inp::placeholder{color:var(--dim)}
+.inp-label{display:block;color:var(--muted);font-size:11px;font-weight:700;
+  letter-spacing:.5px;margin-bottom:7px;text-transform:uppercase}
+select.inp{cursor:pointer}
+.hint{color:var(--dim);font-size:11px;margin-top:5px}
+
+/* ─── TOGGLES ────────────────────────────────────────────────── */
+.toggle-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 0;border-bottom:1px solid var(--bg4);
+}
+.toggle-row:last-child{border-bottom:none}
+.toggle-lbl{color:#ccc;font-size:13px}
+.toggle-sub{color:var(--dim);font-size:11px;margin-top:2px}
+.toggle{
+  width:44px;height:24px;border-radius:12px;position:relative;
+  cursor:pointer;transition:background .2s;flex-shrink:0;
+}
+.toggle.on{background:var(--tt)}
+.toggle.off{background:var(--bg4)}
+.toggle-knob{
+  position:absolute;top:3px;width:18px;height:18px;
+  border-radius:50%;background:#fff;transition:left .2s;
+  box-shadow:0 1px 4px rgba(0,0,0,.5);
+}
+.toggle.on .toggle-knob{left:23px}
+.toggle.off .toggle-knob{left:3px}
+
+/* ─── BUTTONS ────────────────────────────────────────────────── */
+.btn{border-radius:var(--r2);padding:10px 20px;font-size:13px;font-weight:700;transition:all .15s}
+.btn-primary{background:linear-gradient(135deg,var(--tt),var(--tt3));color:#fff}
+.btn-primary:hover{opacity:.9}
+.btn-ghost{background:rgba(254,44,85,.1);border:1px solid rgba(254,44,85,.2);color:var(--tt)}
+.btn-ghost:hover{background:rgba(254,44,85,.18)}
+.btn-green{background:linear-gradient(135deg,var(--green),#17a349);color:#fff}
+.btn-green:hover{opacity:.9}
+.btn-add{background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);color:var(--purple)}
+.btn-icon{
+  width:38px;height:38px;border-radius:50%;
+  background:linear-gradient(135deg,var(--tt),var(--tt3));
+  color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.btn-remove{background:transparent;border:none;color:var(--dim);font-size:18px;padding:4px 8px}
+.btn-remove:hover{color:var(--tt)}
+
+/* ─── CONNECT SECTION ────────────────────────────────────────── */
+.connect-row{display:flex;gap:10px;align-items:center}
+.at-wrap{
+  display:flex;align-items:center;flex:1;background:var(--bg);
+  border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden;
+}
+.at-sign{color:var(--tt);font-weight:800;padding:0 12px;font-size:15px}
+.at-inp{
+  flex:1;background:transparent;border:none;
+  padding:12px 12px 12px 0;color:#fff;font-size:14px;
+}
+.at-inp:disabled{opacity:.5}
+.connect-bar{height:3px;background:var(--border);border-radius:2px;
+  margin-top:14px;overflow:hidden;}
+.connect-fill{
+  height:100%;width:0;background:linear-gradient(90deg,var(--tt2),var(--tt));
+  border-radius:2px;animation:fillAnim 2.5s ease-out forwards;
+}
+@keyframes fillAnim{to{width:100%}}
+
+/* ─── LOG BOX ────────────────────────────────────────────────── */
+.log-box{
+  background:var(--bg);border-radius:var(--r2);padding:14px;
+  height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:5px;
+}
+.log-empty{color:var(--dim);font-size:13px;text-align:center;margin:auto}
+.log-item{
+  font-size:12px;padding:6px 10px;border-radius:6px;
+  border-left:2px solid;line-height:1.4;font-family:var(--mono);
+}
+.log-item.gift{background:rgba(254,44,85,.06);border-color:var(--tt);color:#ff8fa0}
+.log-item.follow{background:rgba(37,244,238,.06);border-color:var(--tt2);color:var(--tt2)}
+.log-item.chat{background:rgba(255,255,255,.03);border-color:var(--border2);color:#aaa}
+.log-item.system{background:rgba(167,139,250,.06);border-color:var(--purple);color:var(--purple)}
+.log-item.like{background:rgba(251,191,36,.05);border-color:var(--gold);color:var(--gold)}
+.log-item.battle{background:rgba(29,185,84,.06);border-color:var(--green);color:var(--green)}
+
+/* ─── RANGE SLIDER ───────────────────────────────────────────── */
+input[type=range]{width:100%;accent-color:var(--tt);cursor:pointer;height:4px}
+
+/* ─── CHIPS ──────────────────────────────────────────────────── */
+.chip{
+  background:var(--bg4);border:1px solid var(--border2);
+  border-radius:20px;padding:5px 12px;color:#aaa;font-size:12px;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.chip-x{color:var(--tt);cursor:pointer;margin-left:4px;font-size:13px}
+
+/* ─── DROPDOWN ───────────────────────────────────────────────── */
+.dropdown{
+  position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:200;
+  background:var(--bg4);border:1px solid var(--border2);
+  border-radius:var(--r);padding:12px;
+  box-shadow:0 24px 60px rgba(0,0,0,.8);
+}
+.drop-item{
+  display:flex;align-items:center;gap:10px;padding:10px 8px;
+  border-radius:8px;cursor:pointer;transition:background .1s;
+}
+.drop-item:hover{background:var(--bg)}
+.drop-item-emoji{font-size:24px;min-width:32px}
+.drop-item-name{flex:1;color:#fff;font-weight:600;font-size:13px}
+.drop-item-coins{
+  color:var(--gold);font-size:11px;background:rgba(251,191,36,.1);
+  padding:2px 8px;border-radius:20px;font-family:var(--mono);
+}
+
+/* ─── GIFT CARD ──────────────────────────────────────────────── */
+.gift-card{border-color:rgba(254,44,85,.2) !important}
+.gift-icon-box{
+  width:52px;height:52px;border-radius:12px;background:var(--bg);
+  border:1px solid var(--border2);display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;font-size:28px;
+}
+.gift-name{font-weight:800;color:#fff;font-size:15px}
+.gift-coins{color:var(--gold);font-size:12px;margin-top:2px;font-family:var(--mono)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+
+/* ─── SPOTIFY ────────────────────────────────────────────────── */
+.now-playing{
+  background:rgba(29,185,84,.06);border:1px solid rgba(29,185,84,.2);
+  border-radius:var(--r2);padding:14px 16px;margin-top:14px;
+}
+.now-playing-label{color:var(--green);font-size:10px;font-weight:800;
+  letter-spacing:1.5px;margin-bottom:4px}
+.now-playing-track{color:var(--muted);font-size:13px}
+.spotify-perms{display:flex;flex-wrap:wrap;gap:8px}
+.perm-btn{
+  padding:7px 16px;border-radius:20px;font-size:12px;font-weight:700;
+  cursor:pointer;transition:all .15s;
+  background:var(--bg);border:1px solid var(--border2);color:var(--muted);
+}
+.perm-btn.active{
+  background:rgba(29,185,84,.15);border-color:var(--green);color:var(--green);
+}
+.queue-item{
+  display:flex;align-items:center;gap:10px;padding:9px 0;
+  border-bottom:1px solid var(--bg4);
+}
+.queue-num{color:var(--dim);min-width:22px;font-family:var(--mono);font-size:12px}
+.queue-track{flex:1;color:#fff;font-size:13px}
+.queue-user{color:var(--muted);font-size:11px}
+.info-box{
+  background:rgba(37,244,238,.05);border:1px solid rgba(37,244,238,.15);
+  border-radius:var(--r2);padding:14px 16px;color:#aaa;font-size:13px;
+  line-height:1.6;margin-top:12px;
+}
+
+/* ─── BATALLA ────────────────────────────────────────────────── */
+.battle-arena{
+  background:linear-gradient(135deg,rgba(254,44,85,.05),rgba(37,244,238,.05));
+  border:1px solid rgba(254,44,85,.15);border-radius:var(--r);
+  padding:24px;margin-bottom:14px;
+}
+.battle-vs{
+  display:grid;grid-template-columns:1fr auto 1fr;gap:16px;
+  align-items:center;margin-bottom:20px;
+}
+.battle-team{text-align:center}
+.battle-team-name{font-size:13px;font-weight:700;color:#fff;margin-bottom:4px}
+.battle-team-score{font-size:36px;font-weight:900;letter-spacing:-2px}
+.battle-team-score.red{color:var(--tt)}
+.battle-team-score.cyan{color:var(--tt2)}
+.battle-vs-label{
+  font-size:18px;font-weight:900;color:var(--muted);
+  background:var(--bg4);border-radius:50%;width:40px;height:40px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border2);
+}
+.battle-bar-wrap{height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.battle-bar{height:100%;border-radius:4px;transition:width .5s ease;
+  background:linear-gradient(90deg,var(--tt),var(--tt2))}
+.battle-status{
+  text-align:center;margin-top:14px;color:var(--muted);font-size:12px;
+  font-family:var(--mono);
+}
+.battle-history{max-height:180px;overflow-y:auto}
+.battle-hist-item{
+  display:flex;align-items:center;gap:8px;padding:6px 0;
+  border-bottom:1px solid var(--bg4);font-size:12px;
+}
+.battle-empty{
+  color:var(--dim);text-align:center;padding:24px;font-size:13px;
+}
+
+/* ─── DIAMANTES ──────────────────────────────────────────────── */
+.diamond-goal{
+  background:linear-gradient(135deg,rgba(167,139,250,.08),rgba(251,191,36,.05));
+  border:1px solid rgba(167,139,250,.2);border-radius:var(--r);
+  padding:20px;margin-bottom:14px;
+}
+.diamond-total{
+  font-size:42px;font-weight:900;color:var(--purple);letter-spacing:-2px;
+  font-family:var(--mono);
+}
+.diamond-sub{color:var(--muted);font-size:12px;margin-top:4px}
+.goal-bar-wrap{margin-top:14px}
+.goal-bar{height:10px;background:var(--bg);border-radius:5px;overflow:hidden;margin-top:6px}
+.goal-fill{
+  height:100%;border-radius:5px;
+  background:linear-gradient(90deg,var(--purple),var(--gold));
+  transition:width .5s ease;
+}
+.goal-labels{display:flex;justify-content:space-between;margin-top:5px}
+.goal-lbl{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.top-gifters{margin-top:16px}
+.gifter-item{
+  display:flex;align-items:center;gap:10px;padding:8px 0;
+  border-bottom:1px solid var(--bg4);
+}
+.gifter-rank{
+  width:24px;height:24px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:800;flex-shrink:0;
+}
+.gifter-rank.r1{background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#000}
+.gifter-rank.r2{background:linear-gradient(135deg,#94a3b8,#64748b);color:#fff}
+.gifter-rank.r3{background:linear-gradient(135deg,#92400e,#78350f);color:#fff}
+.gifter-rank.rn{background:var(--bg4);color:var(--muted)}
+.gifter-name{flex:1;color:#fff;font-size:13px;font-weight:600}
+.gifter-coins{color:var(--gold);font-size:12px;font-family:var(--mono)}
+
+/* ─── RESPONSIVE ─────────────────────────────────────────────── */
+@media(max-width:768px){
+  .sidebar{width:200px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .grid-2{grid-template-columns:1fr}
+  .content{padding:16px}
+}
+@media(max-width:600px){
+  .sidebar{display:none}
+  .app-layout{flex-direction:column}
+}
+</style>
+</head>
+<body>
+
+<!-- ─── LOGIN ──────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-glow"></div>
+  <div class="login-glow2"></div>
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="logo-x">✕</span>
+      <span class="logo-text">TikShank</span>
+    </div>
+    <p class="login-sub">Panel de control para streamers de TikTok</p>
+    <span class="login-badge">🔐 Acceso privado</span>
+
+    <div class="field">
+      <label>Correo</label>
+      <input id="login-email" type="email" placeholder="tu@correo.com"/>
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input id="login-pass" type="password" placeholder="••••••••"/>
+    </div>
+    <div id="login-err" class="login-error" style="display:none"></div>
+    <button class="btn-login" onclick="doLogin()">Iniciar sesión →</button>
+    <p class="login-hint">admin@tikpanel.com / admin123</p>
+  </div>
+</div>
+
+<!-- ─── APP ────────────────────────────────────────────────────── -->
+<div id="app-screen">
+  <div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sb-logo">
+        <span class="logo-x">✕</span>
+        <span class="logo-text">TikShank</span>
+      </div>
+
+      <div class="sb-user">
+        <div class="sb-avatar" id="sb-avatar">A</div>
+        <div>
+          <div class="sb-name" id="sb-name">Admin</div>
+          <div class="sb-plan" id="sb-plan">Pro</div>
+        </div>
+      </div>
+
+      <div class="sb-status" id="sb-status">
+        <div class="status-dot"></div>
+        <span id="sb-status-txt">Sin conectar</span>
+      </div>
+
+      <div class="nav-section">Panel</div>
+      <div class="nav" id="nav">
+        <button class="nav-btn active" data-tab="dashboard" onclick="setTab('dashboard',this)">
+          <span class="nav-icon">⚡</span> Dashboard
+        </button>
+        <button class="nav-btn" data-tab="tts" onclick="setTab('tts',this)">
+          <span class="nav-icon">🔊</span> TTS
+        </button>
+        <button class="nav-btn" data-tab="gifts" onclick="setTab('gifts',this)">
+          <span class="nav-icon">🎁</span> Regalos
+        </button>
+        <button class="nav-btn" data-tab="batalla" onclick="setTab('batalla',this)">
+          <span class="nav-icon">⚔️</span> Batalla
+        </button>
+        <button class="nav-btn" data-tab="diamantes" onclick="setTab('diamantes',this)">
+          <span class="nav-icon">💎</span> Diamantes
+        </button>
+        <button class="nav-btn" data-tab="spotify" onclick="setTab('spotify',this)">
+          <span class="nav-icon">🎵</span> Música
+        </button>
+      </div>
+
+      <div class="sb-bottom">
+        <button class="btn-logout" onclick="doLogout()">⎋ Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="topbar">
+        <div>
+          <div class="page-title" id="page-title">⚡ Dashboard</div>
+          <div class="page-sub">Panel de tu LIVE en TikTok</div>
+        </div>
+        <div id="live-badge" class="live-badge" style="display:none">
+          <div class="live-dot"></div> LIVE
+        </div>
+      </div>
+
+      <div class="content" id="content">
+        <!-- Se llena con JS -->
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const SERVER_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'ws://localhost:8080'
+  : 'wss://tikshank-production.up.railway.app'; // Cambia por tu URL de Railway
+
+const USERS = {
+  'admin@tikpanel.com': { password: 'admin123', name: 'Admin', plan: 'Pro' },
+  'usuario@tikpanel.com': { password: 'pass123', name: 'StreamerPro', plan: 'Free' },
+};
+
+const GIFTS_DB = [
+  {id:'rose',name:'Rosa',emoji:'🌹',coins:1},
+  {id:'icecream',name:'Ice Cream',emoji:'🍦',coins:1},
+  {id:'tiktok',name:'TikTok',emoji:'📱',coins:1},
+  {id:'finger',name:'Finger Heart',emoji:'🤞',coins:5},
+  {id:'hat',name:'Sombrero',emoji:'🎩',coins:10},
+  {id:'sunglasses',name:'Gafas',emoji:'😎',coins:30},
+  {id:'perfume',name:'Perfume',emoji:'🌸',coins:99},
+  {id:'butterfly',name:'Mariposa',emoji:'🦋',coins:399},
+  {id:'alien',name:'Alien',emoji:'👾',coins:399},
+  {id:'dancer',name:'Bailarina',emoji:'💃',coins:300},
+  {id:'animalband',name:'Animal Band',emoji:'🎷',coins:2500},
+  {id:'astrobear',name:'Astrobear',emoji:'🐻',coins:1500},
+  {id:'leon',name:'León',emoji:'🦁',coins:1000},
+  {id:'drama',name:'Drama Queen',emoji:'👑',coins:5000},
+  {id:'park',name:'Parque',emoji:'🎡',coins:17000},
+  {id:'universe',name:'Universo',emoji:'🌍',coins:34999},
+];
+
+// ─── ESTADO ───────────────────────────────────────────────────────────────────
+let state = {
+  user: null,
+  tab: 'dashboard',
+  ws: null,
+  connected: false,
+  tiktokUser: '',
+  stats: { viewers: 0, gifts: 0, follows: 0, likes: 0, diamonds: 0, messages: 0 },
+  log: [],
+  // TTS
+  ttsVoice: 'es-MX-DaliaNeural', ttsVol: 1.0, ttsSpeed: 1.0, ttsPitch: 1.0,
+  ttsEvents: { chat: true, gifts: false, follows: false, shares: false, join: false },
+  ttsTemplates: {
+    chat: '{nickname} dice: {message}',
+    gift: '{username} envió {giftName} x{repeatCount}',
+    follow: '{username} te siguió',
+    share: '{username} compartió el live',
+    join: '{username} se unió',
+  },
+  ttsFilters: { all: false, followers: true, mods: false, superFans: false },
+  ttsOptions: { infinite: true, skipEmoji: true, skipAt: false, skipCmd: false, antiSpam: false },
+  // Regalos
+  addedGifts: [], giftConfigs: {}, defaultVol: 80, showGiftDrop: false, giftSearch: '',
+  // Batalla
+  battle: { active: false, teamA: 'Equipo A', teamB: 'Equipo B', scoreA: 0, scoreB: 0, history: [] },
+  // Diamantes
+  diamonds: { total: 0, goal: 5000, topGifters: [] },
+  // Spotify
+  spotify: {
+    enabled: false, connected: false, cmd: '!song', perm: 'Solo seguidores',
+    cooldown: 30, maxQueue: 5, allowSkip: false, skipPerm: 'Solo moderadores',
+    queue: [], customUsers: [], nowPlaying: null,
+  },
+  // Filtros custom TTS
+  filterCustomUsers: [],
+  spotifyCustomUsers: [],
+};
+
+// ─── LOGIN ────────────────────────────────────────────────────────────────────
+document.getElementById('login-pass').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doLogin();
+});
+
+function doLogin() {
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const pass = document.getElementById('login-pass').value;
+  const u = USERS[email];
+  const err = document.getElementById('login-err');
+  if (u && u.password === pass) {
+    state.user = { email, name: u.name, plan: u.plan };
+    err.style.display = 'none';
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-screen').style.display = 'block';
+    document.getElementById('sb-avatar').textContent = u.name[0];
+    document.getElementById('sb-name').textContent = u.name;
+    document.getElementById('sb-plan').textContent = u.plan;
+    renderTab();
+  } else {
+    err.style.display = 'block';
+    err.textContent = '⚠️ Credenciales incorrectas. Revisa tu correo y contraseña.';
+  }
+}
+
+function doLogout() {
+  if (state.ws) state.ws.close();
+  state = { ...state, connected: false, ws: null, tiktokUser: '' };
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-pass').value = '';
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+const TAB_TITLES = {
+  dashboard: '⚡ Dashboard', tts: '🔊 TTS', gifts: '🎁 Regalos',
+  batalla: '⚔️ Batalla', diamantes: '💎 Diamantes', spotify: '🎵 Música',
+};
+
+function setTab(tab, btn) {
+  state.tab = tab;
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('page-title').textContent = TAB_TITLES[tab];
+  renderTab();
+}
+
+function renderTab() {
+  const c = document.getElementById('content');
+  switch (state.tab) {
+    case 'dashboard': c.innerHTML = renderDashboard(); break;
+    case 'tts': c.innerHTML = renderTTS(); break;
+    case 'gifts': c.innerHTML = renderGifts(); break;
+    case 'batalla': c.innerHTML = renderBatalla(); break;
+    case 'diamantes': c.innerHTML = renderDiamantes(); break;
+    case 'spotify': c.innerHTML = renderSpotify(); break;
+  }
+  bindEvents();
+}
+
+// ─── WEBSOCKET ────────────────────────────────────────────────────────────────
+function connectWS(username) {
+  if (state.ws) state.ws.close();
+
+  // Para desarrollo/demo: simular sin WS real
+  if (!username) return;
+
+  state.tiktokUser = username;
+
+  try {
+    const ws = new WebSocket(SERVER_URL);
+    state.ws = ws;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'CONNECT', username }));
+    };
+
+    ws.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      handleServerEvent(data);
+    };
+
+    ws.onerror = () => {
+      // Si no hay servidor: simular localmente
+      simulateLocal(username);
+    };
+
+    ws.onclose = () => {
+      state.ws = null;
+    };
+  } catch {
+    simulateLocal(username);
+  }
+}
+
+function simulateLocal(username) {
+  // Simular eventos localmente si no hay servidor disponible
+  state.connected = true;
+  state.tiktokUser = username;
+  updateConnectionUI();
+  addLog('system', `✅ Conectado (demo) a @${username}`);
+
+  const users = ['fan_peru','streamer_mx','chico_ar','user_es','tiktokfan99','amigo_live'];
+  const msgs = ['¡Hola desde Peru! 🇵🇪','muy buen live!','saludos desde México','eres el mejor','!song Bad Bunny','¿cuándo haces giveaway?'];
+  const gifts = GIFTS_DB.slice(0,6);
+
+  state._simInterval = setInterval(() => {
+    if (!state.connected) { clearInterval(state._simInterval); return; }
+    const r = Math.random();
+    const u = users[Math.floor(Math.random()*users.length)];
+
+    state.stats.viewers = Math.max(10, state.stats.viewers + Math.floor((Math.random()-.3)*5));
+
+    if (r < 0.35) {
+      const msg = msgs[Math.floor(Math.random()*msgs.length)];
+      state.stats.messages++;
+      addLog('chat', `💬 @${u}: ${msg}`);
+      // TTS
+      if (state.ttsEvents.chat) {
+        const tmpl = state.ttsTemplates.chat.replace('{nickname}',u).replace('{message}',msg);
+        speakTTS(tmpl);
+        // Spotify command
+        if (msg.startsWith(state.spotify.cmd+' ') && state.spotify.enabled && state.spotify.connected) {
+          const song = msg.substring(state.spotify.cmd.length+1);
+          addToSpotifyQueue(song, u);
+        }
+      }
+    } else if (r < 0.5) {
+      const g = gifts[Math.floor(Math.random()*gifts.length)];
+      const cnt = Math.ceil(Math.random()*5);
+      state.stats.gifts++;
+      state.stats.diamonds += g.coins * cnt;
+      state.diamonds.total += g.coins * cnt;
+      updateTopGifter(u, g.coins * cnt);
+      addLog('gift', `🎁 @${u} envió ${g.emoji} ${g.name} ×${cnt} (${g.coins*cnt} 💎)`);
+      if (state.ttsEvents.gifts) {
+        const tmpl = state.ttsTemplates.gift.replace('{username}',u).replace('{giftName}',g.name).replace('{repeatCount}',cnt);
+        speakTTS(tmpl);
+      }
+      playGiftAlert(g.id);
+    } else if (r < 0.62) {
+      state.stats.follows++;
+      addLog('follow', `➕ @${u} te siguió`);
+      if (state.ttsEvents.follows) speakTTS(state.ttsTemplates.follow.replace('{username}',u));
+    } else if (r < 0.7) {
+      const lk = Math.floor(Math.random()*20+1);
+      state.stats.likes += lk;
+      addLog('like', `❤️ @${u} dio ${lk} likes`);
+    }
+
+    // Actualizar stats en pantalla si estamos en dashboard
+    if (state.tab === 'dashboard') updateDashboardStats();
+    if (state.tab === 'diamantes') updateDiamondStats();
+
+  }, 2000);
+}
+
+function disconnectWS() {
+  if (state.ws) state.ws.close();
+  if (state._simInterval) clearInterval(state._simInterval);
+  state.connected = false;
+  state.ws = null;
+  state.stats = { viewers:0, gifts:0, follows:0, likes:0, diamonds:0, messages:0 };
+  state.log = [];
+  state.diamonds.total = 0;
+  state.diamonds.topGifters = [];
+  updateConnectionUI();
+  if (state.tab === 'dashboard') renderTab();
+}
+
+function handleServerEvent(data) {
+  switch (data.type) {
+    case 'CONNECTED':
+      state.connected = true;
+      updateConnectionUI();
+      addLog('system', `✅ Conectado a @${data.username}`);
+      break;
+    case 'DISCONNECTED':
+      state.connected = false;
+      updateConnectionUI();
+      break;
+    case 'ERROR':
+    case 'WS_ERROR':
+      addLog('system', `⚠️ ${data.message}`);
+      break;
+    case 'CHAT':
+      state.stats.messages++;
+      addLog('chat', `💬 @${data.user}: ${data.message}`);
+      if (state.ttsEvents.chat) speakTTS(
+        state.ttsTemplates.chat.replace('{nickname}',data.nickname||data.user).replace('{message}',data.message)
+      );
+      if (state.spotify.enabled && state.spotify.connected && data.message.startsWith(state.spotify.cmd+' ')) {
+        addToSpotifyQueue(data.message.substring(state.spotify.cmd.length+1), data.user);
+      }
+      break;
+    case 'GIFT':
+      state.stats.gifts++;
+      state.stats.diamonds += data.coins * data.repeatCount;
+      state.diamonds.total += data.coins * data.repeatCount;
+      updateTopGifter(data.user, data.coins * data.repeatCount);
+      addLog('gift', `🎁 @${data.user} envió ${data.giftEmoji||'🎁'} ${data.giftName} ×${data.repeatCount}`);
+      if (state.ttsEvents.gifts) speakTTS(
+        state.ttsTemplates.gift.replace('{username}',data.user).replace('{giftName}',data.giftName).replace('{repeatCount}',data.repeatCount)
+      );
+      playGiftAlert(data.giftId);
+      break;
+    case 'FOLLOW':
+      state.stats.follows++;
+      addLog('follow', `➕ @${data.user} te siguió`);
+      if (state.ttsEvents.follows) speakTTS(state.ttsTemplates.follow.replace('{username}',data.user));
+      break;
+    case 'LIKES':
+      state.stats.likes += data.count || 0;
+      break;
+    case 'VIEWERS':
+      state.stats.viewers = data.count;
+      break;
+    case 'BATTLE':
+      handleBattleEvent(data);
+      break;
+  }
+  if (state.tab === 'dashboard') updateDashboardStats();
+  if (state.tab === 'batalla') updateBattleUI();
+  if (state.tab === 'diamantes') updateDiamondStats();
+}
+
+// ─── TTS ──────────────────────────────────────────────────────────────────────
+function speakTTS(text) {
+  if (!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.volume = state.ttsVol;
+  u.rate = state.ttsSpeed;
+  u.pitch = state.ttsPitch;
+  const vs = window.speechSynthesis.getVoices();
+  const m = vs.find(v => v.lang.startsWith('es'));
+  if (m) u.voice = m;
+  window.speechSynthesis.speak(u);
+}
+
+function playGiftAlert(giftId) {
+  const cfg = state.giftConfigs[giftId];
+  if (!cfg || !cfg.enabled || !cfg.sound) return;
+  try {
+    const audio = new Audio(cfg.sound);
+    audio.volume = cfg.volume / 100;
+    audio.play().catch(() => {});
+    if (cfg.tts) speakTTS(cfg.ttsTemplate || 'Recibiste un regalo');
+  } catch {}
+}
+
+// ─── BATALLA ─────────────────────────────────────────────────────────────────
+function handleBattleEvent(data) {
+  if (data.subType === 'start') {
+    state.battle.active = true;
+    state.battle.scoreA = 0;
+    state.battle.scoreB = 0;
+    addLog('battle', '⚔️ ¡Batalla iniciada!');
+  } else if (data.subType === 'update') {
+    state.battle.scoreA = data.data?.scoreA ?? state.battle.scoreA;
+    state.battle.scoreB = data.data?.scoreB ?? state.battle.scoreB;
+  } else if (data.subType === 'end') {
+    state.battle.active = false;
+    const winner = state.battle.scoreA >= state.battle.scoreB ? state.battle.teamA : state.battle.teamB;
+    state.battle.history.unshift({ winner, scoreA: state.battle.scoreA, scoreB: state.battle.scoreB, date: new Date().toLocaleTimeString() });
+    if (state.battle.history.length > 20) state.battle.history.pop();
+    addLog('battle', `🏆 Ganó ${winner}`);
+  }
+}
+
+// ─── TOP GIFTERS ──────────────────────────────────────────────────────────────
+function updateTopGifter(user, coins) {
+  const tg = state.diamonds.topGifters;
+  const idx = tg.findIndex(g => g.user === user);
+  if (idx >= 0) tg[idx].coins += coins;
+  else tg.push({ user, coins });
+  tg.sort((a,b) => b.coins - a.coins);
+  if (tg.length > 10) tg.pop();
+}
+
+// ─── SPOTIFY QUEUE ────────────────────────────────────────────────────────────
+function addToSpotifyQueue(song, user) {
+  if (state.spotify.queue.length >= state.spotify.maxQueue) return;
+  state.spotify.queue.push({ title: song, user });
+  addLog('system', `🎵 @${user} pidió: ${song}`);
+  if (state.tab === 'spotify') renderTab();
+}
+
+// ─── LOG ──────────────────────────────────────────────────────────────────────
+function addLog(type, text) {
+  state.log.unshift({ type, text });
+  if (state.log.length > 40) state.log.pop();
+  if (state.tab === 'dashboard') {
+    const box = document.getElementById('log-box');
+    if (!box) return;
+    const el = document.createElement('div');
+    el.className = `log-item ${type}`;
+    el.textContent = text;
+    box.insertBefore(el, box.firstChild);
+    if (box.children.length > 40) box.lastChild.remove();
+    const empty = box.querySelector('.log-empty');
+    if (empty) empty.remove();
+  }
+}
+
+// ─── UI HELPERS ───────────────────────────────────────────────────────────────
+function updateConnectionUI() {
+  const status = document.getElementById('sb-status');
+  const txt = document.getElementById('sb-status-txt');
+  const badge = document.getElementById('live-badge');
+  if (state.connected) {
+    status.classList.add('live');
+    txt.textContent = `@${state.tiktokUser}`;
+    if (badge) badge.style.display = 'flex';
+  } else {
+    status.classList.remove('live');
+    txt.textContent = 'Sin conectar';
+    if (badge) badge.style.display = 'none';
+  }
+}
+
+function updateDashboardStats() {
+  ['viewers','gifts','follows','likes','diamonds','messages'].forEach(k => {
+    const el = document.getElementById('stat-'+k);
+    if (el) el.textContent = state.stats[k].toLocaleString();
+  });
+}
+
+function updateBattleUI() {
+  if (state.tab !== 'batalla') return;
+  renderTab();
+}
+
+function updateDiamondStats() {
+  const el = document.getElementById('diamond-total');
+  if (el) el.textContent = state.diamonds.total.toLocaleString();
+  const fill = document.getElementById('goal-fill');
+  if (fill) fill.style.width = Math.min(100, (state.diamonds.total / state.diamonds.goal) * 100) + '%';
+}
+
+// ─── RENDER FUNCTIONS ─────────────────────────────────────────────────────────
+
+function renderDashboard() {
+  const s = state.stats;
+  const logHtml = state.log.length === 0
+    ? '<div class="log-empty">' + (state.connected ? 'Esperando actividad…' : 'Conecta tu LIVE para ver actividad') + '</div>'
+    : state.log.map(l => `<div class="log-item ${l.type}">${l.text}</div>`).join('');
+
+  return `
+  <div class="card">
+    <div class="card-title">🎯 Conectar al LIVE</div>
+    <div class="connect-row">
+      <div class="at-wrap">
+        <span class="at-sign">@</span>
+        <input class="at-inp" id="tt-user" placeholder="tu_usuario_tiktok"
+          value="${state.tiktokUser}"
+          ${state.connected ? 'disabled' : ''}/>
+      </div>
+      ${state.connected
+        ? `<button class="btn btn-ghost" onclick="disconnectWS();renderTab()">Desconectar</button>`
+        : `<button class="btn btn-primary" id="btn-connect" onclick="doConnect()">Conectar</button>`
+      }
+    </div>
+    ${!state.connected && state.tiktokUser ? '<div class="connect-bar"><div class="connect-fill"></div></div>' : ''}
+  </div>
+
+  <div class="stats-grid">
+    ${statCard('👁️','viewers',s.viewers,'#25f4ee','Espectadores')}
+    ${statCard('🎁','gifts',s.gifts,'#fe2c55','Regalos')}
+    ${statCard('➕','follows',s.follows,'#a78bfa','Seguidores')}
+    ${statCard('❤️','likes',s.likes,'#ff6b81','Likes')}
+    ${statCard('💎','diamonds',s.diamonds,'#fbbf24','Diamantes')}
+    ${statCard('💬','messages',s.messages,'#25f4ee','Mensajes')}
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 Actividad en tiempo real</div>
+    <div class="log-box" id="log-box">${logHtml}</div>
+  </div>`;
+}
+
+function statCard(icon, id, val, color, label) {
+  return `<div class="stat-card">
+    <div class="stat-icon">${icon}</div>
+    <div class="stat-val" id="stat-${id}" style="color:${color}">${val.toLocaleString()}</div>
+    <div class="stat-lbl">${label}</div>
+  </div>`;
+}
+
+function doConnect() {
+  const u = document.getElementById('tt-user');
+  if (!u || !u.value.trim()) return;
+  state.tiktokUser = u.value.trim();
+  connectWS(state.tiktokUser);
+  renderTab();
+}
+
+// ─── TTS TAB ──────────────────────────────────────────────────────────────────
+function renderTTS() {
+  const e = state.ttsEvents;
+  const t = state.ttsTemplates;
+  const o = state.ttsOptions;
+  const f = state.ttsFilters;
+
+  return `
+  ${secHdr('🎙️ VOZ PREDETERMINADA')}
+  <div class="card">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px">
+      <select class="inp" style="flex:1" id="tts-voice" onchange="state.ttsVoice=this.value">
+        ${['es-MX-DaliaNeural·Dalia (México)','es-MX-JorgeNeural·Jorge (México)',
+          'es-ES-ElviraNeural·Elvira (España)','es-ES-AlvaroNeural·Álvaro (España)',
+          'es-AR-ElenaNeural·Elena (Argentina)','es-CO-SalomeNeural·Salomé (Colombia)']
+          .map(v => `<option value="${v.split('·')[0]}" ${state.ttsVoice===v.split('·')[0]?'selected':''}>${v.split('·')[1]}</option>`).join('')}
+      </select>
+      <button class="btn-icon" onclick="speakTTS(document.getElementById('tts-test').value)">▶</button>
+    </div>
+    ${sliderRow('Volumen','ttsVol',0,1,.01)}
+    ${sliderRow('Velocidad','ttsSpeed',0.5,2,.1)}
+    ${sliderRow('Tono','ttsPitch',0,2,.1)}
+    <div style="margin-top:14px">
+      <label class="inp-label">Texto de prueba</label>
+      <div style="display:flex;gap:8px">
+        <input class="inp" id="tts-test" value="Hola soy el TTS de tu live!" style="flex:1"/>
+        <button class="btn btn-ghost" onclick="speakTTS(document.getElementById('tts-test').value)">▶ Probar</button>
+      </div>
+    </div>
+  </div>
+
+  ${secHdr('📢 EVENTOS A LEER')}
+  <div class="card">
+    ${toggleRow('Chat','Lee los mensajes del chat','ttsEvt-chat',e.chat)}
+    ${toggleRow('Regalos','Lee cuando reciben regalos','ttsEvt-gifts',e.gifts)}
+    ${toggleRow('Seguidores','Lee nuevos seguidores','ttsEvt-follows',e.follows)}
+    ${toggleRow('Compartidos','Lee cuando comparten el live','ttsEvt-shares',e.shares)}
+    ${toggleRow('Se unió','Anuncia cuando alguien entra','ttsEvt-join',e.join)}
+  </div>
+
+  ${secHdr('📝 PLANTILLAS')}
+  <div class="card">
+    ${tplRow('Chat',t.chat,'tpl-chat','{nickname} {message}')}
+    ${tplRow('Regalos',t.gift,'tpl-gift','{username} {giftName} {repeatCount}')}
+    ${tplRow('Seguidores',t.follow,'tpl-follow','{username} {nickname}')}
+    ${tplRow('Compartidos',t.share,'tpl-share','{username} {nickname}')}
+    ${tplRow('Se Unió',t.join,'tpl-join','{username} {nickname}')}
+  </div>
+
+  ${secHdr('👥 FILTROS DE USUARIOS')}
+  <div class="card">
+    ${toggleRow('Leer todos','Ignora todos los filtros','flt-all',f.all)}
+    ${toggleRow('Seguidores','Solo usuarios que te siguen','flt-followers',f.followers)}
+    ${toggleRow('Moderadores','Solo moderadores del live','flt-mods',f.mods)}
+    ${toggleRow('Super Fans','Solo super fans del canal','flt-superFans',f.superFans)}
+  </div>
+
+  ${secHdr('⚙️ OPCIONES DE COLA')}
+  <div class="card">
+    ${toggleRow('Cola infinita','Lee todos sin descartar','opt-infinite',o.infinite)}
+    ${toggleRow('Omitir emojis','No lee emojis','opt-skipEmoji',o.skipEmoji)}
+    ${toggleRow('Omitir @menciones','No lee mensajes con @','opt-skipAt',o.skipAt)}
+    ${toggleRow('Omitir comandos !','No lee comandos','opt-skipCmd',o.skipCmd)}
+    ${toggleRow('Anti-spam','Bloquea jajaja, xdxd, etc.','opt-antiSpam',o.antiSpam)}
+  </div>`;
+}
+
+function sliderRow(label, key, min, max, step) {
+  const val = state[key];
+  return `<div style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+      <span class="inp-label" style="margin:0">${label}</span>
+      <span style="color:#fff;font-size:13px;font-weight:700;font-family:var(--mono)" id="sv-${key}">${val.toFixed(2)}</span>
+    </div>
+    <input type="range" min="${min}" max="${max}" step="${step}" value="${val}"
+      oninput="state.${key}=Number(this.value);document.getElementById('sv-${key}').textContent=Number(this.value).toFixed(2)"/>
+  </div>`;
+}
+
+function toggleRow(label, sub, id, on) {
+  return `<div class="toggle-row">
+    <div>
+      <div class="toggle-lbl">${label}</div>
+      <div class="toggle-sub">${sub}</div>
+    </div>
+    <div class="toggle ${on?'on':'off'}" id="tgl-${id}" onclick="toggleState('${id}')">
+      <div class="toggle-knob"></div>
+    </div>
+  </div>`;
+}
+
+function tplRow(label, val, id, vars) {
+  return `<div style="margin-bottom:16px">
+    <label class="inp-label">${label}</label>
+    <input class="inp" id="${id}" value="${val}"
+      oninput="updateTemplate('${id}',this.value)"/>
+    <div class="hint">Variables: ${vars}</div>
+  </div>`;
+}
+
+function toggleState(id) {
+  const el = document.getElementById('tgl-'+id);
+  const on = el.classList.contains('on');
+  el.classList.toggle('on', !on);
+  el.classList.toggle('off', on);
+
+  // Mapear IDs a state
+  if (id.startsWith('ttsEvt-')) {
+    const k = id.replace('ttsEvt-','');
+    state.ttsEvents[k] = !on;
+  } else if (id.startsWith('flt-')) {
+    const k = id.replace('flt-','');
+    state.ttsFilters[k] = !on;
+  } else if (id.startsWith('opt-')) {
+    const k = id.replace('opt-','');
+    state.ttsOptions[k] = !on;
+  } else if (id === 'spotify-enabled') {
+    state.spotify.enabled = !on;
+    renderTab();
+  } else if (id === 'spotify-skip') {
+    state.spotify.allowSkip = !on;
+    renderTab();
+  }
+}
+
+function updateTemplate(id, val) {
+  const map = {
+    'tpl-chat':'chat','tpl-gift':'gift','tpl-follow':'follow',
+    'tpl-share':'share','tpl-join':'join',
+  };
+  if (map[id]) state.ttsTemplates[map[id]] = val;
+}
+
+// ─── REGALOS TAB ──────────────────────────────────────────────────────────────
+function renderGifts() {
+  const filtered = GIFTS_DB.filter(g =>
+    g.name.toLowerCase().includes(state.giftSearch.toLowerCase())
+  );
+
+  return `
+  ${secHdr('🔔 VOLUMEN DEFAULT')}
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12;margin-bottom:10px">
+      <span style="font-size:24px">🎁</span>
+      <span style="font-weight:700;color:#fff;margin-left:10px">Default (todos los regalos)</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12;margin-top:10px">
+      <input type="range" min="0" max="100" value="${state.defaultVol}" style="flex:1"
+        oninput="state.defaultVol=Number(this.value);document.getElementById('defvol').textContent=this.value+'%'"/>
+      <span id="defvol" style="color:#fff;font-weight:700;min-width:36px;font-family:var(--mono)">${state.defaultVol}%</span>
+    </div>
+  </div>
+
+  ${secHdr('🎀 PERSONALIZAR POR REGALO')}
+  <div class="card" style="position:relative">
+    <div style="display:flex;gap:10px">
+      <input class="inp" style="flex:1" placeholder="🔍 Buscar y agregar regalo..."
+        id="gift-search"
+        value="${state.giftSearch}"
+        oninput="state.giftSearch=this.value;document.getElementById('gift-drop').innerHTML=renderGiftDropItems()"
+        onfocus="document.getElementById('gift-drop').style.display='block'"
+        />
+    </div>
+    <div id="gift-drop" class="dropdown" style="display:none">
+      ${renderGiftDropItems()}
+    </div>
+  </div>
+
+  ${state.addedGifts.length === 0
+    ? `<div class="card" style="text-align:center;color:var(--dim);padding:36px">
+        Busca y agrega regalos arriba para personalizar sus alertas
+       </div>`
+    : state.addedGifts.map(g => renderGiftCard(g)).join('')
+  }`;
+}
+
+function renderGiftDropItems() {
+  const filtered = GIFTS_DB.filter(g =>
+    g.name.toLowerCase().includes(state.giftSearch.toLowerCase()) &&
+    !state.addedGifts.find(a => a.id === g.id)
+  ).slice(0, 10);
+
+  if (filtered.length === 0) return '<div style="color:var(--dim);text-align:center;padding:12px;font-size:13px">Sin resultados</div>';
+
+  return filtered.map(g => `
+    <div class="drop-item" onclick="addGift('${g.id}')">
+      <span class="drop-item-emoji">${g.emoji}</span>
+      <span class="drop-item-name">${g.name}</span>
+      <span class="drop-item-coins">🪙 ${g.coins}</span>
+    </div>
+  `).join('');
+}
+
+function addGift(id) {
+  const g = GIFTS_DB.find(x => x.id === id);
+  if (!g || state.addedGifts.find(a => a.id === id)) return;
+  state.addedGifts.push(g);
+  state.giftConfigs[id] = { enabled: false, sound: '', volume: 80, duration: 5, tts: false, ttsTemplate: '{username} envió {giftName}' };
+  state.giftSearch = '';
+  renderTab();
+}
+
+function removeGift(id) {
+  state.addedGifts = state.addedGifts.filter(g => g.id !== id);
+  renderTab();
+}
+
+function renderGiftCard(g) {
+  const cfg = state.giftConfigs[g.id] || {};
+  return `
+  <div class="card gift-card">
+    <div style="display:flex;align-items:center;gap:12;margin-bottom:16px">
+      <div class="gift-icon-box">${g.emoji}</div>
+      <div style="flex:1;margin-left:10px">
+        <div class="gift-name">${g.name}</div>
+        <div class="gift-coins">🪙 ${g.coins} monedas</div>
+      </div>
+      <div class="toggle ${cfg.enabled?'on':'off'}" id="tgl-gift-${g.id}" onclick="toggleGift('${g.id}')">
+        <div class="toggle-knob"></div>
+      </div>
+      <button class="btn-remove" onclick="removeGift('${g.id}')">✕</button>
+    </div>
+    <div class="grid-2">
+      <div>
+        <label class="inp-label">Archivo / URL del sonido</label>
+        <input class="inp" placeholder="alerta.mp3 o https://..." value="${cfg.sound||''}"
+          oninput="state.giftConfigs['${g.id}'].sound=this.value"/>
+      </div>
+      <div>
+        <label class="inp-label">Volumen · <span id="gvol-${g.id}">${cfg.volume||80}%</span></label>
+        <input type="range" min="0" max="100" value="${cfg.volume||80}"
+          oninput="state.giftConfigs['${g.id}'].volume=Number(this.value);document.getElementById('gvol-${g.id}').textContent=this.value+'%'"/>
+      </div>
+      <div>
+        <label class="inp-label">Duración alerta · <span id="gdur-${g.id}">${cfg.duration||5}s</span></label>
+        <input type="range" min="1" max="30" value="${cfg.duration||5}"
+          oninput="state.giftConfigs['${g.id}'].duration=Number(this.value);document.getElementById('gdur-${g.id}').textContent=this.value+'s'"/>
+      </div>
+      <div style="display:flex;align-items:center;gap:10;padding-top:18px">
+        <div class="toggle ${cfg.tts?'on':'off'}" id="tgl-gtts-${g.id}" onclick="toggleGiftTTS('${g.id}')">
+          <div class="toggle-knob"></div>
+        </div>
+        <span class="toggle-lbl" style="margin-left:8px">Leer con TTS</span>
+      </div>
+    </div>
+    ${cfg.tts ? `
+    <div style="margin-top:14px">
+      <label class="inp-label">Plantilla TTS</label>
+      <input class="inp" value="${cfg.ttsTemplate||''}"
+        oninput="state.giftConfigs['${g.id}'].ttsTemplate=this.value"/>
+      <div class="hint">Variables: {username} {giftName} {repeatCount} {totalValue}</div>
+    </div>` : ''}
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-ghost" onclick="playGiftAlert('${g.id}')">▶ Probar sonido</button>
+    </div>
+  </div>`;
+}
+
+function toggleGift(id) {
+  if (!state.giftConfigs[id]) return;
+  state.giftConfigs[id].enabled = !state.giftConfigs[id].enabled;
+  const el = document.getElementById('tgl-gift-'+id);
+  if (el) { el.classList.toggle('on'); el.classList.toggle('off'); }
+}
+function toggleGiftTTS(id) {
+  if (!state.giftConfigs[id]) return;
+  state.giftConfigs[id].tts = !state.giftConfigs[id].tts;
+  renderTab();
+}
+
+// ─── BATALLA TAB ──────────────────────────────────────────────────────────────
+function renderBatalla() {
+  const b = state.battle;
+  const total = b.scoreA + b.scoreB || 1;
+  const pct = Math.round((b.scoreA / total) * 100);
+
+  return `
+  ${secHdr('⚔️ ARENA DE BATALLA')}
+  <div class="battle-arena">
+    <div class="battle-vs">
+      <div class="battle-team">
+        <div class="battle-team-name" id="teamA-name">${b.teamA}</div>
+        <div class="battle-team-score red" id="teamA-score">${b.scoreA.toLocaleString()}</div>
+        <div class="hint" style="margin-top:4px">💎 diamantes</div>
+      </div>
+      <div class="battle-vs-label">VS</div>
+      <div class="battle-team">
+        <div class="battle-team-name" id="teamB-name">${b.teamB}</div>
+        <div class="battle-team-score cyan" id="teamB-score">${b.scoreB.toLocaleString()}</div>
+        <div class="hint" style="margin-top:4px">💎 diamantes</div>
+      </div>
+    </div>
+    <div class="battle-bar-wrap">
+      <div class="battle-bar" style="width:${pct}%"></div>
+    </div>
+    <div class="battle-status">
+      ${b.active
+        ? `⚔️ Batalla en curso · ${pct}% – ${100-pct}%`
+        : `Sin batalla activa · Se detecta automáticamente del LIVE`
+      }
+    </div>
+  </div>
+
+  ${secHdr('⚙️ CONFIGURACIÓN')}
+  <div class="card">
+    <div class="grid-2">
+      <div>
+        <label class="inp-label">Nombre Equipo A</label>
+        <input class="inp" value="${b.teamA}" oninput="state.battle.teamA=this.value"/>
+      </div>
+      <div>
+        <label class="inp-label">Nombre Equipo B</label>
+        <input class="inp" value="${b.teamB}" oninput="state.battle.teamB=this.value"/>
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      ${toggleRow('Anunciar ganador por TTS','Lee el nombre del ganador al terminar','battle-tts', b.ttsPct||false)}
+      ${toggleRow('Mostrar contador en pantalla','Overlay visible sobre el stream','battle-overlay', b.overlay||false)}
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="btn btn-primary" onclick="simBattle()">⚔️ Simular batalla</button>
+      <button class="btn btn-ghost" onclick="resetBattle()">↺ Reiniciar</button>
+    </div>
+  </div>
+
+  ${secHdr('📜 HISTORIAL')}
+  <div class="card">
+    <div class="battle-history">
+      ${b.history.length === 0
+        ? '<div class="battle-empty">Sin batallas registradas aún</div>'
+        : b.history.map((h,i) => `
+          <div class="battle-hist-item">
+            <span style="color:var(--gold)">🏆</span>
+            <span style="flex:1;color:#fff;font-size:13px">Ganó <strong>${h.winner}</strong></span>
+            <span style="color:var(--muted);font-family:var(--mono)">${h.scoreA} – ${h.scoreB}</span>
+            <span style="color:var(--dim);font-size:10px;margin-left:8px">${h.date}</span>
+          </div>`).join('')
+      }
+    </div>
+  </div>`;
+}
+
+function simBattle() {
+  state.battle.active = true;
+  state.battle.scoreA = 0;
+  state.battle.scoreB = 0;
+  addLog('battle', '⚔️ Batalla simulada iniciada');
+
+  let ticks = 0;
+  const t = setInterval(() => {
+    if (!state.battle.active || ticks > 20) {
+      clearInterval(t);
+      if (state.battle.active) {
+        state.battle.active = false;
+        const winner = state.battle.scoreA >= state.battle.scoreB ? state.battle.teamA : state.battle.teamB;
+        state.battle.history.unshift({ winner, scoreA: state.battle.scoreA, scoreB: state.battle.scoreB, date: new Date().toLocaleTimeString() });
+        addLog('battle', `🏆 Ganó ${winner}`);
+      }
+      if (state.tab === 'batalla') renderTab();
+      return;
+    }
+    state.battle.scoreA += Math.floor(Math.random() * 500);
+    state.battle.scoreB += Math.floor(Math.random() * 500);
+    ticks++;
+    if (state.tab === 'batalla') renderTab();
+  }, 600);
+}
+
+function resetBattle() {
+  state.battle.scoreA = 0;
+  state.battle.scoreB = 0;
+  state.battle.active = false;
+  renderTab();
+}
+
+// ─── DIAMANTES TAB ────────────────────────────────────────────────────────────
+function renderDiamantes() {
+  const d = state.diamonds;
+  const pct = Math.min(100, Math.round((d.total / d.goal) * 100));
+
+  return `
+  ${secHdr('💎 RESUMEN DE DIAMANTES')}
+  <div class="diamond-goal">
+    <div class="hint">Total recibido este live</div>
+    <div class="diamond-total">${d.total.toLocaleString()}</div>
+    <div class="diamond-sub">≈ $${(d.total * 0.005).toFixed(2)} USD estimado</div>
+
+    <div class="goal-bar-wrap">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+        <span class="inp-label" style="margin:0">Meta del live</span>
+        <span style="color:#fff;font-size:12px;font-family:var(--mono)">${pct}%</span>
+      </div>
+      <div class="goal-bar">
+        <div class="goal-fill" id="goal-fill" style="width:${pct}%"></div>
+      </div>
+      <div class="goal-labels">
+        <span class="goal-lbl">0</span>
+        <span class="goal-lbl">${d.goal.toLocaleString()} 💎</span>
+      </div>
+    </div>
+  </div>
+
+  ${secHdr('🎯 META DEL LIVE')}
+  <div class="card">
+    <label class="inp-label">Meta de diamantes</label>
+    <div style="display:flex;gap:10px">
+      <input class="inp" type="number" value="${d.goal}" style="flex:1"
+        oninput="state.diamonds.goal=Number(this.value)||1;updateDiamondStats()"/>
+      <button class="btn btn-primary" onclick="state.diamonds.total=0;state.diamonds.topGifters=[];renderTab()">
+        Reiniciar
+      </button>
+    </div>
+    <div class="hint" style="margin-top:8px">Los diamantes se acumulan automáticamente de los regalos recibidos</div>
+  </div>
+
+  ${secHdr('🏆 TOP GIFTERS')}
+  <div class="card">
+    ${d.topGifters.length === 0
+      ? '<div style="color:var(--dim);text-align:center;padding:24px;font-size:13px">Sin regalos recibidos aún</div>'
+      : d.topGifters.slice(0,10).map((g,i) => `
+        <div class="gifter-item">
+          <div class="gifter-rank ${i===0?'r1':i===1?'r2':i===2?'r3':'rn'}">${i+1}</div>
+          <div class="gifter-name">@${g.user}</div>
+          <div class="gifter-coins">💎 ${g.coins.toLocaleString()}</div>
+        </div>`).join('')
+    }
+  </div>`;
+}
+
+// ─── SPOTIFY TAB ──────────────────────────────────────────────────────────────
+function renderSpotify() {
+  const sp = state.spotify;
+
+  return `
+  ${secHdr('🎵 MÚSICA POR COMANDOS')}
+  <div class="card">
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-lbl">Activar módulo Música</div>
+        <div class="toggle-sub">Los viewers piden canciones con un comando en el chat</div>
+      </div>
+      <div class="toggle ${sp.enabled?'on':'off'}" id="tgl-spotify-enabled" onclick="toggleState('spotify-enabled')">
+        <div class="toggle-knob"></div>
+      </div>
+    </div>
+
+    ${!sp.enabled ? `
+    <div class="info-box">
+      💡 Conecta tu Spotify y tus espectadores escriben
+      <strong style="color:var(--green)">!song nombre de canción</strong>
+      en el chat para agregar canciones a tu cola. Puedes controlar quién puede usar el comando.
+    </div>` : `
+    <button class="btn btn-green" style="margin-bottom:16px;margin-top:8px"
+      onclick="state.spotify.connected=!state.spotify.connected;renderTab()">
+      ${sp.connected ? '✅ Spotify conectado' : '🎵 Conectar Spotify'}
+    </button>
+
+    ${sp.connected ? `
+    <div class="now-playing">
+      <div class="now-playing-label">▶ REPRODUCIENDO AHORA</div>
+      <div class="now-playing-track" id="now-playing-track">
+        ${sp.nowPlaying || 'Sin canción en reproducción'}
+      </div>
+    </div>` : `
+    <div class="info-box">
+      ⚠️ Haz clic en "Conectar Spotify" para autorizar el acceso a tu cuenta
+    </div>`}
+    `}
+  </div>
+
+  ${sp.enabled ? `
+  ${secHdr('⌨️ CONFIGURAR COMANDO')}
+  <div class="card">
+    <div class="grid-2">
+      <div>
+        <label class="inp-label">Comando para pedir canción</label>
+        <input class="inp" value="${sp.cmd}" oninput="state.spotify.cmd=this.value"/>
+        <div class="hint">Ej: ${sp.cmd} Never Gonna Give You Up</div>
+      </div>
+      <div>
+        <label class="inp-label">Cola máxima · ${sp.maxQueue} canciones</label>
+        <input type="range" min="1" max="50" value="${sp.maxQueue}"
+          oninput="state.spotify.maxQueue=Number(this.value);this.previousElementSibling.textContent='Cola máxima · '+this.value+' canciones'"/>
+      </div>
+      <div>
+        <label class="inp-label">Cooldown · ${sp.cooldown}s por usuario</label>
+        <input type="range" min="0" max="300" step="5" value="${sp.cooldown}"
+          oninput="state.spotify.cooldown=Number(this.value);this.previousElementSibling.textContent='Cooldown · '+this.value+'s por usuario'"/>
+      </div>
+    </div>
+  </div>
+
+  ${secHdr('🔒 PERMISOS')}
+  <div class="card">
+    <label class="inp-label" style="margin-bottom:10px">¿Quién puede usar ${sp.cmd}?</label>
+    <div class="spotify-perms">
+      ${['Todos','Solo seguidores','Solo moderadores','Usuarios personalizados'].map(p =>
+        `<button class="perm-btn ${sp.perm===p?'active':''}" onclick="state.spotify.perm='${p}';renderTab()">${p}</button>`
+      ).join('')}
+    </div>
+
+    ${sp.perm === 'Usuarios personalizados' ? `
+    <div style="margin-top:16px">
+      <label class="inp-label">Usuarios autorizados</label>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input class="inp" id="sp-user-inp" placeholder="@usuario" style="flex:1"/>
+        <button class="btn btn-add" onclick="addSpotifyUser()">+ Agregar</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${state.spotifyCustomUsers.map((u,i) =>
+          `<span class="chip">${u}<span class="chip-x" onclick="removeSpotifyUser(${i})">×</span></span>`
+        ).join('')}
+      </div>
+    </div>` : ''}
+
+    <div style="margin-top:16px">
+      ${toggleRow('Permitir saltar canción','Habilita un comando para pasar a la siguiente','spotify-skip',sp.allowSkip)}
+    </div>
+
+    ${sp.allowSkip ? `
+    <div style="margin-top:10px">
+      <label class="inp-label">¿Quién puede saltar?</label>
+      <div class="spotify-perms">
+        ${['Todos','Solo seguidores','Solo moderadores'].map(p =>
+          `<button class="perm-btn ${sp.skipPerm===p?'active':''}" onclick="state.spotify.skipPerm='${p}';renderTab()">${p}</button>`
+        ).join('')}
+      </div>
+    </div>` : ''}
+  </div>
+
+  ${secHdr('🎶 COLA DE CANCIONES')}
+  <div class="card">
+    ${sp.queue.length === 0
+      ? `<div style="color:var(--dim);text-align:center;padding:24px;font-size:13px">
+          Cola vacía · Los espectadores usan
+          <span style="color:var(--green)">${sp.cmd} [canción]</span> en el chat
+         </div>`
+      : sp.queue.map((s,i) => `
+        <div class="queue-item">
+          <span class="queue-num">${i+1}.</span>
+          <span class="queue-track">${s.title}</span>
+          <span class="queue-user">@${s.user}</span>
+          <button class="btn-remove" onclick="removeFromQueue(${i})">✕</button>
+        </div>`).join('')
+    }
+    ${sp.queue.length > 0 ? `
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-ghost" onclick="nextInQueue()">⏭ Siguiente</button>
+      <button class="btn" style="background:var(--bg4);color:var(--muted)"
+        onclick="state.spotify.queue=[];renderTab()">Limpiar cola</button>
+    </div>` : ''}
+  </div>
+  ` : ''}`;
+}
+
+function addSpotifyUser() {
+  const inp = document.getElementById('sp-user-inp');
+  if (!inp || !inp.value.trim()) return;
+  state.spotifyCustomUsers.push(inp.value.trim());
+  renderTab();
+}
+function removeSpotifyUser(i) {
+  state.spotifyCustomUsers.splice(i, 1);
+  renderTab();
+}
+function removeFromQueue(i) {
+  state.spotify.queue.splice(i, 1);
+  renderTab();
+}
+function nextInQueue() {
+  if (state.spotify.queue.length > 0) {
+    state.spotify.nowPlaying = state.spotify.queue.shift().title;
+    renderTab();
+  }
+}
+
+// ─── HELPER RENDERERS ─────────────────────────────────────────────────────────
+function secHdr(txt) {
+  return `<div class="sec-hdr"><div class="sec-hdr-dot"></div><div class="sec-hdr-txt">${txt}</div></div>`;
+}
+
+// ─── BIND EVENTS ──────────────────────────────────────────────────────────────
+function bindEvents() {
+  // Cerrar dropdown al hacer click fuera
+  document.addEventListener('click', function handler(e) {
+    const drop = document.getElementById('gift-drop');
+    if (drop && !drop.contains(e.target) && e.target.id !== 'gift-search') {
+      drop.style.display = 'none';
+    }
+  }, { once: true });
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+// Render inicial
+renderTab();
+</script>
+</body>
+</html>
