@@ -1286,7 +1286,7 @@ function App() {
         hostNickname: name,
         points: getBattlePoints(t),
         userId: t.userId || t.hostName || t.uniqueId || "",
-        teamIdx: t.teamIdx !== void 0 && t.teamIdx !== null ? Number(t.teamIdx) : t.team !== void 0 && t.team !== null ? Number(t.team) : i % 2
+        teamIdx: t.teamIdx !== void 0 && t.teamIdx !== null ? Number(t.teamIdx) : t.team !== void 0 && t.team !== null ? Number(t.team) : i
       };
     }).filter((t) => t.hostName && t.hostName !== "?");
     return __spreadProps(__spreadValues({}, d), {
@@ -1746,7 +1746,7 @@ function App() {
           points: getBattlePoints(p),
           _i: i,
           // teamIdx: 0 = equipo A (rojo), 1 = equipo B (cyan)
-          side: (p.teamIdx === 0 || p.teamIdx === 1) ? p.teamIdx : (i % 2),
+          side: p.teamIdx !== void 0 && p.teamIdx !== null ? Number(p.teamIdx) : i,
         }));
 
         const totalPts = players.reduce((s, p) => s + p.points, 0);
@@ -1760,6 +1760,12 @@ function App() {
         const leaderA  = teamA[0] || {};
         const leaderB  = teamB[0] || {};
         const isBattle4 = players.length >= 3;
+        // ── Detectar modo individual (1v1v1, 1v3, FFA) ─────────────────
+        const numSides = new Set(players.map(p => p.side)).size;
+        const isIndividual = numSides >= 3;
+        const sortedByPts = [...players].sort((a, b) => b.points - a.points);
+        const IND_COLORS = ["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#4ade80","#fb923c"];
+        const playerColor = (p) => isIndividual ? (IND_COLORS[p.side % IND_COLORS.length] || "#aaa") : (p.side === 0 ? colorA : colorB);
 
         // Nombre limpio
         const cleanName = (p) => p.hostNickname || p.hostName || "?";
@@ -1774,7 +1780,36 @@ function App() {
         return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } },
 
           // ── MARCADOR PRINCIPAL ──────────────────────────────────────
-          /* @__PURE__ */ React.createElement("div", { style: { background: "linear-gradient(135deg,#12121e,#0d0d18)", border: "1px solid #1e1e2e", borderRadius: 16, padding: "16px 14px 12px" } },
+          isIndividual
+            // ── MODO INDIVIDUAL: podio compacto ──────────────────────
+            ? /* @__PURE__ */ React.createElement("div", { style: { background: "linear-gradient(135deg,#12121e,#0d0d18)", border: "1px solid #1e1e2e", borderRadius: 16, padding: "16px 14px 12px" } },
+                /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", color: "#555", fontSize: 9, fontWeight: 800, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 } },
+                  players.length === 3 ? "⚔️ 1v1v1 — Individual" : players.length === 4 ? "⚔️ Battle 4 — Individual" : `⚔️ Battle ${players.length} — Individual`
+                ),
+                sortedByPts.map((p, rank) => {
+                  const col = playerColor(p);
+                  const pct = totalPts > 0 && p.points > 0 ? Math.round(p.points / totalPts * 100) : 0;
+                  const medals = ["🥇","🥈","🥉"];
+                  return /* @__PURE__ */ React.createElement("div", {
+                    key: p.userId || p.hostName || rank,
+                    style: { display: "flex", alignItems: "center", gap: 10, marginBottom: rank < sortedByPts.length - 1 ? 8 : 0 }
+                  },
+                    /* @__PURE__ */ React.createElement("div", { style: { fontSize: 16, width: 22, textAlign: "center", flexShrink: 0 } }, medals[rank] || (rank + 1)),
+                    /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+                      /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 3 } },
+                        /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 800, color: col, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60%" } }, "@", cleanName(p)),
+                        /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, fontWeight: 900, color: col, fontFamily: "'Syne',sans-serif" } }, p.points.toLocaleString())
+                      ),
+                      /* @__PURE__ */ React.createElement("div", { style: { height: 8, background: "#1a1a2e", borderRadius: 999, overflow: "hidden" } },
+                        /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: pct + "%", background: col, borderRadius: 999, transition: "width .5s ease" } })
+                      )
+                    ),
+                    /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#555", flexShrink: 0, width: 28, textAlign: "right" } }, pct, "%")
+                  );
+                })
+              )
+            // ── MODO EQUIPO: scoreboard A vs B ───────────────────────
+            : /* @__PURE__ */ React.createElement("div", { style: { background: "linear-gradient(135deg,#12121e,#0d0d18)", border: "1px solid #1e1e2e", borderRadius: 16, padding: "16px 14px 12px" } },
 
             // Nombres + puntos equipo
             /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 } },
@@ -1829,22 +1864,24 @@ function App() {
               /* @__PURE__ */ React.createElement("span", { style: { color: "#777" } }, " va ganando por "),
               /* @__PURE__ */ React.createElement("strong", { style: { color: "#fff" } }, Math.abs(ptsA - ptsB).toLocaleString())
             )
-          ),
+          ), // cierre equipo-scoreboard
 
           // ── JUGADORES INDIVIDUALES ──────────────────────────────────
           /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } },
             players.map((player, idx) => {
-              const color   = player.side === 0 ? colorA : colorB;
+              const color   = playerColor(player);
               const isOwner = safeLc(player.userId || player.hostName) === safeLc(battle.ownerUsername);
               const bp      = barPct(player.points);
               const indPct  = totalPts > 0 && player.points > 0 ? Math.round(player.points / totalPts * 100) : 0;
               const name    = cleanName(player);
+              const teamLabel = isIndividual ? ("Jugador " + (sortedByPts.findIndex(p => (p.userId || p.hostName) === (player.userId || player.hostName)) + 1) + "°") : (player.side === 0 ? "Equipo A" : "Equipo B");
+              const borderCol = isOwner ? "rgba(254,44,85,.45)" : color + "30";
 
               return /* @__PURE__ */ React.createElement("div", {
                 key: player.userId || player.hostName || idx,
                 style: {
                   background: "#0e0e1a",
-                  border: "1px solid " + (isOwner ? "rgba(254,44,85,.45)" : (player.side === 0 ? "rgba(254,44,85,.18)" : "rgba(37,244,238,.18)")),
+                  border: "1px solid " + borderCol,
                   borderRadius: 12,
                   padding: "10px 10px 8px",
                   position: "relative",
@@ -1862,7 +1899,7 @@ function App() {
                     ),
                     isOwner && /* @__PURE__ */ React.createElement("span", { style: { fontSize: 8, color: colorA, background: "rgba(254,44,85,.12)", padding: "1px 5px", borderRadius: 999, marginTop: 2, display: "inline-block" } }, "TÚ"),
                     /* @__PURE__ */ React.createElement("div", { style: { fontSize: 8, color: "#555", marginTop: 1 } },
-                      player.side === 0 ? "Equipo A" : "Equipo B"
+                      teamLabel
                     )
                   ),
                   /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right", flexShrink: 0 } },
@@ -1875,7 +1912,31 @@ function App() {
 
                 // Barra individual
                 /* @__PURE__ */ React.createElement("div", { style: { height: 5, background: "#1a1a2e", borderRadius: 999, overflow: "hidden" } },
-                  /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: bp + "%", background: player.side === 0 ? "linear-gradient(90deg,#fe2c55,#ff6b81)" : "linear-gradient(90deg,#25f4ee,#00d4cc)", borderRadius: 999, transition: "width .4s ease" } })
+                  /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: bp + "%", background: color, borderRadius: 999, transition: "width .4s ease" } })
+                )
+              );
+            })
+          ),
+
+          // ── BARRAS DE PUNTOS (todos los anfitriones) ────────────────
+          /* @__PURE__ */ React.createElement("div", { style: { background: "#0d0d18", border: "1px solid #1a1a28", borderRadius: 14, padding: "12px 14px" } },
+            /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, fontWeight: 800, color: "#444", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 10 } }, "📊 Puntaje por anfitrión"),
+            sortedByPts.map((p, rank) => {
+              const col = playerColor(p);
+              const pct = totalPts > 0 && p.points > 0 ? Math.round(p.points / totalPts * 100) : 0;
+              return /* @__PURE__ */ React.createElement("div", {
+                key: p.userId || p.hostName || rank,
+                style: { marginBottom: rank < sortedByPts.length - 1 ? 8 : 0 }
+              },
+                /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: 3, alignItems: "center" } },
+                  /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 5, minWidth: 0, flex: 1 } },
+                    /* @__PURE__ */ React.createElement("div", { style: { width: 7, height: 7, borderRadius: "50%", background: col, flexShrink: 0 } }),
+                    /* @__PURE__ */ React.createElement("span", { style: { fontSize: 10, fontWeight: 700, color: col, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, "@", cleanName(p))
+                  ),
+                  /* @__PURE__ */ React.createElement("span", { style: { fontSize: 11, fontWeight: 900, color: "#fff", fontFamily: "'Syne',sans-serif", marginLeft: 8, flexShrink: 0 } }, p.points.toLocaleString())
+                ),
+                /* @__PURE__ */ React.createElement("div", { style: { height: 6, background: "#1a1a2e", borderRadius: 999, overflow: "hidden" } },
+                  /* @__PURE__ */ React.createElement("div", { style: { height: "100%", width: pct + "%", background: col, borderRadius: 999, transition: "width .5s ease", opacity: 0.85 } })
                 )
               );
             })

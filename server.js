@@ -195,9 +195,9 @@ function extractTeams(data) {
         points = extractPoints(army.hostUser);
       }
 
-      var teamIdx = army.armyType !== undefined ? Number(army.armyType) % 2
-                  : army.teamId  !== undefined ? Number(army.teamId)   % 2
-                  : idx % 2;
+      var teamIdx = army.armyType !== undefined ? Number(army.armyType)
+                  : army.teamId  !== undefined ? Number(army.teamId)
+                  : idx;
 
       return { hostName, hostNickname, userId, points, teamIdx };
     }).filter(function(t) { return t.hostName && t.hostName !== "?"; });
@@ -350,6 +350,14 @@ async function startTikTokConnection(username, sessionId) {
     }
 
     const rawTeams = extractTeams(data);
+    // ── Reiniciar picos al inicio de cada nueva batalla ────────────────
+    const lastBattle2 = sessions[username]?.lastBattle;
+    const prevIds = (lastBattle2?.teams || []).map(t => t.userId || t.hostName).sort().join(",");
+    const newIds  = rawTeams.map(t => t.userId || t.hostName).sort().join(",");
+    if (!lastBattle2 || prevIds !== newIds) {
+      resetPeakPoints();
+      console.log("[linkMicBattle] Nueva batalla detectada → puntos reiniciados");
+    }
     const teams    = applyPeakPoints(rawTeams);
     console.log("[linkMicBattle] players:", teams.length, JSON.stringify(teams));
 
