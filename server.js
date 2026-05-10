@@ -429,12 +429,14 @@ io.use((socket, next) => {
 });
 
 async function startTikTokConnection(username, sessionId, ownerUsername) {
+  // sessionId is OPTIONAL — only needed to send chat messages
+  // Connection to LIVE events works without it
   const opts = {
     processInitialData: false,
     enableExtendedGiftInfo: true,
-    enableWebsocketUpgrade: false,      // ← Desactivado: TikTok ya no soporta WS upgrade sin sessionId
-    requestPollingIntervalMs: 1500,     // ← Polling cada 1.5s
-    ...(sessionId ? { sessionId } : {}),// ← Solo incluir sessionId si existe
+    enableWebsocketUpgrade: true,
+    requestPollingIntervalMs: 2000,
+    ...(sessionId && sessionId.length > 5 ? { sessionId } : {}),
   };
 
   const tiktok = new WebcastPushConnection(username, opts);
@@ -448,7 +450,6 @@ async function startTikTokConnection(username, sessionId, ownerUsername) {
   tiktok.on("gift", (data) => {
     registerUser(data);
     io.emit("event", { type:"gift", user:data.uniqueId, nickname:data.nickname||data.uniqueId, giftName:data.giftName||"", giftId:data.giftId, diamondCount:data.diamondCount||0, repeatCount:data.repeatCount||1, img:data.giftPictureUrl||"", timestamp:Date.now() });
-
     const lastBattle = sessions[username]?.lastBattle;
     if (!lastBattle) return;
     const diamonds = Number(data.diamondCount||0) * Number(data.repeatCount||1);
@@ -534,6 +535,7 @@ async function startTikTokConnection(username, sessionId, ownerUsername) {
   return tiktok;
 }
 
+
 // ── REST endpoints ────────────────────────────────────────────────────────────
 app.get("/", (_req, res) => res.json({ status:"TikPanel Server ✅ v2", connections:Object.keys(sessions).length }));
 
@@ -584,8 +586,8 @@ app.post("/connect", authMiddleware, async (req, res) => {
     const msg = err.message || "Error desconocido";
     console.warn(`Conexión fallida para @${clean}: ${msg}`);
     // Si el error es de websocket upgrade, dar mensaje claro
-    if (msg.includes("websocket upgrade") || msg.includes("sessionId")) {
-      return res.status(500).json({ error: "¿Estás en LIVE? Si tu cuenta es privada, ingresa tu Session ID." });
+    if (msg.includes("websocket upgrade") || msg.includes("sessionId") || msg.includes("session")) {
+      return res.status(500).json({ error: "Session ID inválido. Asegúrate de copiar el valor correcto de las cookies de TikTok." });
     }
     res.status(500).json({ error: msg || "No se pudo conectar. ¿Estás en LIVE?" });
   }
