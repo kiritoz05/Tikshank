@@ -362,7 +362,7 @@ async function startTikTokConnection(username, sessionId) {
 
   // ── linkMicArmies: actualización de puntos en tiempo real ─────────────────
   tiktok.on("linkMicArmies", (data) => {
-    console.log("[linkMicArmies] RAW:", JSON.stringify(data).slice(0, 3000));
+    console.log("[linkMicArmies] RAW:", JSON.stringify(data).slice(0, 600));
 
     if (Array.isArray(data.battleArmies)) {
       data.battleArmies.forEach((army, i) => {
@@ -407,7 +407,8 @@ async function startTikTokConnection(username, sessionId) {
 
 app.get("/battle/:username", (req, res) => {
   const s = getSessionRecord(req.params.username);
-  res.json(s?.lastBattle || null);
+  // Devolver {status:0} en lugar de null para que el frontend sepa que terminó
+  res.json(s?.lastBattle || { status: 0, teams: [], timestamp: Date.now() });
 });
 
 app.get("/", (req, res) => res.json({ status:"TikPanel Server ✅", connections:Object.keys(sessions).length, users:Object.keys(sessions) }));

@@ -1015,8 +1015,11 @@ function App() {
         const r = await fetch(`${SERVER}/battle/${encodeURIComponent(tUser.replace(/^@/,""))}`);
         if (r.ok) {
           const d = await r.json();
-          if (d && d.teams && d.teams.length > 0) {
-            setBattle((prev) => normalizeBattlePayload(d, tUser));
+          if (!d || (d.status === 0)) {
+            // batalla terminada → limpiar
+            setBattle(null);
+          } else if (d && d.teams && d.teams.length > 0) {
+            setBattle(normalizeBattlePayload(d, tUser));
           }
         }
       } catch(e) {}
@@ -1214,15 +1217,45 @@ function App() {
     return () => clearInterval(t);
   }, [conn2]);
   const safeLc = (v) => (v || "").toString().trim().toLowerCase().replace(/^@/, "");
+  const tUserRef = React.useRef(tUser);
+  React.useEffect(() => { tUserRef.current = tUser; }, [tUser]);
+  const refreshBattle = React.useCallback(async () => {
+    const u = (tUserRef.current || "").replace(/^@/, "");
+    if (!u) return;
+    try {
+      const r = await fetch(`${SERVER}/battle/${encodeURIComponent(u)}`);
+      if (r.ok) {
+        const d = await r.json();
+        if (!d || d.status === 0) { setBattle(null); }
+        else if (d && d.teams && d.teams.length > 0) { setBattle(normalizeBattlePayload(d, tUserRef.current)); }
+      }
+    } catch(e) {}
+  }, []);
+  // Devuelve el mejor nombre disponible para un jugador de batalla
+  const resolveBattleName = (t) => {
+    const nn = t.hostNickname || t.nickname || "";
+    const un = t.hostName    || t.uniqueId || t.displayId || "";
+    const uid = String(t.userId || "");
+    // Si el nickname no es numérico, úsalo
+    if (nn && !/^\d{6,}$/.test(nn)) return { name: nn, id: uid || un };
+    // Si el hostName no es numérico, úsalo
+    if (un && !/^\d{6,}$/.test(un)) return { name: un, id: uid || un };
+    // Ambos numéricos: mostrar ID abreviado como fallback
+    const rawId = uid || un;
+    return { name: rawId ? "ID·" + rawId.slice(-4) : "?", id: rawId };
+  };
   const normalizeBattlePayload = (d, ownerFallback = "") => {
     if (!d || !d.teams || !Array.isArray(d.teams)) return d || null;
-    const mapped = d.teams.map((t, i) => ({
-      hostName: t.hostName || t.uniqueId || t.displayId || "?",
-      hostNickname: t.hostNickname || t.nickname || t.hostName || "?",
-      points: getBattlePoints(t),
-      userId: t.userId || t.hostName || "",
-      teamIdx: t.teamIdx !== void 0 && t.teamIdx !== null ? Number(t.teamIdx) : t.team !== void 0 && t.team !== null ? Number(t.team) : null
-    })).filter((t) => t.hostName !== "?");
+    const mapped = d.teams.map((t, i) => {
+      const { name, id } = resolveBattleName(t);
+      return {
+        hostName: name,
+        hostNickname: name,
+        points: getBattlePoints(t),
+        userId: t.userId || t.hostName || t.uniqueId || "",
+        teamIdx: t.teamIdx !== void 0 && t.teamIdx !== null ? Number(t.teamIdx) : t.team !== void 0 && t.team !== null ? Number(t.team) : i % 2
+      };
+    }).filter((t) => t.hostName && t.hostName !== "?");
     return __spreadProps(__spreadValues({}, d), {
       ownerUsername: (d.ownerUsername || ownerFallback || tUser || "").toLowerCase().replace(/^@/, ""),
       teams: mapped,
@@ -1410,7 +1443,11 @@ function App() {
       });
     });
     sock.on("battle", (d) => {
-      setBattle(normalizeBattlePayload(d, tUser || ld("tuser", "") || ""));
+      if (!d || d.status === 0 || !d.teams || d.teams.length === 0) {
+        setBattle(null); // batalla terminada
+      } else {
+        setBattle(normalizeBattlePayload(d, tUser || ld("tuser", "") || ""));
+      }
     });
     sock.on("tiktok_disconnected", (d) => {
       setConn(false);
@@ -1454,6 +1491,7 @@ function App() {
         likeUserMapR.current = {};
         setViewR([]);
         sv("viewR", []);
+        setBattle(null);
         setLog([{ t: "sys", tx: `\u2705 Conectado a @${tUser}` }]);
       } else {
         setConn2(false);
@@ -1676,12 +1714,7 @@ function App() {
       // ── BOTÓN REFRESH ──
       /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "flex-end" } },
         /* @__PURE__ */ React.createElement("button", {
-          onClick: async () => {
-            try {
-              const r = await fetch(SERVER + "/battle/" + encodeURIComponent((tUser||"").replace(/^@/,"")));
-              if (r.ok) { const d = await r.json(); if (d && d.teams) setBattle(normalizeBattlePayload(d, tUser)); }
-            } catch(e) {}
-          },
+          onClick: refreshBattle,
           style: { background: "rgba(37,244,238,.08)", border: "1px solid rgba(37,244,238,.25)", borderRadius: 8, padding: "6px 14px", color: "#25f4ee", fontSize: 10, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }
         }, "\u21BB Actualizar")
       ),
@@ -1691,7 +1724,7 @@ function App() {
           // LADO IZQUIERDO
           /* @__PURE__ */ React.createElement("div", { style: { flex: 1, textAlign: "left" } },
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#fe2c55", letterSpacing: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-              "@", (() => { const n = leader0.hostNickname && !/^\d{6,}$/.test(leader0.hostNickname) ? leader0.hostNickname : leader0.hostName && !/^\d{6,}$/.test(leader0.hostName) ? leader0.hostName : "Equipo 1"; return n; })()
+              "@", (leader0.hostNickname || leader0.hostName || "Equipo 1")
             ),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#fe2c55", lineHeight: 1.1 } }, pts0.toLocaleString()),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#777" } }, "puntos")
@@ -1706,7 +1739,7 @@ function App() {
           // LADO DERECHO
           /* @__PURE__ */ React.createElement("div", { style: { flex: 1, textAlign: "right" } },
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 10, fontWeight: 800, color: "#25f4ee", letterSpacing: 0.5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } },
-              "@", (() => { const n = leader1.hostNickname && !/^\d{6,}$/.test(leader1.hostNickname) ? leader1.hostNickname : leader1.hostName && !/^\d{6,}$/.test(leader1.hostName) ? leader1.hostName : "Equipo 2"; return n; })()
+              "@", (leader1.hostNickname || leader1.hostName || "Equipo 2")
             ),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 24, fontWeight: 900, color: "#25f4ee", lineHeight: 1.1 } }, pts1.toLocaleString()),
             /* @__PURE__ */ React.createElement("div", { style: { fontSize: 9, color: "#777" } }, "puntos")
@@ -1728,8 +1761,8 @@ function App() {
         pts0 !== pts1 && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", marginTop: 6, fontSize: 10, color: "#555" } },
           /* @__PURE__ */ React.createElement("span", { style: { color: pts0 > pts1 ? "#fe2c55" : "#25f4ee", fontWeight: 700 } },
             "@", (() => {
-              const src = pts0 > pts1 ? leader0 : leader1; const n = (src.hostNickname && !/^\d{6,}$/.test(src.hostNickname)) ? src.hostNickname : src.hostName && !/^\d{6,}$/.test(src.hostName) ? src.hostName : (src.hostNickname || src.hostName);
-              return /^\d{6,}$/.test(n) ? "ID·" + n.slice(-4) : (n || "?");
+              const src = pts0 > pts1 ? leader0 : leader1;
+              return src.hostNickname || src.hostName || "?";
             })()
           ),
           " va ganando por ", /* @__PURE__ */ React.createElement("strong", { style: { color: "#fff" } }, Math.abs(pts0 - pts1).toLocaleString())
@@ -1743,14 +1776,8 @@ function App() {
           const isOwner = safeLc(player.userId || player.hostName) === safeLc(battle.ownerUsername);
           const pct = total > 0 ? Math.round((player.points||0) / total * 100) : 0;
 
-          // Resolver nombre: si es número largo usar nickname o "...1234"
-          const rawName = player.hostNickname || player.hostName || player.uniqueId || "";
-          const isNumeric = /^\d{6,}$/.test(rawName);
-          const displayName = isNumeric
-            ? (player.hostNickname && !/^\d{6,}$/.test(player.hostNickname)
-                ? player.hostNickname
-                : "ID·" + rawName.slice(-4))
-            : rawName;
+          // hostName ya viene resuelto desde normalizeBattlePayload
+          const displayName = player.hostNickname || player.hostName || "Jugador";
 
           return /* @__PURE__ */ React.createElement("div", { key: idx, style: {
             background: "#12121e",
