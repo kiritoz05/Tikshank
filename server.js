@@ -368,6 +368,10 @@ async function startTikTokConnection(username, sessionId) {
     const battlePayload = { status, teams, ownerUsername, timestamp: Date.now() };
     if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : battlePayload;
     io.emit("battle", battlePayload);
+    if (status === 0) {
+      // Limpiar puntos acumulados al terminar la batalla
+      Object.keys(battleGiftPoints).forEach(k => delete battleGiftPoints[k]);
+    }
 
     if (sessions[username]) sessions[username].lastBattle = status === 0 ? null : { status, teams, ownerUsername, timestamp: Date.now() };
     const cb = emitUpdatedBattle(username, ownerUsername, teams, status);
@@ -375,6 +379,25 @@ async function startTikTokConnection(username, sessionId) {
       if (/^\d{8,}$/.test(t.hostName)) resolveUserId(t.hostName, cb);
       if (/^\d{8,}$/.test(t.userId))   resolveUserId(t.userId,   cb);
     });
+  });
+
+  // ── Acumulador de puntos por regalos durante batalla ──────────────────
+  // TikTok a veces no manda los puntos en linkMicArmies, así que los
+  // acumulamos manualmente a partir de los regalos recibidos.
+  // key: hostName (userId o uniqueId del streamer del equipo)
+  const battleGiftPoints = {};  // { userId/uniqueId: totalDiamonds }
+
+  tiktok.on("gift", (giftData) => {
+    // Solo acumular si hay batalla activa
+    if (!sessions[username]?.lastBattle) return;
+    registerUser(giftData);
+    if (giftData.giftType === 1 && !giftData.repeatEnd) return; // combo sin terminar
+    const diamonds = Number(giftData.diamondCount || 0) * Number(giftData.repeatCount || 1);
+    if (diamonds <= 0) return;
+    // Sumar al equipo del owner (el streamer que recibe el regalo es el owner)
+    const ownerKey = ownerUsername;
+    battleGiftPoints[ownerKey] = (battleGiftPoints[ownerKey] || 0) + diamonds;
+    console.log(`[gift-battle] +${diamonds} para ${ownerKey} → total=${battleGiftPoints[ownerKey]}`);
   });
 
   // ── linkMicArmies ──────────────────────────────────────────────────────
@@ -403,9 +426,20 @@ async function startTikTokConnection(username, sessionId) {
       });
     }
 
-    const teams = extractTeams(data);
+    let teams = extractTeams(data);
     console.log(`[linkMicArmies] individual players=${teams.length}`);
     if (teams.length === 0) return;
+
+    // Fallback: si los puntos vienen en 0, usar los acumulados por regalos
+    const totalGiftPts = Object.values(battleGiftPoints).reduce((s, v) => s + v, 0);
+    if (totalGiftPts > 0) {
+      teams = teams.map(t => {
+        if ((t.points || 0) > 0) return t; // ya tiene puntos reales
+        const key = t.userId || t.hostName;
+        const giftPts = battleGiftPoints[key] || battleGiftPoints[ownerUsername] || 0;
+        return { ...t, points: giftPts };
+      });
+    }
 
     lastTeams  = teams;
     lastStatus = 1;
