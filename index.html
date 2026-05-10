@@ -1741,13 +1741,20 @@ function App() {
     : (() => {
         // ── Procesar jugadores ──────────────────────────────────────────
         const rawPlayers = battle.players || battle.teams || [];
+        // ── ORDENAMIENTO ESTABLE: mismo jugador = mismo color siempre ──
+        // Ordenar por (teamIdx, userId/hostName) para que el orden no cambie
+        // entre actualizaciones y los colores sean fijos por anfitrión.
         const players = rawPlayers.map((p, i) => ({
           ...p,
           points: getBattlePoints(p),
           _i: i,
-          // teamIdx: 0 = equipo A (rojo), 1 = equipo B (cyan)
           side: p.teamIdx !== void 0 && p.teamIdx !== null ? Number(p.teamIdx) : i,
-        }));
+        })).sort((a, b) => {
+          if (a.side !== b.side) return a.side - b.side;
+          const ka = String(a.userId || a.hostName || "");
+          const kb = String(b.userId || b.hostName || "");
+          return ka.localeCompare(kb);
+        });
 
         const totalPts = players.reduce((s, p) => s + p.points, 0);
         const teamA    = players.filter(p => p.side === 0);
@@ -1765,7 +1772,17 @@ function App() {
         const isIndividual = numSides >= 3;
         const sortedByPts = [...players].sort((a, b) => b.points - a.points);
         const IND_COLORS = ["#fe2c55","#25f4ee","#a78bfa","#fbbf24","#4ade80","#fb923c"];
-        const playerColor = (p) => isIndividual ? (IND_COLORS[p.side % IND_COLORS.length] || "#aaa") : (p.side === 0 ? colorA : colorB);
+        // Color estable: en modo individual se asigna por posición ordenada (side);
+        // en modo equipo, rojo fijo para side=0, cyan fijo para side=1.
+        const colorMap = {};
+        players.forEach((p, i) => {
+          const key = String(p.userId || p.hostName || i);
+          colorMap[key] = isIndividual ? (IND_COLORS[i % IND_COLORS.length]) : (p.side === 0 ? colorA : colorB);
+        });
+        const playerColor = (p) => {
+          const key = String(p.userId || p.hostName || "");
+          return colorMap[key] || (p.side === 0 ? colorA : colorB);
+        };
 
         // Nombre limpio
         const cleanName = (p) => p.hostNickname || p.hostName || "?";

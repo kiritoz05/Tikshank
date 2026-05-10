@@ -163,44 +163,63 @@ function extractPoints(obj) {
   return 0;
 }
 
+// ── Helper: resolver un usuario de army a { hostName, hostNickname, userId } ─
+function resolveArmyUser(u, fallbackIdx) {
+  var uid      = (u.uniqueId || u.displayId || String(u.userId || u.id || "")).trim();
+  var nn       = (u.nickname || u.displayName || u.name || uid).trim();
+  var userId   = String(u.userId || u.id || "");
+  var resolved = (uid && /^\d{8,}$/.test(uid) && userMap[uid]) ? userMap[uid]
+               : (userId && userMap[userId])                   ? userMap[userId]
+               : null;
+  var hostName     = resolved?.uniqueId || (uid && !/^\d{8,}$/.test(uid) ? uid : (userId || ("player_" + fallbackIdx)));
+  var hostNickname = resolved?.nickname  || nn || hostName;
+  return { hostName, hostNickname, userId };
+}
+
 // ── Extrae teams del payload de batalla ────────────────────────────────────
+// Soporta: 1v1, 2v2 (armies con participants), 1v1v1, 1v3, 4-FFA
 function extractTeams(data) {
   const armies = data.battleArmies || (data.linkMicBattleInfo && data.linkMicBattleInfo.battleArmies) || [];
 
   if (armies.length > 0) {
-    return armies.map(function(army, idx) {
-      var host     = army.hostUser || {};
-      var uid      = host.uniqueId || host.displayId || String(army.hostUserId || "");
-      var nn       = host.nickname || host.displayName || uid;
-      var userId   = String(host.userId || host.id || army.hostUserId || "");
-      // Intentar resolver ID numérico desde userMap ya poblado
-      var resolved = (uid && /^\d{8,}$/.test(uid) && userMap[uid]) ? userMap[uid]
-                   : (userId && userMap[userId]) ? userMap[userId]
-                   : null;
-      var hostName     = resolved?.uniqueId || (uid && !/^\d{8,}$/.test(uid) ? uid : (userId || ("player_" + idx)));
-      var hostNickname = resolved?.nickname  || nn || hostName;
-
-      // Puntos directos del army
-      var points = extractPoints(army);
-
-      // Sumar participantes si no hay puntos directos
-      if (points === 0 && Array.isArray(army.participants) && army.participants.length > 0) {
-        points = army.participants.reduce(function(sum, p) {
-          return sum + extractPoints(p);
-        }, 0);
-      }
-
-      // Intentar hostUser como último recurso
-      if (points === 0 && army.hostUser) {
-        points = extractPoints(army.hostUser);
-      }
-
+    const result = [];
+    armies.forEach(function(army, idx) {
       var teamIdx = army.armyType !== undefined ? Number(army.armyType)
                   : army.teamId  !== undefined ? Number(army.teamId)
                   : idx;
 
-      return { hostName, hostNickname, userId, points, teamIdx };
-    }).filter(function(t) { return t.hostName && t.hostName !== "?"; });
+      const participants = Array.isArray(army.participants) ? army.participants.filter(Boolean) : [];
+
+      // ── 2v2 / 1v3: army con múltiples participantes → expandir cada uno ──
+      if (participants.length > 1) {
+        participants.forEach(function(p, pIdx) {
+          var info   = resolveArmyUser(p, idx + "_" + pIdx);
+          var points = extractPoints(p);
+          if (info.hostName && info.hostName !== "?") {
+            result.push({ hostName: info.hostName, hostNickname: info.hostNickname, userId: info.userId, points, teamIdx });
+          }
+        });
+        return; // no agregar el army-host además
+      }
+
+      // ── 1v1 / 1v1v1: army con 1 host ─────────────────────────────────
+      var host = army.hostUser || {};
+      var info = resolveArmyUser(
+        { uniqueId: host.uniqueId || host.displayId || String(army.hostUserId || ""),
+          nickname: host.nickname || host.displayName || "",
+          userId:   host.userId || host.id || army.hostUserId || "" },
+        idx
+      );
+
+      var points = extractPoints(army);
+      if (points === 0 && participants.length === 1) points = extractPoints(participants[0]);
+      if (points === 0 && army.hostUser)              points = extractPoints(army.hostUser);
+
+      if (info.hostName && info.hostName !== "?") {
+        result.push({ hostName: info.hostName, hostNickname: info.hostNickname, userId: info.userId, points, teamIdx });
+      }
+    });
+    return result;
   }
 
   // Fallback: battleUsers
@@ -350,14 +369,12 @@ async function startTikTokConnection(username, sessionId) {
     }
 
     const rawTeams = extractTeams(data);
-    // ── Reiniciar picos al inicio de cada nueva batalla ────────────────
-    const lastBattle2 = sessions[username]?.lastBattle;
-    const prevIds = (lastBattle2?.teams || []).map(t => t.userId || t.hostName).sort().join(",");
-    const newIds  = rawTeams.map(t => t.userId || t.hostName).sort().join(",");
-    if (!lastBattle2 || prevIds !== newIds) {
-      resetPeakPoints();
-      console.log("[linkMicBattle] Nueva batalla detectada → puntos reiniciados");
-    }
+    // ── SIEMPRE reiniciar puntos al inicio de cada batalla ─────────────────
+    // linkMicBattle status=1 es el evento de INICIO; linkMicArmies maneja
+    // las actualizaciones en tiempo real. Reiniciar aquí garantiza que
+    // rondas consecutivas con los mismos oponentes empiecen en 0.
+    resetPeakPoints();
+    console.log("[linkMicBattle] Nueva batalla → puntos reiniciados");
     const teams    = applyPeakPoints(rawTeams);
     console.log("[linkMicBattle] players:", teams.length, JSON.stringify(teams));
 
