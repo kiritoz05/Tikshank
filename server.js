@@ -336,7 +336,12 @@ async function startTikTokConnection(username) {
   return tiktok;
 }
 
-app.get("/", (req, res) => res.json({ status:"TikPanel Server ✅", connections:Object.keys(sessions).length, users:Object.keys(sessions) }));
+// Servir el panel HTML en la raíz — así solo necesitas Railway, sin Vercel
+app.get("/", (req, res) => {
+  const path = require("path");
+  res.sendFile(path.join(__dirname, "tikpanel.html"));
+});
+app.get("/api/status", (req, res) => res.json({ status:"TikPanel Server ✅", connections:Object.keys(sessions).length, users:Object.keys(sessions) }));
 app.get("/status/:username", (req, res) => res.json({ connected: !!sessions[req.params.username]?.tiktok }));
 
 app.post("/connect", async (req, res) => {
@@ -364,4 +369,4 @@ app.post("/disconnect", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => console.log(`🚀 TikPanel Server en puerto ${PORT}`));
+server.listen(PORT, "0.0.0.0", () => console.log(`🚀 TikPanel Server en puerto ${PORT}`));
