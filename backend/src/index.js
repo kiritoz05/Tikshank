@@ -1,74 +1,97 @@
-const express = require('express')
-const http    = require('http')
+const express   = require('express')
+const http      = require('http')
 const WebSocket = require('ws')
-const cors    = require('cors')
+const cors      = require('cors')
+const { WebcastPushConnection } = require('tiktok-live-connector')
 
-const app = express()
+const app    = express()
 const ORIGIN = process.env.ALLOWED_ORIGIN || '*'
-
 app.use(cors({ origin: ORIGIN }))
 app.use(express.json())
 
-// ── Estado del live ──────────────────────────────────────────────────────────
-let state = {
-  connected: false, user: null,
-  viewers: 0, gifts: 0, followers: 0, messages: 0, likes: 0, diamonds: 0,
-  events: []
-}
-
 const server = http.createServer(app)
 const wss    = new WebSocket.Server({ server })
+
+let tiktok  = null
+let state   = { connected:false, user:null, viewers:0, gifts:0, followers:0, messages:0, likes:0, diamonds:0 }
 
 function broadcast(data) {
   const msg = JSON.stringify(data)
   wss.clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg) })
 }
 
-// ── API REST ─────────────────────────────────────────────────────────────────
-app.get('/status', (_, res) => res.json({ ok: true }))
-app.get('/state',  (_, res) => res.json(state))
+function resetState(user) {
+  state = { connected:true, user, viewers:0, gifts:0, followers:0, messages:0, likes:0, diamonds:0 }
+}
 
-app.post('/connect', (req, res) => {
-  state.connected = true
-  state.user = req.body.user || 'streamer'
-  state.viewers = 6
-  broadcast({ type: 'CONNECTED', user: state.user, state })
-  res.json({ ok: true })
+// ── Conectar a TikTok LIVE ────────────────────────────────────────────────────
+app.post('/connect', async (req, res) => {
+  const { user } = req.body
+  if (!user) return res.status(400).json({ error: 'user required' })
+
+  try {
+    if (tiktok) { try { tiktok.disconnect() } catch(e) {} }
+
+    tiktok = new WebcastPushConnection(user)
+
+    tiktok.on('streamEnd',  ()  => { state.connected = false; broadcast({ type:'STREAM_END' }) })
+    tiktok.on('roomUser',   (d) => { state.viewers = d.viewerCount; broadcast({ type:'STATE', state }) })
+    tiktok.on('like',       (d) => { state.likes += d.likeCount; broadcast({ type:'EVENT', event:{ title:`❤️ @${d.uniqueId} dio likes`, desc:`+${d.likeCount} likes` }, state }) })
+    tiktok.on('follow',     (d) => { state.followers++; broadcast({ type:'EVENT', event:{ title:`➕ @${d.uniqueId} te siguió`, desc:'Nuevo seguidor en el live.' }, state }) })
+    tiktok.on('gift',       (d) => {
+      if (d.giftType === 1 && !d.repeatEnd) return
+      state.gifts++
+      state.diamonds += d.diamondCount * d.repeatCount
+      broadcast({ type:'EVENT', event:{ title:`🎁 @${d.uniqueId} envió ${d.repeatCount}x ${d.giftName}`, desc:`+${d.diamondCount * d.repeatCount} diamantes` }, state })
+    })
+    tiktok.on('chat', (d) => {
+      state.messages++
+      broadcast({ type:'EVENT', event:{ title:`💬 @${d.uniqueId}: "${d.comment}"`, desc:'Mensaje en el chat del live.' }, state })
+    })
+
+    const info = await tiktok.connect()
+    resetState(user)
+    state.viewers = info.roomInfo?.userCount || 0
+    broadcast({ type:'CONNECTED', user, state })
+    res.json({ ok:true, roomId: info.roomId })
+
+  } catch(err) {
+    res.status(400).json({ error: err.message || 'No se pudo conectar. Verifica que el usuario esté en LIVE.' })
+  }
 })
 
 app.post('/disconnect', (_, res) => {
-  state = { connected:false, user:null, viewers:0, gifts:0, followers:0, messages:0, likes:0, diamonds:0, events:[] }
-  broadcast({ type: 'DISCONNECTED', state })
-  res.json({ ok: true })
+  try { if (tiktok) tiktok.disconnect() } catch(e) {}
+  tiktok = null
+  state = { connected:false, user:null, viewers:0, gifts:0, followers:0, messages:0, likes:0, diamonds:0 }
+  broadcast({ type:'DISCONNECTED', state })
+  res.json({ ok:true })
 })
 
-const EVENTS = [
-  { title:'❤️ @miguelgamer dio 21 likes',   desc:'Trigger: sumar meta de likes + overlay flash.',        apply: s => { s.likes += 21 } },
-  { title:'🎁 @jibenv6 envió 7x Rose',       desc:'Gift detectado: TTS "Gracias por tu rosa".',            apply: s => { s.gifts++; s.diamonds += 35 } },
-  { title:'➕ @newcomer00 te siguió',         desc:'Seguidor nuevo. Mensaje automático enviado.',           apply: s => { s.followers++ } },
-  { title:'💬 @fanprimero: "Hola hermosa!"', desc:'Comentario en chat. Moderación: OK.',                   apply: s => { s.messages++ } },
-  { title:'⚔️ Bonus Mission detectada',      desc:'Overlay urgencia activo. 72% completado.',             apply: s => {} },
-  { title:'🎁 @mvpking envió 1x Lion',       desc:'Gift VIP: sonido especial + TTS VIP.',                  apply: s => { s.gifts++; s.diamonds += 199 } },
-  { title:'💬 @chatero: "cuánto falta?"',   desc:'Comando → respuesta rápida al chat.',                   apply: s => { s.messages++ } },
-  { title:'➕ @tiktokfan99 te siguió',        desc:'Meta de seguidores actualizada.',                      apply: s => { s.followers++ } },
+app.get('/state',  (_, res) => res.json(state))
+app.get('/status', (_, res) => res.json({ ok:true }))
+
+// Simular eventos de prueba
+const DEMO = [
+  { title:'❤️ @miguelgamer dio 21 likes',  desc:'+21 likes',          apply:s=>{ s.likes+=21 } },
+  { title:'🎁 @jibenv6 envió 7x Rose',      desc:'+35 diamantes',      apply:s=>{ s.gifts++; s.diamonds+=35 } },
+  { title:'➕ @newcomer00 te siguió',        desc:'Nuevo seguidor.',    apply:s=>{ s.followers++ } },
+  { title:'💬 @fanprimero: "Hola!"',        desc:'Mensaje en el chat.',apply:s=>{ s.messages++ } },
+  { title:'⚔️ Bonus Mission detectada',     desc:'72% completado.',    apply:s=>{}  },
+  { title:'🎁 @mvpking envió 1x Lion',      desc:'+199 diamantes.',    apply:s=>{ s.gifts++; s.diamonds+=199 } },
 ]
-let evIdx = 0
+let demoIdx = 0
 
 app.post('/simulate', (_, res) => {
-  if (!state.connected) return res.status(400).json({ error: 'not connected' })
-  const ev = EVENTS[evIdx++ % EVENTS.length]
+  const ev = DEMO[demoIdx++ % DEMO.length]
   ev.apply(state)
-  state.viewers = Math.max(1, state.viewers + (Math.random() > .5 ? 1 : -1))
-  const event = { title: ev.title, desc: ev.desc, ts: new Date().toISOString() }
-  state.events = [event, ...state.events].slice(0, 50)
-  broadcast({ type: 'EVENT', event, state })
-  res.json({ ok: true, event })
+  state.viewers = Math.max(1, state.viewers + (Math.random()>.5?1:-1))
+  const event = { title:ev.title, desc:ev.desc }
+  broadcast({ type:'EVENT', event, state })
+  res.json({ ok:true })
 })
 
-// ── WebSocket handshake ───────────────────────────────────────────────────────
-wss.on('connection', ws => {
-  ws.send(JSON.stringify({ type: 'HELLO', state }))
-})
+wss.on('connection', ws => ws.send(JSON.stringify({ type:'HELLO', state })))
 
 const PORT = process.env.PORT || 3001
 server.listen(PORT, () => console.log(`TikShankz backend :${PORT}`))
