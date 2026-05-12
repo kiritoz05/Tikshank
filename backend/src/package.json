@@ -1,0 +1,14 @@
+{
+  "name": "tikshankz-backend",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "ws": "^8.17.0",
+    "cors": "^2.8.5"
+  }
+}
