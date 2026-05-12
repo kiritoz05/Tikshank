@@ -64,10 +64,7 @@ input,select,button,textarea{font-family:'DM Sans',sans-serif}
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-// URL del servidor: si el HTML lo sirve el propio Railway, usa la misma URL
-const SERVER = (typeof window !== "undefined" && window.location.hostname !== "localhost" && !window.location.hostname.includes("vercel"))
-  ? window.location.origin
-  : "https://tikshank-production.up.railway.app";
+const SERVER = "https://tikshank-production.up.railway.app";
 const EL_KEY  = "sk_c59a0c3dddc47a866083fc9b58a7dbd92b722fb2fb12da11";
 
 /* ─── Storage helpers ───────────────────────────────── */
@@ -978,26 +975,19 @@ function App() {
       if (d && d.teams) {
         const normalized = {
           ...d,
+          // ownerUsername: usar el que manda el servidor o el usuario conectado como fallback
           ownerUsername: (d.ownerUsername || tUser || "").toLowerCase().replace(/^@/,""),
           teams: d.teams.map(t => ({
             hostName:     t.hostName     || t.uniqueId  || t.displayId  || "?",
             hostNickname: t.hostNickname || t.nickname  || t.hostName   || "?",
-            userId:       t.userId || "",
             points:       Number(t.points || t.battleScore || t.score || 0),
           })).filter(t => t.hostName !== "?"),
         };
         setBattle(normalized);
       } else {
-        setBattle(null); // null limpia el estado
+        setBattle(d);
       }
     });
-
-    // Limpiar batalla al reconectar (nueva sesión)
-    sock.on("battle_reset", () => setBattle(null));
-
-    // Pedir la última batalla conocida al conectar (carga instantánea sin esperar evento)
-    const savedUser = ld("tuser", "");
-    if (savedUser) sock.emit("get_battle", { username: savedUser });
 
     sock.on("tiktok_disconnected", d => {
       setConn(false);
@@ -1993,307 +1983,194 @@ function App() {
 
 
           {/* ── BATALLA / VERSUS ── */}
-          {tab==="batalla" && (() => {
-            /* ── helpers ───────────────────────────────────────────── */
-            const isNum = s => /^\d{6,}$/.test(s||"");
-            const getName = t => {
-              const nn=t.hostNickname||""; const hn=t.hostName||"";
-              if(nn&&!isNum(nn)) return nn;
-              if(hn&&!isNum(hn)) return hn;
-              return nn||hn||"?";
-            };
-            // Paleta fija: rojo · cyan · dorado · morado
-            const C  = ["#fe2c55","#25f4ee","#ffd700","#a855f7"];
-            const BG = [
-              "linear-gradient(135deg,#fe2c55,#ff6b81)",
-              "linear-gradient(135deg,#0ea5e9,#25f4ee)",
-              "linear-gradient(135deg,#d97706,#ffd700)",
-              "linear-gradient(135deg,#7c3aed,#a855f7)",
-            ];
-
-            const raw   = battle?.teams || [];
-            const n     = raw.length;
-
-            // Dueño siempre primero
-            const owner = (battle?.ownerUsername||"").toLowerCase().replace(/^@/,"");
-            let oi = raw.findIndex(t=>{
-              const hn=(t.hostName||"").toLowerCase();
-              const nn=(t.hostNickname||"").toLowerCase();
-              return owner&&(hn===owner||nn===owner||hn.includes(owner)||owner.includes(hn));
-            });
-            if(oi<0) oi=0;
-            const teams = n>0 ? [raw[oi],...raw.filter((_,i)=>i!==oi)] : [];
-            const totalPts = teams.reduce((s,t)=>s+t.points,0)||1;
-
-            // Modo de batalla según número de participantes
-            const modeMap = {1:"Solo",2:"1 vs 1",3:"1 vs 1 vs 1",4:"1 vs 1 vs 1 vs 1"};
-            // TikTok también usa 2v2 (4 hosts pero 2 equipos) — detectar por estructura
-            const modeLabel = modeMap[n] || `${n} jugadores`;
-
-            return (
+          {tab==="batalla" && (
             <div className="ai">
-
-              {/* Header */}
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:15,display:"flex",alignItems:"center",gap:8}}>
-                  ⚔️ Batalla
-                  {battle?.status===1&&<span className="ld" style={{width:7,height:7,borderRadius:"50%",background:"#fe2c55",boxShadow:"0 0 8px #fe2c55",display:"inline-block"}}/>}
-                </div>
-                {battle&&(
-                  <div style={{display:"flex",alignItems:"center",gap:8}}>
-                    <span style={{background:"rgba(255,255,255,.05)",border:"1px solid #252535",borderRadius:20,padding:"2px 10px",fontSize:9,color:"#666",fontWeight:700,letterSpacing:1}}>
-                      {modeLabel}
-                    </span>
-                    <span style={{background:battle.status===1?"rgba(254,44,85,.12)":"rgba(37,244,238,.1)",
-                      border:`1px solid ${battle.status===1?"rgba(254,44,85,.3)":"rgba(37,244,238,.3)"}`,
-                      borderRadius:20,padding:"3px 12px",fontSize:10,fontWeight:800,
-                      color:battle.status===1?"#fe2c55":"#25f4ee",letterSpacing:1}}>
-                      {battle.status===1?"🔴 EN CURSO":"✅ FIN"}
-                    </span>
-                  </div>
+              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:15,marginBottom:14,
+                display:"flex",alignItems:"center",gap:8}}>
+                ⚔️ Batalla en vivo
+                {battle && battle.status===1 && (
+                  <span className="ld" style={{width:7,height:7,borderRadius:"50%",
+                    background:"#fe2c55",boxShadow:"0 0 8px #fe2c55",display:"inline-block"}}/>
                 )}
               </div>
 
-              {/* No conectado */}
-              {!conn?(
+              {!conn ? (
                 <div style={{textAlign:"center",padding:"40px 0",color:"#333",fontSize:12}}>
                   Conecta tu LIVE para ver la batalla
                 </div>
-
-              /* Sin batalla */
-              ):!battle?(
-                <div style={{textAlign:"center",padding:"32px 0",color:"#444",fontSize:12}}>
-                  <div style={{fontSize:44,marginBottom:12}}>⚔️</div>
-                  <div style={{fontWeight:700,fontSize:13,color:"#555",marginBottom:6}}>Sin batalla activa</div>
-                  <div style={{fontSize:10,color:"#2a2a3a",lineHeight:1.7}}>
-                    Cuando inicies un versus en TikTok LIVE<br/>aparecerá aquí automáticamente en tiempo real.
-                  </div>
+              ) : !battle ? (
+                <div style={{textAlign:"center",padding:"30px 0",color:"#444",fontSize:12}}>
+                  <div style={{fontSize:36,marginBottom:12}}>⚔️</div>
+                  Esperando batalla...<br/>
+                  <span style={{fontSize:10,color:"#333"}}>
+                    La batalla aparece automáticamente cuando el LIVE inicia un versus
+                  </span>
                 </div>
-
-              /* Sin equipos */
-              ):n===0?(
-                <div style={{textAlign:"center",color:"#333",fontSize:11,padding:"24px 0"}}>Sin datos de equipos...</div>
-
-              /* ── 1v1: diseño especial con tarjeta grande VS ── */
-              ):n===2?(()=>{
-                const t0=teams[0]; const t1=teams[1];
-                const p0=t0.points; const p1=t1.points;
-                const tot=(p0+p1)||1;
-                const pct0=Math.round(p0/tot*100); const pct1=100-pct0;
-                const w0=p0>=p1;
-                const diff=Math.abs(p0-p1);
-                return(
-                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
-
-                    {/* ── Tarjeta VS principal ── */}
-                    <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:20,padding:"18px 16px"}}>
-
-                      {/* Nombres */}
-                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:14}}>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:12,fontWeight:800,color:C[0],
-                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.3}}>
-                            {w0&&<span style={{marginRight:4}}>👑</span>}@{getName(t0)}
-                          </div>
-                          <div style={{fontSize:9,color:"#444",marginTop:2}}>Equipo A</div>
-                        </div>
-                        <div style={{background:"#0d0d18",border:"2px solid #252535",borderRadius:12,
-                          padding:"5px 12px",flexShrink:0,fontFamily:"'Syne',sans-serif",
-                          fontWeight:900,fontSize:14,color:"#333",letterSpacing:3}}>
-                          VS
-                        </div>
-                        <div style={{flex:1,minWidth:0,textAlign:"right"}}>
-                          <div style={{fontSize:12,fontWeight:800,color:C[1],
-                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",lineHeight:1.3}}>
-                            @{getName(t1)}{!w0&&<span style={{marginLeft:4}}>👑</span>}
-                          </div>
-                          <div style={{fontSize:9,color:"#444",marginTop:2}}>Equipo B</div>
-                        </div>
-                      </div>
-
-                      {/* Puntajes grandes */}
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                        <div>
-                          <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:48,color:C[0],lineHeight:1}}>
-                            {p0.toLocaleString()}
-                          </div>
-                          <div style={{fontSize:11,color:C[0]+"99",fontWeight:700}}>puntos · {pct0}%</div>
-                        </div>
-                        <div style={{color:"#1e1e2e",fontSize:24}}>⚡</div>
-                        <div style={{textAlign:"right"}}>
-                          <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:48,color:C[1],lineHeight:1}}>
-                            {p1.toLocaleString()}
-                          </div>
-                          <div style={{fontSize:11,color:C[1]+"99",fontWeight:700}}>puntos · {pct1}%</div>
-                        </div>
-                      </div>
-
-                      {/* Barra doble */}
-                      <div style={{height:14,borderRadius:7,background:"#0a0a14",overflow:"hidden",display:"flex",
-                        boxShadow:"inset 0 2px 4px rgba(0,0,0,.6)"}}>
-                        <div style={{height:"100%",width:`${pct0}%`,background:BG[0],
-                          transition:"width 1.2s cubic-bezier(.4,0,.2,1)"}}/>
-                        <div style={{height:"100%",width:`${pct1}%`,background:BG[1],
-                          transition:"width 1.2s cubic-bezier(.4,0,.2,1)"}}/>
-                      </div>
-
-                      {/* Porcentajes debajo */}
-                      <div style={{display:"flex",justifyContent:"space-between",marginTop:5}}>
-                        <span style={{fontSize:10,color:C[0],fontWeight:800}}>{pct0}%</span>
-                        <span style={{fontSize:9,color:"#333",fontWeight:600}}>{(p0+p1).toLocaleString()} total</span>
-                        <span style={{fontSize:10,color:C[1],fontWeight:800}}>{pct1}%</span>
-                      </div>
-
-                      {/* Quién va ganando */}
-                      {diff>0&&(
-                        <div style={{textAlign:"center",marginTop:10,
-                          background:"rgba(255,255,255,.03)",borderRadius:8,padding:"7px 12px",fontSize:10,color:"#666"}}>
-                          <span style={{color:w0?C[0]:C[1],fontWeight:700}}>@{getName(w0?t0:t1)}</span>
-                          {" "}va ganando por{" "}
-                          <span style={{color:"#fff",fontWeight:800}}>{diff.toLocaleString()}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* ── Cards individuales ── */}
-                    <div style={{display:"flex",gap:8}}>
-                      {[{t:t0,c:C[0],pct:pct0,bg:BG[0],w:w0,label:"Equipo A"},
-                        {t:t1,c:C[1],pct:pct1,bg:BG[1],w:!w0,label:"Equipo B"}].map(({t,c,pct,bg,w,label},i)=>(
-                        <div key={i} style={{flex:1,background:"#12121e",
-                          border:`1px solid ${w?"rgba(255,215,0,.3)":"#1e1e2e"}`,
-                          borderRadius:14,padding:"12px 10px"}}>
-                          <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
-                            <div style={{width:30,height:30,borderRadius:"50%",background:bg,flexShrink:0,
-                              display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:900,color:"#000"}}>
-                              {i===0?"A":"B"}
-                            </div>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontWeight:800,fontSize:10,color:c,
-                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>@{getName(t)}</div>
-                              {w&&<div style={{fontSize:8,color:"#ffd700",fontWeight:700,marginTop:1}}>👑 Ganando</div>}
-                            </div>
-                          </div>
-                          <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:28,color:c,lineHeight:1,marginBottom:5}}>
-                            {t.points.toLocaleString()}
-                          </div>
-                          <div style={{height:5,background:"#0a0a14",borderRadius:3,overflow:"hidden"}}>
-                            <div style={{height:"100%",width:`${pct}%`,background:bg,
-                              transition:"width 1.2s ease",borderRadius:3}}/>
-                          </div>
-                          <div style={{fontSize:8,color:"#444",marginTop:3,textAlign:"right",fontWeight:700}}>{pct}%</div>
-                        </div>
-                      ))}
-                    </div>
+              ) : (
+                <div>
+                  {/* Estado */}
+                  <div style={{textAlign:"center",marginBottom:14}}>
+                    <span style={{background:battle.status===1?"rgba(254,44,85,.12)":"rgba(37,244,238,.1)",
+                      border:`1px solid ${battle.status===1?"rgba(254,44,85,.3)":"rgba(37,244,238,.3)"}`,
+                      borderRadius:20,padding:"4px 14px",fontSize:10,fontWeight:800,
+                      color:battle.status===1?"#fe2c55":"#25f4ee",letterSpacing:1}}>
+                      {battle.status===1?"🔴 EN CURSO":"✅ FINALIZADA"}
+                    </span>
                   </div>
-                );
-              })()
 
-              /* ── 3–4 participantes: individual con ranking ── */
-              ):(()=>{
-                const sorted=[...teams].sort((a,b)=>b.points-a.points);
-                const winner=sorted[0];
-                return(
-                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  {battle.teams && battle.teams.length >= 2 ? (() => {
+                    // Encontrar qué equipo es el dueño del live
+                    const owner = (battle.ownerUsername || "").toLowerCase().replace(/^@/,"");
+                    const isNumeric = s => /^\d{8,}$/.test(s||"");
+                    const getName = t => {
+                      const nn = t.hostNickname||""; const hn = t.hostName||"";
+                      if (!isNumeric(nn)) return nn;
+                      if (!isNumeric(hn)) return hn;
+                      return nn || hn;
+                    };
 
-                    {/* ── Tabla de puntaje por anfitrión (estilo imagen) ── */}
-                    <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:18,padding:16}}>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}>
-                        <span style={{fontSize:14}}>📊</span>
-                        <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:11,
-                          color:"#555",letterSpacing:1,textTransform:"uppercase"}}>Puntaje por anfitrión</span>
-                      </div>
-                      {teams.map((t,i)=>{
-                        const pct=Math.round(t.points/totalPts*100);
-                        const c=C[i]||"#888";
-                        const bg=BG[i]||"linear-gradient(135deg,#333,#555)";
-                        const isW=t===winner;
-                        return(
-                          <div key={i} style={{marginBottom:i<teams.length-1?14:0}}>
-                            <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:6}}>
-                              {/* Dot de color */}
-                              <div style={{width:10,height:10,borderRadius:"50%",background:c,flexShrink:0,
-                                boxShadow:`0 0 6px ${c}66`}}/>
-                              <div style={{fontWeight:800,fontSize:11,color:c,flex:1,minWidth:0,
-                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                {isW&&"👑 "}@{getName(t)}
-                              </div>
-                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:c,flexShrink:0,lineHeight:1}}>
-                                {t.points.toLocaleString()}
-                              </div>
+                    // Siempre: dueño del live = izquierda (rojo), contrario = derecha (cyan)
+                    const ownerTeamIdx = battle.teams.findIndex(t => {
+                      const hn = (t.hostName||"").toLowerCase().replace(/^@/,"");
+                      const nn = (t.hostNickname||"").toLowerCase().replace(/^@/,"");
+                      return owner && (hn===owner || nn===owner || hn.includes(owner) || owner.includes(hn));
+                    });
+                    // Si no encontramos por nombre, usar índice 0 por defecto
+                    const idx0 = ownerTeamIdx >= 0 ? ownerTeamIdx : 0;
+                    const idx1 = idx0 === 0 ? 1 : 0;
+                    const t0 = battle.teams[idx0]; // dueño — siempre izquierda ROJO
+                    const t1 = battle.teams[idx1]; // contrario — siempre derecha CYAN
+
+                    const total = (t0.points + t1.points) || 1;
+                    const pct0 = Math.round(t0.points / total * 100);
+                    const pct1 = 100 - pct0;
+                    const win0 = t0.points >= t1.points;
+                    const win1 = !win0;
+                    const name0 = getName(t0);
+                    const name1 = getName(t1);
+
+                    return (
+                      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+                        {/* ── VERSUS PRINCIPAL ── */}
+                        <div style={{background:"#12121e",border:"1px solid #1e1e2e",
+                          borderRadius:16,padding:16}}>
+
+                          {/* Nombres — FIJOS, sin corona */}
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+                            <div style={{flex:1,textAlign:"left",minWidth:0}}>
+                              <span style={{fontSize:11,fontWeight:800,color:"#fe2c55",
+                                wordBreak:"break-all",lineHeight:1.3}}>
+                                @{name0}
+                              </span>
                             </div>
-                            <div style={{height:8,background:"#0a0a14",borderRadius:4,overflow:"hidden",marginLeft:19}}>
-                              <div style={{height:"100%",width:`${pct}%`,background:bg,
-                                transition:"width 1.2s cubic-bezier(.4,0,.2,1)",borderRadius:4}}/>
+                            <div style={{flexShrink:0,padding:"0 5px"}}>
+                              <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
+                                fontSize:13,color:"#333",letterSpacing:2}}>VS</span>
+                            </div>
+                            <div style={{flex:1,textAlign:"right",minWidth:0}}>
+                              <span style={{fontSize:11,fontWeight:800,color:"#25f4ee",
+                                wordBreak:"break-all",lineHeight:1.3}}>
+                                @{name1}
+                              </span>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
 
-                    {/* ── Cards individuales en grid ── */}
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                      {teams.map((t,i)=>{
-                        const pct=Math.round(t.points/totalPts*100);
-                        const c=C[i]||"#888";
-                        const bg=BG[i]||"linear-gradient(135deg,#333,#555)";
-                        const rank=sorted.indexOf(t)+1;
-                        const isW=rank===1;
-                        return(
+                          {/* Puntajes — FIJOS en su lado, solo el número cambia */}
+                          <div style={{display:"flex",alignItems:"center",
+                            justifyContent:"space-between",marginBottom:10}}>
+                            <div style={{textAlign:"left"}}>
+                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
+                                fontSize:40,color:"#fe2c55",lineHeight:1}}>
+                                {t0.points.toLocaleString()}
+                              </div>
+                              <div style={{fontSize:10,color:"#fe2c5570",fontWeight:700}}>
+                                {pct0}%
+                              </div>
+                            </div>
+                            <div style={{textAlign:"right"}}>
+                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
+                                fontSize:40,color:"#25f4ee",lineHeight:1}}>
+                                {t1.points.toLocaleString()}
+                              </div>
+                              <div style={{fontSize:10,color:"#25f4ee70",fontWeight:700}}>
+                                {pct1}%
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Barra — SOLO ESTO se anima con transition */}
+                          <div style={{height:12,borderRadius:6,background:"#0d0d18",
+                            overflow:"hidden",display:"flex"}}>
+                            <div style={{height:"100%",width:`${pct0}%`,
+                              background:"linear-gradient(90deg,#fe2c55,#ff6b81)",
+                              transition:"width 1s ease"}}/>
+                            <div style={{height:"100%",width:`${pct1}%`,
+                              background:"linear-gradient(90deg,#0ea5e9,#25f4ee)",
+                              transition:"width 1s ease"}}/>
+                          </div>
+                        </div>
+
+                        {/* Cards individuales — también fijos */}
+                        {[{team:t0,c:"#fe2c55",pct:pct0,isWin:win0,nm:name0},
+                          {team:t1,c:"#25f4ee",pct:pct1,isWin:win1,nm:name1}].map(({team,c,pct,isWin,nm},i) => (
                           <div key={i} style={{background:"#12121e",
-                            border:`1px solid ${isW?"rgba(255,215,0,.3)":"#1e1e2e"}`,
-                            borderRadius:14,padding:"12px 10px"}}>
-                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}>
-                              <div style={{width:26,height:26,borderRadius:"50%",background:bg,flexShrink:0,
-                                display:"flex",alignItems:"center",justifyContent:"center",
-                                fontSize:11,fontWeight:900,color:"#000"}}>
-                                {rank===1?"👑":rank}
+                            border:`1px solid ${isWin?"rgba(255,215,0,.25)":"#1e1e2e"}`,
+                            borderRadius:13,padding:13}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                              {isWin && <span style={{fontSize:16}}>👑</span>}
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontWeight:800,fontSize:12,color:c,
+                                  overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                  @{nm}
+                                </div>
                               </div>
-                              <div style={{fontWeight:800,fontSize:10,color:c,flex:1,minWidth:0,
-                                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                                @{getName(t)}
+                              <div style={{textAlign:"right",flexShrink:0}}>
+                                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
+                                  fontSize:28,color:c,lineHeight:1}}>
+                                  {team.points.toLocaleString()}
+                                </div>
+                                <div style={{fontSize:9,color:"#555",fontWeight:600}}>puntos</div>
                               </div>
                             </div>
-                            <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:26,color:c,lineHeight:1,marginBottom:5}}>
-                              {t.points.toLocaleString()}
+                            <div style={{height:5,background:"#0d0d18",borderRadius:3,overflow:"hidden"}}>
+                              <div style={{height:"100%",width:`${pct}%`,borderRadius:3,
+                                transition:"width 1s ease",
+                                background:`linear-gradient(90deg,${c},${c}55)`}}/>
                             </div>
-                            <div style={{height:5,background:"#0a0a14",borderRadius:3,overflow:"hidden"}}>
-                              <div style={{height:"100%",width:`${pct}%`,background:bg,
-                                transition:"width 1.2s ease",borderRadius:3}}/>
-                            </div>
-                            <div style={{display:"flex",justifyContent:"space-between",marginTop:3}}>
-                              <span style={{fontSize:8,color:"#333",fontWeight:700}}>Equipo {String.fromCharCode(65+i)}</span>
-                              <span style={{fontSize:8,color:"#444",fontWeight:700}}>{pct}%</span>
+                            <div style={{fontSize:9,color:"#444",marginTop:3,textAlign:"right"}}>
+                              {pct}% del total
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Diferencias */}
-                    {winner&&teams.length>1&&(
-                      <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:12,
-                        padding:"10px 14px",textAlign:"center",fontSize:10,color:"#555"}}>
-                        <span style={{color:C[0],fontWeight:700}}>@{getName(winner)}</span>
-                        {" "}va ganando por{" "}
-                        <span style={{color:"#fff",fontWeight:800}}>
-                          {(winner.points-(sorted[1]?.points||0)).toLocaleString()}
-                        </span>
+                        ))}
                       </div>
-                    )}
-                  </div>
-                );
-              })()}
+                    );
+                  })() : battle.teams && battle.teams.length === 1 ? (
+                    <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:13,padding:14}}>
+                      <div style={{fontWeight:800,fontSize:13,color:"#fe2c55",marginBottom:6}}>
+                        @{battle.teams[0].hostNickname||battle.teams[0].hostName}
+                      </div>
+                      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:32,color:"#fe2c55"}}>
+                        {battle.teams[0].points.toLocaleString()}
+                      </div>
+                      <div style={{fontSize:9,color:"#555",marginTop:4}}>Esperando oponente...</div>
+                    </div>
+                  ) : (
+                    <div style={{textAlign:"center",color:"#444",fontSize:11,padding:"20px 0"}}>
+                      Sin datos de equipos aún...
+                    </div>
+                  )}
 
-              {/* Timestamp */}
-              {battle?.timestamp&&(
-                <div style={{textAlign:"center",color:"#1e1e2e",fontSize:9,marginTop:10}}>
-                  ⏱ {new Date(battle.timestamp).toLocaleTimeString()}
+                                    {/* Última actualización */}
+                  {battle.timestamp && (
+                    <div style={{textAlign:"center",color:"#333",fontSize:9,marginTop:12}}>
+                      Actualizado: {new Date(battle.timestamp).toLocaleTimeString()}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-            );
-          })()}
-
+          )}
 
           {/* ── ESPECTADORES ── */}
           {tab==="espect" && (
