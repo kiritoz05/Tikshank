@@ -1,0 +1,2293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>TikPanel</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a0f;color:#fff;font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+input,select,button,textarea{font-family:'DM Sans',sans-serif}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#0a0a0f}::-webkit-scrollbar-thumb{background:#2a2a3a;border-radius:2px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(220%)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes hp{0%{transform:scale(1)}40%{transform:scale(1.8)}100%{transform:scale(1)}}
+@keyframes fu{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-60px)}}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes popIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai{animation:fadeIn .25s ease forwards}
+.ld{animation:pulse 1.2s infinite}
+.cf{animation:slide 1.5s ease-in-out infinite}
+.hpa{animation:hp .3s ease}
+.fh{position:absolute;animation:fu 1s ease forwards;pointer-events:none;font-size:18px;z-index:10}
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px)}
+@media(min-width:580px){.mo{align-items:center;padding:16px}}
+.mb{background:#12121e;border:1px solid #252535;border-radius:20px 20px 0 0;padding:22px;width:100%;max-width:530px;max-height:94vh;overflow-y:auto;animation:slideUp .25s ease}
+@media(min-width:580px){.mb{border-radius:20px;animation:popIn .2s ease}}
+.th{color:#363655;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase}
+.tr{display:grid;grid-template-columns:30px 1fr 85px 44px 40px 40px 86px;padding:9px 12px;gap:5px;align-items:center;border-bottom:1px solid #0f0f1a;transition:background .1s}
+.tr:last-child{border-bottom:none}
+.tr:hover{background:rgba(255,255,255,.013)}
+.tr.dis{opacity:.35}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:9px;font-weight:700;white-space:nowrap}
+.bf{background:rgba(37,244,238,.1);color:#25f4ee;border:1px solid rgba(37,244,238,.2)}
+.bg{background:rgba(254,44,85,.1);color:#fe2c55;border:1px solid rgba(254,44,85,.2)}
+.bl{background:rgba(245,197,24,.1);color:#f5c518;border:1px solid rgba(245,197,24,.2)}
+.bs{background:rgba(139,92,246,.1);color:#8b5cf6;border:1px solid rgba(139,92,246,.2)}
+.bsh{background:rgba(255,255,255,.05);color:#777;border:1px solid rgba(255,255,255,.1)}
+.it{width:28px;height:16px;border-radius:8px;cursor:pointer;position:relative;border:none;flex-shrink:0;background:#1e1e2e;transition:background .2s;outline:none}
+.it.on{background:#fe2c55}
+.it::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.it.on::after{left:14px}
+.ua{background:#0a0a0f;border:1.5px dashed #252535;border-radius:10px;padding:11px;display:flex;align-items:center;gap:9px;position:relative;overflow:hidden;transition:border-color .2s;cursor:pointer}
+.ua:hover,.ua.has{border-color:#25f4ee}
+.ua.has{border-style:solid}
+.ua input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f2010;border:1px solid #2a5a2a;border-radius:10px;padding:9px 18px;color:#4ade80;font-size:12px;font-weight:700;z-index:999;white-space:nowrap;animation:popIn .2s ease}
+.spinner{width:14px;height:14px;border:2px solid #333;border-top-color:#fe2c55;border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+/* Filter toggles */
+.ftog{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #0f0f1a}
+.ftog:last-child{border-bottom:none}
+/* TTS mode tabs */
+.mode-btn{flex:1;padding:7px;border:1px solid #252535;background:transparent;color:#555;border-radius:7px;cursor:pointer;font-size:11px;font-weight:600;transition:all .15s}
+.mode-btn.act{background:rgba(254,44,85,.12);border-color:rgba(254,44,85,.3);color:#fe2c55}
+</style>
+</head>
+<body><div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+const SERVER = "https://tikpanel-production.up.railway.app";
+const EL_KEY  = "sk_c59a0c3dddc47a866083fc9b58a7dbd92b722fb2fb12da11";
+
+/* ─── Storage helpers ───────────────────────────────── */
+const sv  = (k,v)=>{ try{ localStorage.setItem("tp_"+k, JSON.stringify(v)); }catch(e){} };
+const ld  = (k,d)=>{ try{ const v=localStorage.getItem("tp_"+k); return v!==null?JSON.parse(v):d; }catch(e){ return d; } };
+
+/* ─── TTS ENGINE ────────────────────────────────────────
+   Prioridad: ElevenLabs → Web Speech API (gratis, nativo)
+   Cola única — nunca se traba aunque falle EL              */
+const ttsQueue  = [];
+let   ttsActive = false;
+
+
+/* ─── TTS text processing ──────────────────────────── */
+function stripEmojis(text) {
+  if (!text) return '';
+  // Eliminar secuencias emoji completas (ZWJ sequences, skin tones, variantes)
+  let t = text
+    // Secuencias ZWJ y modificadores de skin tone
+    .replace(/\p{Emoji_Presentation}\p{Emoji_Modifier}*/gu, '')
+    // Cualquier emoji con sus variantes y selectores de texto
+    .replace(/\p{Extended_Pictographic}(\u{FE0F})?(\u{20E3})?/gu, '')
+    // Rangos Unicode adicionales
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')  // Mahjong, dominó, juegos, emojis
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')    // Símbolos varios, dingbats
+    .replace(/[\u{2300}-\u{23FF}]/gu, '')    // Símbolos técnicos
+    .replace(/[\u{2B00}-\u{2BFF}]/gu, '')    // Flechas adicionales
+    .replace(/[\u{FE00}-\u{FEFF}]/gu, '')    // Selectores de variante
+    .replace(/[\u{E0000}-\u{E007F}]/gu, '')  // Tags
+    .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')  // Emojis principales
+    .replace(/[\u{1FA00}-\u{1FAFF}]/gu, '')  // Emojis extendidos
+    .replace(/[\u{200D}\u{20E3}\u{FE0F}]/gu, '') // ZWJ, combinadores
+    .replace(/[\u00A9\u00AE\u203C\u2049\u2122\u2139\u2194-\u2199\u21A9-\u21AA\u231A-\u231B\u2328\u23CF\u23E9-\u23F3\u23F8-\u23FA\u24C2\u25AA-\u25AB\u25B6\u25C0\u25FB-\u25FE\u2600-\u2604\u260E\u2611\u2614-\u2615\u2618\u261D\u2620\u2622-\u2623\u2626\u262A\u262E-\u262F\u2638-\u263A\u2640\u2642\u2648-\u2653\u265F-\u2660\u2663\u2665-\u2666\u2668\u267B\u267E-\u267F\u2692-\u2697\u2699\u269B-\u269C\u26A0-\u26A1\u26A7\u26AA-\u26AB\u26B0-\u26B1\u26BD-\u26BE\u26C4-\u26C5\u26CE-\u26CF\u26D1\u26D3-\u26D4\u26E9-\u26EA\u26F0-\u26F5\u26F7-\u26FA\u26FD\u2702\u2705\u2708-\u270D\u270F\u2712\u2714\u2716\u271D\u2721\u2728\u2733-\u2734\u2744\u2747\u274C\u274E\u2753-\u2755\u2757\u2763-\u2764\u2795-\u2797\u27A1\u27B0\u27BF\u2934-\u2935\u2B05-\u2B07\u2B1B-\u2B1C\u2B50\u2B55\u3030\u303D\u3297\u3299]/gu, '');
+  // Limpiar espacios múltiples que quedan tras quitar emojis
+  return t.replace(/\s+/g, ' ').trim();
+}
+
+function filterText(text, blocked) {
+  // Siempre quitar emojis — el bot solo lee texto
+  let t = stripEmojis(text);
+  for (const w of (blocked||[])) {
+    if (!w) continue;
+    try { t = t.replace(new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\b','gi'),''); } catch(e){}
+  }
+  return t.trim();
+}
+
+function shouldReadUser(data, allR, followR, modR, sfanR, fcR, fcLvlR, cusR) {
+  // Si ningún filtro está activo → leer todo (comportamiento por defecto)
+  const anyFilterOn = followR.current || modR.current || sfanR.current || fcR.current || (cusR.current||[]).length > 0;
+  if (!anyFilterOn || allR.current) return true;
+
+  // Hay al menos un filtro activo → verificar si el usuario pasa alguno
+  const user = (data.user||data.uniqueId||"").toLowerCase().replace(/^@/,'');
+  if ((cusR.current||[]).some(u => u.toLowerCase().replace(/^@/,'') === user)) return true;
+  // followRole: 1=seguidor, 2=amigo. isModerator, isSubscriber pueden venir como bool o 1/0
+  if (followR.current && (data.followRole === 1 || data.followRole === 2)) return true;
+  if (modR.current    && (data.isModerator === true  || data.isModerator === 1)) return true;
+  if (sfanR.current   && (data.isSubscriber === true || data.isSubscriber === 1)) return true;
+  if (fcR.current     && (data.teamMemberLevel||0) >= (fcLvlR.current||1)) return true;
+  return false;
+}
+
+
+/* ─── Apply TTS template ──────────────────────────── */
+function applyTpl(tpl, vars) {
+  // Limpiar emojis de cada variable (nickname, username, message, etc.) antes de insertar
+  const clean = {};
+  for (const k in vars) clean[k] = stripEmojis(String(vars[k] ?? ''));
+  return tpl.replace(/\{(\w+)\}/g, (_, k) => (clean[k] !== undefined ? clean[k] : ''));
+}
+function enqueueTTS(text, voiceId, vol, mode) {
+  if (!text || !text.trim()) return;
+  ttsQueue.push({ text: text.trim(), voiceId, vol, mode });
+  if (!ttsActive) drainQueue();
+}
+
+async function drainQueue() {
+  if (ttsQueue.length === 0) { ttsActive = false; return; }
+  ttsActive = true;
+  const item = ttsQueue.shift();
+  try {
+    if (item.mode === "elevenlabs") {
+      await speakElevenLabs(item.text, item.voiceId, item.vol);
+    } else if (item.mode === "google") {
+      await speakGoogle(item.text, item.voiceId, item.vol);
+    } else {
+      await speakNative(item.text, item.voiceId, item.vol);
+    }
+  } catch(e) {
+    console.warn("TTS falló, siguiente:", e.message);
+  }
+  // Siempre continuar la cola
+  setTimeout(drainQueue, 50);
+}
+
+async function speakElevenLabs(text, voiceId, vol) {
+  const r = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    method: "POST",
+    headers: { "xi-api-key": EL_KEY, "Content-Type": "application/json", "Accept": "audio/mpeg" },
+    body: JSON.stringify({ text, model_id: "eleven_multilingual_v2", voice_settings:{ stability:0.5, similarity_boost:0.75 } }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) throw new Error("EL HTTP " + r.status);
+  const blob = await r.blob();
+  const url  = URL.createObjectURL(blob);
+  await playAudio(url, vol);
+  URL.revokeObjectURL(url);
+}
+
+async function speakGoogle(text, lang, vol) {
+  // Google Translate TTS API (gratuita)
+  const isMale = lang.endsWith("-m");
+  const langCode = isMale ? lang.replace("-m","") : lang;
+  const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=${langCode}&total=1&idx=0&textlen=${text.length}&client=tw-ob`;
+  await playAudio(url, vol);
+}
+
+const _savedRate  = (() => { try { const v=localStorage.getItem("tp_nativeRate");  return v!==null?JSON.parse(v):1.05; } catch(e){ return 1.05; } })();
+const _savedPitch = (() => { try { const v=localStorage.getItem("tp_nativePitch"); return v!==null?JSON.parse(v):1;    } catch(e){ return 1;    } })();
+const nativeTTSConfig = { rate: _savedRate, pitch: _savedPitch };
+
+function speakNative(text, voiceId, vol) {
+  return new Promise((res) => {
+    if (!window.speechSynthesis) { res(); return; }
+    window.speechSynthesis.cancel();
+    function doSpeak() {
+      const utt   = new SpeechSynthesisUtterance(text);
+      utt.volume  = Math.min(1, Math.max(0, vol));
+      utt.rate    = nativeTTSConfig.rate;
+      utt.pitch   = nativeTTSConfig.pitch;
+      utt.lang    = "es-MX";
+      const voices = window.speechSynthesis.getVoices();
+      if (voiceId) {
+        const byName = voices.find(v => v.name === voiceId);
+        if (byName) utt.voice = byName;
+      }
+      if (!utt.voice) {
+        const esVoice = voices.find(v => v.lang.startsWith("es"));
+        if (esVoice) utt.voice = esVoice;
+      }
+      utt.onend   = res;
+      utt.onerror = res;
+      window.speechSynthesis.speak(utt);
+      setTimeout(res, 15000);
+    }
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      doSpeak();
+    } else {
+      window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.onvoiceschanged = null; doSpeak(); };
+      setTimeout(doSpeak, 500); // fallback si onvoiceschanged no dispara
+    }
+  });
+}
+
+
+
+function playAudio(src, vol) {
+  return new Promise((res) => {
+    const a    = new Audio(src);
+    a.volume   = Math.min(1, Math.max(0, vol));
+    a.onended  = res;
+    a.onerror  = res;
+    a.play().catch(res);
+    setTimeout(res, 30000); // max 30s
+  });
+}
+
+/* ─── Conversión base64 para persistir audio ──────── */
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+/* ─── Datos de TikTok ───────────────────────────────── */
+const EV_TYPES = ["Follow Alert","Gift Alert","Like Alert","Sub Alert","Share Alert"];
+
+const TIKTOK_GIFTS = [
+  "Cualquier regalo","Rose","You're awesome","GG","TikTok","Ice Cream Cone","Pop",
+  "Love you so much","Wink wink","Glow Stick","Cake Slice","Heart Me","Thumbs Up",
+  "Heart","Love you","Heart Puff","Blue Heart","Flame heart","Power hug","Squirrel",
+  "Chilli Pepper","Tulip","Graduation Bouquet","Wink Charm","Team Bracelet","Overreact",
+  "Finger Heart","Name shoutout","Pomegranate","Embroidered Heart","Super Popular",
+  "Cheer You Up","Club Power","Rosa","Friendship Necklace","Panda","Sunflower",
+  "Birthday Cake","Doughnut","Lollipop","Rainbow Puke","Great","LMAO","Perfume",
+  "I Love You","Garfield","Confetti","Sun Cream","Sunglasses","Hashtag","Bunny",
+  "Pixel Heart","Owl","Money Rain","Newspaper","Corgi","Drama Queen","Tiny Diny",
+  "Fashion Brand","Castle","Gem","Mishka","Star Shower","Disco Ball","Lovely",
+  "Interstellar","GG EZ","Dolphin","Elephant","Cap","Ferris Wheel","Mermaid",
+  "Rocket","Galaxy","Airplane","Planet","Diamond Flight","Lion","Universe",
+  "Diamond Tree","Concert","Crown","Big Cat","Boxing Gloves","Super Nova",
+  "UFO","Dragon","Phoenix","Bear",
+];
+
+const DEF_VOICES_EL = [
+  {id:"cgSgspJ2msm6clMCkdW9", name:"Bella - Natural (Femenina)"},
+  {id:"21m00Tcm4TlvDq8ikWAM", name:"Rachel - Multilingüe"},
+  {id:"AZnzlk1XvdvUeBnXmlld", name:"Domi - Energética"},
+  {id:"EXAVITQu4vr4xnSDxMaL", name:"Elli - Joven"},
+  {id:"ErXwobaYiN019PkySvjV", name:"Antoni - Natural (Masculina)"},
+  {id:"VR6AewLTigWG4xSOukaG", name:"Arnold - Profunda"},
+  {id:"pNInz6obpgDQGcFmaJgB", name:"Adam - Narrador"},
+  {id:"yoZ06aMxZJJ28mfd3POQ", name:"Sam - Cálida"},
+];
+
+const DEF_ACTIONS = [
+  {id:1, enabled:true,  name:"Follow Alert", event:"Follow Alert", giftName:"",          minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por seguirme!"},
+  {id:2, enabled:true,  name:"Rosa Gift",    event:"Gift Alert",   giftName:"Rose",       minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por la rosa!"},
+  {id:3, enabled:true,  name:"Like Alert",   event:"Like Alert",   giftName:"",          minCount:1, duration:5,  soundName:"", soundData:"", ttsOn:false, ttsText:""},
+  {id:4, enabled:false, name:"Sub Alert",    event:"Sub Alert",    giftName:"",          minCount:1, duration:10, soundName:"", soundData:"", ttsOn:false, ttsText:"¡Gracias @usuario por suscribirte!"},
+  {id:5, enabled:false, name:"León Gift",    event:"Gift Alert",   giftName:"Lion",       minCount:1, duration:8,  soundName:"", soundData:"", ttsOn:false, ttsText:"¡WOW! @usuario mandó un LEÓN! 🦁"},
+];
+
+/* ─── Users (demo) ──────────────────────────────────── */
+const USERS = {
+  "admin@tikpanel.com":   {password:"admin123", name:"Admin",    plan:"Pro",  avatar:"A"},
+  "luzalva@tikpanel.com": {password:"luz2024",  name:"Luz Álva", plan:"Pro",  avatar:"L"},
+  "usuario@tikpanel.com": {password:"pass123",  name:"Streamer", plan:"Free", avatar:"S"},
+};
+
+/* ─── Pequeños componentes ──────────────────────────── */
+function Toggle({on, onChange, color="#fe2c55", size="md"}) {
+  const w = size==="sm" ? 28 : 42, h = size==="sm" ? 16 : 23, r = size==="sm" ? 12 : 10, dot = size==="sm" ? 12 : 19;
+  return (
+    <div onClick={onChange} style={{width:w,height:h,borderRadius:w,cursor:"pointer",position:"relative",
+      background:on?color:"#1e1e2e",transition:"background .2s",flexShrink:0,border:"1px solid rgba(255,255,255,.05)"}}>
+      <div style={{position:"absolute",top:2,left:on?w-dot-2:2,width:dot,height:dot,borderRadius:"50%",
+        background:"#fff",transition:"left .2s",boxShadow:"0 1px 4px rgba(0,0,0,.5)"}}/>
+    </div>
+  );
+}
+
+function IBtn({ico, onClick, color="#aaa", title=""}) {
+  return (
+    <button onClick={onClick} title={title}
+      style={{background:"transparent",border:"1px solid #1e1e2e",borderRadius:5,
+        width:24,height:24,cursor:"pointer",color,display:"flex",alignItems:"center",
+        justifyContent:"center",fontSize:11,flexShrink:0,transition:"border-color .15s"}}
+      onMouseEnter={e=>e.currentTarget.style.borderColor=color}
+      onMouseLeave={e=>e.currentTarget.style.borderColor="#1e1e2e"}>
+      {ico}
+    </button>
+  );
+}
+
+/* ─── Modal Acción ──────────────────────────────────── */
+function ActModal({ action, ttsMode, ttsVoiceId, ttsNativeVoice, vol, onSave, onClose }) {
+  const def = {
+    id: Date.now(), enabled:true, name:"", event:"Gift Alert",
+    giftName:"Cualquier regalo", minCount:1, duration:5,
+    soundName:"", soundData:"", ttsOn:false, ttsText:"",
+  };
+  const [f,     setF]   = useState(action ? {...action} : def);
+  const [busy,  setBusy] = useState(false);
+
+  const set = (k, v) => setF(p => ({...p, [k]:v}));
+
+  const lbl = {display:"block",color:"#556",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:5};
+  const inp = {width:"100%",background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,padding:"9px 12px",color:"#fff",fontSize:12,outline:"none"};
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      const data = await fileToBase64(file);
+      set("soundData", data);
+      set("soundName", file.name);
+    } catch(err) { alert("Error al leer el archivo"); }
+    setBusy(false);
+  };
+
+  const testSound = () => {
+    if (!f.soundData) return;
+    playAudio(f.soundData, (vol||80)/100);
+  };
+
+  const testTTS = () => {
+    const text = (f.ttsText||"Hola, esto es una prueba").replace(/@usuario/gi, "UsuarioPrueba");
+    if (ttsMode === "elevenlabs") {
+      enqueueTTS(text, ttsVoiceId, (vol||80)/100, "elevenlabs");
+    } else if (ttsMode === "google") {
+      enqueueTTS(text, ttsGoogleVoice||(typeof googleVoiceR!=='undefined'?googleVoiceR.current:"es-MX"), (vol||80)/100, "google");
+    } else {
+      enqueueTTS(text, ttsNativeVoice, (vol||80)/100, "native");
+    }
+  };
+
+  return (
+    <div className="mo" onClick={e => e.target.classList.contains("mo") && onClose()}>
+      <div className="mb">
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}>
+          <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16}}>
+            {action ? "✏️ Editar Acción" : "➕ Nueva Acción"}
+          </div>
+          <button onClick={onClose} style={{background:"#1a1a28",border:"none",borderRadius:6,width:26,height:26,
+            cursor:"pointer",color:"#555",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+        </div>
+
+        {/* Nombre */}
+        <div style={{marginBottom:12}}>
+          <label style={lbl}>Nombre de la acción</label>
+          <input value={f.name} onChange={e=>set("name",e.target.value)}
+            placeholder="Ej: Rosa Sound" style={inp}/>
+        </div>
+
+        {/* Evento + Duración */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:12}}>
+          <div>
+            <label style={lbl}>Evento</label>
+            <select value={f.event} onChange={e=>set("event",e.target.value)} style={{...inp,cursor:"pointer"}}>
+              {EV_TYPES.map(t=><option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={lbl}>Duración (seg)</label>
+            <input type="number" min="1" max="120" value={f.duration}
+              onChange={e=>set("duration",Number(e.target.value))} style={inp}/>
+          </div>
+        </div>
+
+        {/* Regalo específico */}
+        {f.event === "Gift Alert" && (
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:12}}>
+            <div>
+              <label style={lbl}>Regalo de TikTok</label>
+              <select value={f.giftName} onChange={e=>set("giftName",e.target.value)} style={{...inp,cursor:"pointer"}}>
+                {TIKTOK_GIFTS.map(g=><option key={g}>{g}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Cantidad mínima</label>
+              <input type="number" min="1" value={f.minCount}
+                onChange={e=>set("minCount",Number(e.target.value))} style={inp}/>
+            </div>
+          </div>
+        )}
+
+        {/* Sonido MP3 — persistido en base64 */}
+        <div style={{marginBottom:12}}>
+          <label style={lbl}>Sonido de alerta (MP3/WAV/OGG)</label>
+          <div className={`ua ${f.soundName ? "has" : ""}`}>
+            <input type="file" accept="audio/*" onChange={handleFile} disabled={busy}/>
+            <div style={{width:32,height:32,borderRadius:8,background:"rgba(37,244,238,.08)",
+              display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>
+              {busy ? <span className="spinner"/> : "🎵"}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,fontWeight:600,color:f.soundName?"#25f4ee":"#aaa",
+                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {busy ? "Cargando..." : f.soundName || "Toca para subir audio"}
+              </div>
+              <div style={{fontSize:9,color:f.soundName?"rgba(37,244,238,.6)":"#444",marginTop:2}}>
+                {f.soundName ? "✓ Guardado — no se pierde al recargar" : "MP3, WAV, OGG"}
+              </div>
+            </div>
+            {f.soundData && (
+              <button onClick={e=>{e.preventDefault();e.stopPropagation();testSound();}}
+                style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.3)",
+                  borderRadius:7,padding:"5px 10px",color:"#25f4ee",fontSize:10,fontWeight:700,
+                  cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>▶ Probar</button>
+            )}
+            {f.soundName && (
+              <button onClick={e=>{e.preventDefault();e.stopPropagation();set("soundData","");set("soundName","");}}
+                style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",
+                  borderRadius:7,padding:"5px 9px",color:"#fe2c55",fontSize:10,fontWeight:700,
+                  cursor:"pointer",zIndex:2,position:"relative",flexShrink:0}}>✕</button>
+            )}
+          </div>
+        </div>
+
+        {/* TTS */}
+        <div style={{marginBottom:18}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+            <label style={{...lbl,marginBottom:0}}>Mensaje TTS al activarse</label>
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              <Toggle on={f.ttsOn} onChange={()=>set("ttsOn",!f.ttsOn)} color="#25f4ee" size="sm"/>
+              <span style={{fontSize:9,color:f.ttsOn?"#25f4ee":"#444",fontWeight:700}}>
+                {f.ttsOn ? "ACTIVO" : "APAGADO"}
+              </span>
+            </div>
+          </div>
+          <div style={{background:"#0a0a0f",border:`1px solid ${f.ttsOn?"rgba(37,244,238,.25)":"#252535"}`,
+            borderRadius:9,overflow:"hidden",transition:"border-color .2s"}}>
+            <textarea value={f.ttsText} onChange={e=>set("ttsText",e.target.value)} disabled={!f.ttsOn}
+              placeholder="Ej: ¡Gracias @usuario por la rosa!"
+              style={{width:"100%",background:"transparent",border:"none",padding:"9px 12px",
+                color:f.ttsOn?"#fff":"#333",fontSize:12,outline:"none",resize:"vertical",
+                minHeight:55,lineHeight:1.6}}/>
+            {f.ttsOn && f.ttsText && (
+              <div style={{borderTop:"1px solid #1a1a28",padding:"6px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:9,color:"#444"}}>
+                  Motor: <span style={{color:"#fe2c55"}}>{ttsMode==="elevenlabs"?"ElevenLabs":"Voz del navegador (gratis)"}</span>
+                </span>
+                <button onClick={testTTS}
+                  style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",
+                    borderRadius:6,padding:"4px 10px",color:"#fe2c55",fontSize:9,fontWeight:700,cursor:"pointer"}}>
+                  🔊 Probar
+                </button>
+              </div>
+            )}
+          </div>
+          <div style={{color:"#444",fontSize:9,marginTop:4}}>
+            💡 <span style={{color:"#25f4ee",fontFamily:"monospace"}}>@usuario</span> se reemplaza con el nombre
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={onClose}
+            style={{flex:1,background:"transparent",border:"1px solid #252535",borderRadius:9,
+              padding:"10px",color:"#555",fontWeight:600,cursor:"pointer",fontSize:12}}>
+            Cancelar
+          </button>
+          <button onClick={()=>{
+              if(!f.name.trim()) { alert("Ponle un nombre a la acción"); return; }
+              onSave({...f});
+            }}
+            style={{flex:2,background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",
+              borderRadius:9,padding:"10px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:12}}>
+            💾 Guardar Acción
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Login ─────────────────────────────────────────── */
+function Login({ onLogin }) {
+  const [email,   setEmail]   = useState("");
+  const [pass,    setPass]    = useState("");
+  const [err,     setErr]     = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const go = () => {
+    setErr(""); setLoading(true);
+    setTimeout(() => {
+      const u = USERS[email.toLowerCase()];
+      if (u && u.password === pass) { onLogin({...u, email}); }
+      else { setErr("Correo o contraseña incorrectos."); setLoading(false); }
+    }, 600);
+  };
+
+  const inp = {width:"100%",background:"#0d0d18",border:"1px solid #1e1e2e",borderRadius:10,
+    padding:"11px 14px",color:"#fff",fontSize:13,outline:"none"};
+
+  return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",
+      background:"#0a0a0f",padding:20}}>
+      <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:22,padding:"40px 32px",
+        width:"100%",maxWidth:380,boxShadow:"0 40px 80px rgba(0,0,0,.7)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:6}}>
+          <div style={{width:36,height:36,borderRadius:9,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:17}}>T</div>
+          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:21,letterSpacing:-.5}}>
+            ik<span style={{color:"#fe2c55"}}>Panel</span>
+          </span>
+        </div>
+        <p style={{color:"#555",fontSize:12,marginBottom:22}}>Panel de control para TikTok LIVE</p>
+        <div style={{marginBottom:12}}>
+          <label style={{display:"block",color:"#555",fontSize:9,fontWeight:700,letterSpacing:.8,
+            textTransform:"uppercase",marginBottom:6}}>Correo</label>
+          <input value={email} onChange={e=>setEmail(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&go()} type="email" placeholder="tu@correo.com" style={inp}/>
+        </div>
+        <div style={{marginBottom:16}}>
+          <label style={{display:"block",color:"#555",fontSize:9,fontWeight:700,letterSpacing:.8,
+            textTransform:"uppercase",marginBottom:6}}>Contraseña</label>
+          <input value={pass} onChange={e=>setPass(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&go()} type="password" placeholder="••••••••" style={inp}/>
+        </div>
+        {err && (
+          <div style={{background:"rgba(254,44,85,.08)",border:"1px solid rgba(254,44,85,.2)",
+            borderRadius:8,padding:"8px 12px",color:"#fe2c55",fontSize:12,marginBottom:12}}>{err}</div>
+        )}
+        <button onClick={go} disabled={loading}
+          style={{width:"100%",background:loading?"#1e1e2e":"linear-gradient(135deg,#fe2c55,#ff6b81)",
+            border:"none",borderRadius:10,padding:"12px",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+          {loading ? "Verificando..." : "Ingresar →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Pantalla principal ────────────────────────────── */
+function App() {
+  const [user,   setUser]   = useState(() => ld("session", null));
+  const [tab,    setTab]    = useState(() => ld("tab", "dashboard"));
+  const [sb,     setSb]     = useState(false);
+
+  // Batalla / Versus
+  const [battle, setBattle] = useState(null);
+  const [battleRaw, setBattleRaw] = useState(null); // debug raw
+
+  // Conexión TikTok
+  const [tUser,  setTUser]  = useState(() => ld("tuser", ""));
+  const [conn,   setConn]   = useState(false);
+  const [conn2,  setConn2]  = useState(false);
+  const wakeLockRef = React.useRef(null);
+  const [wakeLockOn, setWakeLockOn] = React.useState(false);
+
+  // ── Wake Lock: mantener pantalla encendida ──────────────────────────────
+  const requestWakeLock = React.useCallback(async () => {
+    if (!('wakeLock' in navigator)) return; // no soportado
+    try {
+      if (wakeLockRef.current) return; // ya activo
+      wakeLockRef.current = await navigator.wakeLock.request('screen');
+      setWakeLockOn(true);
+      console.log('🔆 Wake Lock activo — pantalla no se apagará');
+      wakeLockRef.current.addEventListener('release', () => {
+        wakeLockRef.current = null;
+        setWakeLockOn(false);
+        console.log('Wake Lock liberado');
+      });
+    } catch(e) { console.warn('Wake Lock error:', e.message); }
+  }, []);
+
+  const releaseWakeLock = React.useCallback(async () => {
+    if (wakeLockRef.current) {
+      await wakeLockRef.current.release();
+      wakeLockRef.current = null;
+      setWakeLockOn(false);
+    }
+  }, []);
+
+  // Activar Wake Lock cuando la página vuelve a ser visible (ej: cambiar app y volver)
+  React.useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') requestWakeLock(); };
+    document.addEventListener('visibilitychange', onVisible);
+    requestWakeLock(); // activar al cargar
+    return () => { document.removeEventListener('visibilitychange', onVisible); releaseWakeLock(); };
+  }, [requestWakeLock, releaseWakeLock]);
+  const [dots,   setDots]   = useState("");
+  const [connErr,setConnErr]= useState("");
+
+  // Stats
+  const [stats,  setStats]  = useState({viewers:0, gifts:0, follows:0, messages:0, likes:0});
+  const [log,    setLog]    = useState([]);
+  const [lAnim,  setLAnim]  = useState(false);
+  const [fh,     setFh]     = useState([]);
+  const [totDia, setTotDia] = useState(() => ld("totDia", 0));
+  const [totLike,setTotLike]= useState(() => ld("totLike", 0));
+  const [tapR,   setTapR]   = useState(() => ld("tapR", []));
+  const [likeR,  setLikeR]  = useState(() => ld("likeR", []));
+  const [viewR,  setViewR]  = useState(() => ld("viewR", [])); // historial de entradas
+  const [topViewers, setTopViewers] = useState([]); // espectadores activos ahora
+  const [vTab, setVTab] = useState("historial"); // sub-tab espectadores
+
+  // TTS settings
+  const [ttsMode,  setTtsMode]  = useState(() => ld("ttsMode", "native"));   // "native" | "google" | "elevenlabs"
+  const [ttsOn,    setTtsOn]    = useState(() => ld("ttsOn", true));
+  const [ttsVol,   setTtsVol]   = useState(() => ld("ttsVol", 80));
+  const [ttsVoice, setTtsVoice] = useState(() => ld("ttsVoice", "cgSgspJ2msm6clMCkdW9")); // EL voice ID
+  const [nativeVoices, setNativeVoices] = useState([]);
+  const [nativeVoice,  setNativeVoice]  = useState(() => ld("nativeVoice", ""));
+  const [nativeRate,   setNativeRate]   = useState(() => ld("nativeRate",  1.05));
+  const [nativePitch,  setNativePitch]  = useState(() => ld("nativePitch", 1));
+  const [elVoices, setElVoices] = useState(DEF_VOICES_EL);
+  const [googleVoice, setGoogleVoice] = useState(() => ld("googleVoice", "es-MX"));
+  // Filtros de usuarios
+  const [filterAll,      setFilterAll]      = useState(() => ld("filterAll",      false));
+  const [filterFollow,   setFilterFollow]   = useState(() => ld("filterFollow",   true));
+  const [filterMod,      setFilterMod]      = useState(() => ld("filterMod",      false));
+  const [filterSuperFan, setFilterSuperFan] = useState(() => ld("filterSuperFan", false));
+  const [filterFanClub,  setFilterFanClub]  = useState(() => ld("filterFanClub",  false));
+  const [filterFanLevel, setFilterFanLevel] = useState(() => ld("filterFanLevel", 1));
+  const [customUsers,    setCustomUsers]    = useState(() => ld("customUsers",    []));
+  const [customUserInput,setCustomUserInput]= useState("");
+  // Palabras bloqueadas
+  const [blockedWords,   setBlockedWords]   = useState(() => ld("blockedWords",   []));
+  const [blockedInput,   setBlockedInput]   = useState("");
+  // Emojis en TTS
+  // Plantillas TTS
+  const [ttsChatTpl,    setTtsChatTpl]    = useState(() => ld("ttsChatTpl",    "{nickname} dice {message}"));
+  const [ttsGiftTpl,    setTtsGiftTpl]    = useState(() => ld("ttsGiftTpl",    "{username} envió {giftName} x{repeatCount}, valor {totalValue}"));
+  const [ttsFollowTpl,  setTtsFollowTpl]  = useState(() => ld("ttsFollowTpl",  "{username} te siguió"));
+  const [ttsShareTpl,   setTtsShareTpl]   = useState(() => ld("ttsShareTpl",   "{username} compartió el live"));
+  const [ttsJoinTpl,    setTtsJoinTpl]    = useState(() => ld("ttsJoinTpl",    "{username} se unió al live"));
+  const [ttsSuperFanTpl,setTtsSuperFanTpl]= useState(() => ld("ttsSuperFanTpl","{username} se hizo super fan"));
+  // Qué eventos leer con TTS (además del chat)
+  const [ttsReadGift,   setTtsReadGift]   = useState(() => ld("ttsReadGift",   true));
+  const [ttsReadFollow, setTtsReadFollow] = useState(() => ld("ttsReadFollow", true));
+  const [ttsReadShare,  setTtsReadShare]  = useState(() => ld("ttsReadShare",  false));
+  const [ttsReadJoin,   setTtsReadJoin]   = useState(() => ld("ttsReadJoin",   false));
+  const [ttsReadSuperFan,setTtsReadSuperFan]=useState(() => ld("ttsReadSuperFan",false));
+  // Refs para filtros
+  const filterAllR      = useRef(filterAll);
+  const filterFollowR   = useRef(filterFollow);
+  const filterModR      = useRef(filterMod);
+  const filterSuperFanR = useRef(filterSuperFan);
+  const filterFanClubR  = useRef(filterFanClub);
+  const filterFanLevelR = useRef(filterFanLevel);
+  const customUsersR    = useRef(customUsers);
+  const blockedWordsR   = useRef(blockedWords);
+  const ttsChatTplR     = useRef(ttsChatTpl);
+  const ttsGiftTplR     = useRef(ttsGiftTpl);
+  const ttsFollowTplR   = useRef(ttsFollowTpl);
+  const ttsShareTplR    = useRef(ttsShareTpl);
+  const ttsJoinTplR     = useRef(ttsJoinTpl);
+  const ttsSuperFanTplR = useRef(ttsSuperFanTpl);
+  const ttsReadGiftR    = useRef(ttsReadGift);
+  const ttsReadFollowR  = useRef(ttsReadFollow);
+  const ttsReadShareR   = useRef(ttsReadShare);
+  const ttsReadJoinR    = useRef(ttsReadJoin);
+  const ttsReadSuperFanR= useRef(ttsReadSuperFan);
+
+  const [elOk,     setElOk]     = useState(null); // null=sin probar, true=ok, false=error
+
+  // Refs (para callbacks que no re-renderizan)
+  const ttsOnR    = useRef(ttsOn);
+  const ttsVolR   = useRef(ttsVol);
+  const ttsModeR  = useRef(ttsMode);
+  const ttsVoiceR = useRef(ttsVoice);
+  const nativeVoiceR = useRef(nativeVoice);
+  const googleVoiceR = useRef(googleVoice);
+  const nativeRateR  = useRef(nativeRate);
+  const nativePitchR = useRef(nativePitch);
+  const actsR     = useRef([]);
+  const likeUserMapR = useRef({}); // user -> last known totalLikeCount
+  const alertsOnR = useRef(true);
+
+  // Acciones
+  const [actions,   setActions]   = useState(() => ld("actions4", DEF_ACTIONS));
+  const [alertsOn,  setAlertsOn]  = useState(() => ld("alertsOn", true));
+  const [showM,     setShowM]     = useState(false);
+  const [editA,     setEditA]     = useState(null);
+  const [searchQ,   setSearchQ]   = useState("");
+  const [toast,     setToast]     = useState("");
+  const [delConfirm,setDelConfirm]= useState(null); // id acción a confirmar delete
+
+  // UI
+  const showT = (msg) => { setToast(msg); setTimeout(()=>setToast(""), 2500); };
+
+  // Sync refs
+  useEffect(()=>{ ttsOnR.current=ttsOn;    sv("ttsOn",    ttsOn);    }, [ttsOn]);
+  useEffect(()=>{ ttsVolR.current=ttsVol;  sv("ttsVol",   ttsVol);   }, [ttsVol]);
+  useEffect(()=>{ ttsModeR.current=ttsMode;sv("ttsMode",  ttsMode);  }, [ttsMode]);
+  useEffect(()=>{ ttsVoiceR.current=ttsVoice; sv("ttsVoice",ttsVoice);}, [ttsVoice]);
+  useEffect(()=>{ nativeVoiceR.current=nativeVoice; sv("nativeVoice",nativeVoice);}, [nativeVoice]);
+  useEffect(()=>{ googleVoiceR.current=googleVoice; sv("googleVoice",googleVoice);}, [googleVoice]);
+  useEffect(()=>{ nativeRateR.current=nativeRate;   sv("nativeRate",  nativeRate);  nativeTTSConfig.rate=nativeRate; }, [nativeRate]);
+  useEffect(()=>{ nativePitchR.current=nativePitch; sv("nativePitch", nativePitch); nativeTTSConfig.pitch=nativePitch; }, [nativePitch]);
+  useEffect(()=>{ actsR.current=actions;   sv("actions4", actions);  }, [actions]);
+  useEffect(()=>{ alertsOnR.current=alertsOn; sv("alertsOn",alertsOn);}, [alertsOn]);
+  useEffect(()=>{ filterAllR.current=filterAll;           sv("filterAll",      filterAll);      }, [filterAll]);
+  useEffect(()=>{ filterFollowR.current=filterFollow;     sv("filterFollow",   filterFollow);   }, [filterFollow]);
+  useEffect(()=>{ filterModR.current=filterMod;           sv("filterMod",      filterMod);      }, [filterMod]);
+  useEffect(()=>{ filterSuperFanR.current=filterSuperFan; sv("filterSuperFan", filterSuperFan); }, [filterSuperFan]);
+  useEffect(()=>{ filterFanClubR.current=filterFanClub;   sv("filterFanClub",  filterFanClub);  }, [filterFanClub]);
+  useEffect(()=>{ filterFanLevelR.current=filterFanLevel; sv("filterFanLevel", filterFanLevel); }, [filterFanLevel]);
+  useEffect(()=>{ customUsersR.current=customUsers;       sv("customUsers",    customUsers);    }, [customUsers]);
+  useEffect(()=>{ blockedWordsR.current=blockedWords;     sv("blockedWords",   blockedWords);   }, [blockedWords]);
+  useEffect(()=>{ sv("ttsChatTpl",     ttsChatTpl);    }, [ttsChatTpl]);
+  useEffect(()=>{ sv("ttsGiftTpl",     ttsGiftTpl);    }, [ttsGiftTpl]);
+  useEffect(()=>{ sv("ttsFollowTpl",   ttsFollowTpl);  }, [ttsFollowTpl]);
+  useEffect(()=>{ sv("ttsShareTpl",    ttsShareTpl);   }, [ttsShareTpl]);
+  useEffect(()=>{ sv("ttsJoinTpl",     ttsJoinTpl);    }, [ttsJoinTpl]);
+  useEffect(()=>{ sv("ttsSuperFanTpl", ttsSuperFanTpl);}, [ttsSuperFanTpl]);
+  useEffect(()=>{ ttsChatTplR.current=ttsChatTpl;         }, [ttsChatTpl]);
+  useEffect(()=>{ ttsGiftTplR.current=ttsGiftTpl;         }, [ttsGiftTpl]);
+  useEffect(()=>{ ttsFollowTplR.current=ttsFollowTpl;     }, [ttsFollowTpl]);
+  useEffect(()=>{ ttsShareTplR.current=ttsShareTpl;       }, [ttsShareTpl]);
+  useEffect(()=>{ ttsJoinTplR.current=ttsJoinTpl;         }, [ttsJoinTpl]);
+  useEffect(()=>{ ttsSuperFanTplR.current=ttsSuperFanTpl; }, [ttsSuperFanTpl]);
+  useEffect(()=>{ ttsReadGiftR.current=ttsReadGift;       sv("ttsReadGift",ttsReadGift);       }, [ttsReadGift]);
+  useEffect(()=>{ ttsReadFollowR.current=ttsReadFollow;   sv("ttsReadFollow",ttsReadFollow);   }, [ttsReadFollow]);
+  useEffect(()=>{ ttsReadShareR.current=ttsReadShare;     sv("ttsReadShare",ttsReadShare);     }, [ttsReadShare]);
+  useEffect(()=>{ ttsReadJoinR.current=ttsReadJoin;       sv("ttsReadJoin",ttsReadJoin);       }, [ttsReadJoin]);
+  useEffect(()=>{ ttsReadSuperFanR.current=ttsReadSuperFan; sv("ttsReadSuperFan",ttsReadSuperFan); }, [ttsReadSuperFan]);
+  useEffect(()=>{ sv("ttsReadGift",    ttsReadGift);   }, [ttsReadGift]);
+  useEffect(()=>{ sv("ttsReadFollow",  ttsReadFollow); }, [ttsReadFollow]);
+  useEffect(()=>{ sv("ttsReadShare",   ttsReadShare);  }, [ttsReadShare]);
+  useEffect(()=>{ sv("ttsReadJoin",    ttsReadJoin);   }, [ttsReadJoin]);
+  useEffect(()=>{ sv("ttsReadSuperFan",ttsReadSuperFan);}, [ttsReadSuperFan]);
+
+  useEffect(()=>{ sv("tab",   tab);   }, [tab]);
+  useEffect(()=>{ sv("googleVoice", googleVoice); }, [googleVoice]);
+  useEffect(()=>{ sv("tuser", tUser); }, [tUser]);
+  useEffect(()=>{ sv("totDia",  totDia);  }, [totDia]);
+  useEffect(()=>{ sv("totLike", totLike); }, [totLike]);
+  useEffect(()=>{ sv("tapR",    tapR);    }, [tapR]);
+  useEffect(()=>{ sv("likeR",   likeR);   }, [likeR]);
+  useEffect(()=>{ sv("viewR",   viewR);   }, [viewR]);
+
+  // Cargar voces nativas del navegador
+  useEffect(() => {
+    const load = () => {
+      const vs = window.speechSynthesis?.getVoices() || [];
+      const esList = vs.filter(v => v.lang.startsWith("es") || v.lang.startsWith("en"));
+      setNativeVoices(esList.length ? esList : vs);
+      if (!nativeVoice && esList.length) {
+        const def = esList.find(v=>v.lang.startsWith("es-MX")) || esList[0];
+        if (def) { setNativeVoice(def.name); nativeVoiceR.current=def.name; }
+      }
+    };
+    load();
+    window.speechSynthesis?.addEventListener("voiceschanged", load);
+    return () => window.speechSynthesis?.removeEventListener("voiceschanged", load);
+  }, []);
+
+  // Cargar voces ElevenLabs
+  useEffect(() => {
+    if (ttsMode !== "elevenlabs") return;
+    fetch("https://api.elevenlabs.io/v1/voices", {headers:{"xi-api-key":EL_KEY}})
+      .then(r=>r.json())
+      .then(d => {
+        if (d.voices?.length) {
+          const m = d.voices.map(v=>({id:v.voice_id, name:v.name}));
+          setElVoices([...DEF_VOICES_EL, ...m.filter(v=>!DEF_VOICES_EL.find(x=>x.id===v.id))]);
+          setElOk(true);
+        }
+      })
+      .catch(() => setElOk(false));
+  }, [ttsMode]);
+
+  // Dots animación conectando
+  useEffect(() => {
+    if (!conn2) return;
+    const t = setInterval(()=>setDots(d=>d.length>=3?"":d+"."), 400);
+    return () => clearInterval(t);
+  }, [conn2]);
+
+  /* ─── Disparar acción ──────────────────────────── */
+  const fireAction = useCallback((eventType, giftName="", nickname="", giftCount=1) => {
+    if (!alertsOnR.current) return;
+    const acts = actsR.current.filter(a => a.enabled && a.event===eventType);
+    for (const act of acts) {
+      if (act.event==="Gift Alert") {
+        const gn=(giftName||"").toLowerCase();
+        const an=(act.giftName||"").toLowerCase();
+        if (an!=="cualquier regalo" && !gn.includes(an) && !an.includes(gn)) continue;
+        if (giftCount < act.minCount) continue;
+      }
+      // Sonido MP3 (base64 persistido)
+      if (act.soundData) {
+        playAudio(act.soundData, ttsVolR.current/100);
+      }
+      // TTS
+      if (act.ttsOn && act.ttsText && ttsOnR.current) {
+        const rawText = act.ttsText.replace(/@usuario/gi, nickname);
+        const text = filterText(rawText, blockedWordsR.current);
+        if (text) {
+          if (ttsModeR.current === "elevenlabs") {
+            enqueueTTS(text, ttsVoiceR.current, ttsVolR.current/100, "elevenlabs");
+          } else if (ttsModeR.current === "google") {
+            enqueueTTS(text, googleVoiceR.current, ttsVolR.current/100, "google");
+          } else {
+            enqueueTTS(text, nativeVoiceR.current, ttsVolR.current/100, "native");
+          }
+        }
+      }
+    }
+  }, []);
+
+  /* ─── Socket.IO ────────────────────────────────── */
+  useEffect(() => {
+    const sock = io(SERVER, {
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1500,
+      reconnectionDelayMax: 8000,
+      timeout: 12000,
+    });
+
+    sock.on("connect", () => {
+      console.log("Socket conectado:", sock.id);
+    });
+
+    sock.on("connect_error", (e) => {
+      console.warn("Socket error:", e.message);
+    });
+
+    sock.on("event", d => {
+      if (d.type==="chat") {
+        setLog(p=>[{t:"msg",tx:`💬 @${d.nickname||d.user}: ${d.comment}`},...p].slice(0,50));
+        setStats(p=>({...p, messages:p.messages+1}));
+        if (ttsOnR.current && shouldReadUser(d, filterAllR, filterFollowR, filterModR, filterSuperFanR, filterFanClubR, filterFanLevelR, customUsersR)) {
+          const tpl = ttsChatTplR.current || "{nickname} dice {message}";
+          const rawText = applyTpl(tpl, {username:d.user||"", nickname:d.nickname||d.user||"", message:d.comment||""});
+          const text = filterText(rawText, blockedWordsR.current);
+          if (text) {
+            const vp = ttsModeR.current==="elevenlabs"?ttsVoiceR.current:ttsModeR.current==="google"?googleVoiceR.current:nativeVoiceR.current;
+            enqueueTTS(text, vp, ttsVolR.current/100, ttsModeR.current);
+          }
+        }
+      } else if (d.type==="gift") {
+        setLog(p=>[{t:"gift",tx:`🎁 @${d.nickname||d.user} → ${d.giftCount}× ${d.giftName}`},...p].slice(0,50));
+        setStats(p=>({...p, gifts:p.gifts+1}));
+        if (ttsOnR.current && ttsReadGiftR.current) {
+          const tpl = ttsGiftTplR.current || "{username} envió {giftName} x{repeatCount}";
+          const rawText = applyTpl(tpl, {
+            username: d.user||"", nickname: d.nickname||d.user||"",
+            giftName: d.giftName||"", repeatCount: d.giftCount||1,
+            totalValue: d.diamondCount||0,
+          });
+          const text = filterText(rawText, blockedWordsR.current);
+          if (text) {
+            const vp = ttsModeR.current==="elevenlabs"?ttsVoiceR.current:ttsModeR.current==="google"?googleVoiceR.current:nativeVoiceR.current;
+            enqueueTTS(text, vp, ttsVolR.current/100, ttsModeR.current);
+          }
+        }
+        const dm = d.diamondCount||0;
+        setTotDia(p=>p+dm);
+        setTapR(prev=>{
+          const ex=prev.find(u=>u.user===d.user);
+          const upd=ex?prev.map(u=>u.user===d.user?{...u,diamonds:u.diamonds+dm,gifts:u.gifts+1}:u)
+            :[...prev,{user:d.user,nickname:d.nickname||d.user,diamonds:dm,gifts:1}];
+          return upd.sort((a,b)=>b.diamonds-a.diamonds).slice(0,10);
+        });
+        fireAction("Gift Alert", d.giftName, d.nickname||d.user, d.giftCount);
+      } else if (d.type==="follow") {
+        setLog(p=>[{t:"follow",tx:`➕ @${d.nickname||d.user} te siguió`},...p].slice(0,50));
+        setStats(p=>({...p, follows:p.follows+1}));
+        if (ttsOnR.current && ttsReadFollowR.current) {
+          const tpl = ttsFollowTplR.current || "{username} te siguió";
+          const rawText = applyTpl(tpl, {username:d.user||"", nickname:d.nickname||d.user||""});
+          const text = filterText(rawText, blockedWordsR.current);
+          if (text) {
+            const vp = ttsModeR.current==="elevenlabs"?ttsVoiceR.current:ttsModeR.current==="google"?googleVoiceR.current:nativeVoiceR.current;
+            enqueueTTS(text, vp, ttsVolR.current/100, ttsModeR.current);
+          }
+        }
+        fireAction("Follow Alert","", d.nickname||d.user);
+      } else if (d.type==="like") {
+        // likeCount = cantidad de likes enviados en este batch por el usuario
+        // NO acumular por usuario — cada evento ya representa likes nuevos
+        const lc = d.likeCount || 1;
+        setLog(p=>[{t:"like",tx:`❤️ ×${lc} likes de @${d.nickname||d.user}`},...p].slice(0,50));
+        setStats(p=>({...p, likes:p.likes+lc}));
+        setTotLike(p=>p+lc);
+        setLAnim(true); setTimeout(()=>setLAnim(false),300);
+        const hid=Date.now();
+        setFh(p=>[...p,{id:hid,x:Math.random()*60+20}]);
+        setTimeout(()=>setFh(p=>p.filter(h=>h.id!==hid)),1200);
+        setLikeR(prev=>{
+          const ex=prev.find(u=>u.user===d.user);
+          const nickname = d.nickname || d.user;
+          const upd=ex?prev.map(u=>u.user===d.user?{...u,count:u.count+lc,nickname}:u)
+            :[...prev,{user:d.user,nickname,count:lc}];
+          return upd.sort((a,b)=>b.count-a.count).slice(0,10);
+        });
+        fireAction("Like Alert","", d.nickname||d.user);
+      } else if (d.type==="sub") {
+        setLog(p=>[{t:"sub",tx:`⭐ @${d.nickname||d.user} se suscribió`},...p].slice(0,50));
+        if (ttsOnR.current && ttsReadSuperFanR.current) {
+          const tpl = ttsSuperFanTplR.current || "{username} se hizo super fan";
+          const rawText = applyTpl(tpl, {username:d.user||"", nickname:d.nickname||d.user||""});
+          const text = filterText(rawText, blockedWordsR.current);
+          if (text) {
+            const vp = ttsModeR.current==="elevenlabs"?ttsVoiceR.current:ttsModeR.current==="google"?googleVoiceR.current:nativeVoiceR.current;
+            enqueueTTS(text, vp, ttsVolR.current/100, ttsModeR.current);
+          }
+        }
+        fireAction("Sub Alert","", d.nickname||d.user);
+      } else if (d.type==="share") {
+        setLog(p=>[{t:"share",tx:`📤 @${d.nickname||d.user} compartió`},...p].slice(0,50));
+        if (ttsOnR.current && ttsReadShareR.current) {
+          const tpl = ttsShareTplR.current || "{username} compartió el live";
+          const rawText = applyTpl(tpl, {username:d.user||"", nickname:d.nickname||d.user||""});
+          const text = filterText(rawText, blockedWordsR.current);
+          if (text) {
+            const vp = ttsModeR.current==="elevenlabs"?ttsVoiceR.current:ttsModeR.current==="google"?googleVoiceR.current:nativeVoiceR.current;
+            enqueueTTS(text, vp, ttsVolR.current/100, ttsModeR.current);
+          }
+        }
+        fireAction("Share Alert","", d.nickname||d.user);
+      }
+    });
+
+    sock.on("viewers", d => {
+      setStats(p=>({...p, viewers:d.count||0}));
+      // topViewers = lista de espectadores activos ahora
+      if (Array.isArray(d.topViewers) && d.topViewers.length > 0) {
+        setTopViewers(d.topViewers);
+      }
+    });
+    sock.on("member", d => {
+      if (!d.user) return;
+      if (ttsOnR.current && ttsReadJoinR.current) {
+        const tpl = ttsJoinTplR.current || "{username} se unió al live";
+        const rawText = applyTpl(tpl, {username:d.user||"", nickname:d.nickname||d.user||""});
+        const text = filterText(rawText, blockedWordsR.current);
+        if (text) {
+          const vp = ttsModeR.current==="elevenlabs"?ttsVoiceR.current:ttsModeR.current==="google"?googleVoiceR.current:nativeVoiceR.current;
+          enqueueTTS(text, vp, ttsVolR.current/100, ttsModeR.current);
+        }
+      }
+      // Agregar al historial de quienes entraron
+      setViewR(prev => {
+        const ex = prev.find(u => u.user === d.user);
+        if (ex) {
+          // actualizar timestamp
+          return prev.map(u => u.user===d.user ? {...u, joinTime:d.timestamp||Date.now()} : u);
+        }
+        const upd = [{user:d.user, nickname:d.nickname||d.user, joinTime:d.timestamp||Date.now()}, ...prev];
+        return upd.slice(0, 300);
+      });
+    });
+    sock.on("battle", d => {
+      if (d && d.teams) {
+        const normalized = {
+          ...d,
+          // ownerUsername: usar el que manda el servidor o el usuario conectado como fallback
+          ownerUsername: (d.ownerUsername || tUser || "").toLowerCase().replace(/^@/,""),
+          teams: d.teams.map(t => ({
+            hostName:     t.hostName     || t.uniqueId  || t.displayId  || "?",
+            hostNickname: t.hostNickname || t.nickname  || t.hostName   || "?",
+            points:       Number(t.points || t.battleScore || t.score || 0),
+          })).filter(t => t.hostName !== "?"),
+        };
+        setBattle(normalized);
+      } else {
+        setBattle(d);
+      }
+    });
+
+    sock.on("tiktok_disconnected", d => {
+      setConn(false);
+      setLog(p=>[{t:"sys",tx:`⚠️ TikTok desconectado (@${d?.username||"?"}). Reconecta.`},...p].slice(0,50));
+    });
+    sock.on("tiktok_error", d => {
+      setLog(p=>[{t:"sys",tx:`⚠️ Error: ${d.message}`},...p].slice(0,50));
+    });
+
+    return () => sock.disconnect();
+  }, [fireAction]);
+
+  /* ─── Restaurar estado conexión al recargar ─────── */
+  useEffect(() => {
+    const savedUser = ld("tuser", "");
+    if (!savedUser) return;
+    // Verificar si el servidor aún tiene la sesión activa
+    fetch(`${SERVER}/status/${encodeURIComponent(savedUser)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.connected) {
+          setConn(true);
+          setLog([{t:"sys",tx:`✅ Sesión restaurada @${savedUser}`}]);
+        }
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line
+
+  /* ─── Reset likeUserMap al conectar ─────────────── */
+  // (se hace en connect() limpiando el ref)
+
+  /* ─── Conectar/Desconectar TikTok ──────────────── */
+  const connect = async () => {
+    if (!tUser.trim()) return;
+    setConn2(true); setConnErr("");
+    try {
+      const r = await fetch(`${SERVER}/connect`, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({username: tUser.trim()}),
+      });
+      const d = await r.json();
+      if (d.success) {
+        setConn2(false); setConn(true);
+        setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0});
+        setTotDia(0); setTotLike(0); setTapR([]); setLikeR([]);
+        setBattle(null);
+        likeUserMapR.current = {}; // reset delta tracker
+        setViewR([]); sv("viewR",[]);
+        setLog([{t:"sys",tx:`✅ Conectado a @${tUser}`}]);
+      } else {
+        setConn2(false);
+        setConnErr(d.error||"¿Estás en LIVE?");
+        setLog(p=>[{t:"sys",tx:`⚠️ ${d.error||"¿Estás en LIVE?"}`},...p]);
+      }
+    } catch(e) {
+      setConn2(false);
+      setConnErr("Sin respuesta del servidor");
+      setLog(p=>[{t:"sys",tx:"⚠️ Sin respuesta del servidor"},...p]);
+    }
+  };
+
+  const disconnect = async () => {
+    await fetch(`${SERVER}/disconnect`,{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({username:tUser})}).catch(()=>{});
+    setConn(false);
+    setLog([]); setStats({viewers:0,gifts:0,follows:0,messages:0,likes:0});
+    setTotDia(0); setTotLike(0);
+  };
+
+  /* ─── Acciones CRUD ─────────────────────────────── */
+  const saveAction = (form) => {
+    if (form.id && actions.find(a=>a.id===form.id)) {
+      setActions(p=>p.map(a=>a.id===form.id?form:a));
+      showT("✅ Acción actualizada");
+    } else {
+      setActions(p=>[...p, {...form, id:Date.now()}]);
+      showT("✅ Acción creada");
+    }
+    setShowM(false); setEditA(null);
+  };
+
+  const deleteAction = (id) => {
+    setActions(p=>p.filter(a=>a.id!==id));
+    setDelConfirm(null);
+    showT("🗑️ Acción eliminada");
+  };
+
+  const testAction = (act) => {
+    if (act.soundData) playAudio(act.soundData, ttsVol/100);
+    if (act.ttsOn && act.ttsText) {
+      const text = act.ttsText.replace(/@usuario/gi,"UsuarioPrueba");
+      const voiceParam = ttsMode==="elevenlabs" ? ttsVoice : ttsMode==="google" ? googleVoice : nativeVoice;
+      enqueueTTS(text, voiceParam, ttsVol/100, ttsMode);
+    }
+    showT(`▶ Probando: ${act.name}`);
+  };
+
+  /* ─── Render helpers ────────────────────────────── */
+  if (!user) return <Login onLogin={u=>{sv("session",u);setUser(u);}}/>;
+
+  const TABS = [
+    {id:"dashboard", icon:"⚡", l:"Dashboard"},
+    {id:"acciones",  icon:"🎬", l:"Acciones"},
+    {id:"tts",       icon:"🔊", l:"Voz & Audio"},
+    {id:"ranking",   icon:"🏆", l:"Ranking"},
+    {id:"chat",      icon:"💬", l:"Chat"},
+    {id:"batalla",   icon:"⚔️",  l:"Batalla"},
+    {id:"espect",    icon:"👁️", l:"Espectadores"},
+  ];
+
+  const LC = {gift:"rgba(254,44,85,.08)",follow:"rgba(37,244,238,.08)",msg:"rgba(255,255,255,.02)",
+    like:"rgba(254,44,85,.05)",sub:"rgba(139,92,246,.08)",share:"rgba(255,255,255,.04)",sys:"rgba(37,244,238,.06)"};
+  const LB = {gift:"#fe2c55",follow:"#25f4ee",msg:"#2a2a3a",like:"#fe2c55",sub:"#8b5cf6",share:"#666",sys:"#25f4ee"};
+  const bCls = ev=>ev.startsWith("Follow")?"bf":ev.startsWith("Gift")?"bg":ev.startsWith("Like")?"bl":ev.startsWith("Sub")?"bs":"bsh";
+  const bIco = ev=>ev.startsWith("Follow")?"➕":ev.startsWith("Gift")?"🎁":ev.startsWith("Like")?"❤️":ev.startsWith("Sub")?"⭐":"📤";
+
+  const C   = {background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:15,marginBottom:12};
+  const lbl = {display:"block",color:"#556",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase",marginBottom:5};
+  const inp = {width:"100%",background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,padding:"9px 12px",color:"#fff",fontSize:12,outline:"none"};
+
+  const fActs = actions.filter(a=>a.name.toLowerCase().includes(searchQ.toLowerCase()));
+
+  return (
+    <div style={{display:"flex",minHeight:"100vh",background:"#0a0a0f"}}>
+
+      {/* Modales */}
+      {showM && (
+        <ActModal
+          action={editA}
+          ttsMode={ttsMode}
+          ttsVoiceId={ttsVoice}
+          ttsNativeVoice={nativeVoice}
+          vol={ttsVol}
+          onSave={saveAction}
+          onClose={()=>{setShowM(false);setEditA(null);}}
+        />
+      )}
+
+      {/* Confirm delete */}
+      {delConfirm && (
+        <div className="mo" onClick={()=>setDelConfirm(null)}>
+          <div className="mb" style={{maxWidth:320}} onClick={e=>e.stopPropagation()}>
+            <div style={{textAlign:"center",marginBottom:16}}>
+              <div style={{fontSize:32,marginBottom:8}}>🗑️</div>
+              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:15,marginBottom:6}}>
+                Eliminar acción
+              </div>
+              <div style={{color:"#555",fontSize:12}}>
+                ¿Eliminar <span style={{color:"#fff",fontWeight:700}}>
+                  "{actions.find(a=>a.id===delConfirm)?.name}"
+                </span>? No se puede deshacer.
+              </div>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setDelConfirm(null)}
+                style={{flex:1,background:"transparent",border:"1px solid #252535",borderRadius:9,
+                  padding:"10px",color:"#555",fontWeight:600,cursor:"pointer",fontSize:12}}>
+                Cancelar
+              </button>
+              <button onClick={()=>deleteAction(delConfirm)}
+                style={{flex:1,background:"rgba(254,44,85,.15)",border:"1px solid rgba(254,44,85,.35)",
+                  borderRadius:9,padding:"10px",color:"#fe2c55",fontWeight:700,cursor:"pointer",fontSize:12}}>
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && <div className="toast">{toast}</div>}
+      {sb && <div onClick={()=>setSb(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",zIndex:40}}/>}
+
+      {/* Sidebar */}
+      <div style={{width:215,background:"#0d0d18",borderRight:"1px solid #1a1a28",display:"flex",
+        flexDirection:"column",padding:"13px 10px",position:"fixed",top:0,bottom:0,left:0,zIndex:50,
+        transform:sb?"translateX(0)":"translateX(-100%)",transition:"transform .28s ease"}}>
+        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:14,paddingLeft:2}}>
+          <div style={{width:27,height:27,borderRadius:7,background:"linear-gradient(135deg,#fe2c55,#25f4ee)",
+            display:"flex",alignItems:"center",justifyContent:"center",
+            fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:13}}>T</div>
+          <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:16,letterSpacing:-.5}}>
+            ik<span style={{color:"#fe2c55"}}>Panel</span>
+          </span>
+        </div>
+
+        {/* User badge */}
+        <div style={{display:"flex",alignItems:"center",gap:7,background:"#1a1a28",
+          borderRadius:9,padding:"7px 9px",marginBottom:9}}>
+          <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,
+            background:"linear-gradient(135deg,#fe2c55,#25f4ee)",
+            display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:11}}>
+            {user.avatar}
+          </div>
+          <div style={{overflow:"hidden"}}>
+            <div style={{fontSize:11,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{user.name}</div>
+            <div style={{fontSize:9,color:"#fe2c55",fontWeight:600,marginTop:1}}>{user.plan}</div>
+          </div>
+        </div>
+
+        {/* Estado conexión */}
+        <div style={{display:"flex",alignItems:"center",gap:6,
+          background:conn?"rgba(37,244,238,.05)":"rgba(255,255,255,.02)",
+          border:`1px solid ${conn?"rgba(37,244,238,.18)":"#1a1a28"}`,
+          borderRadius:20,padding:"4px 9px",fontSize:9,color:conn?"#25f4ee":"#444",marginBottom:12,overflow:"hidden"}}>
+          <div className={conn?"ld":""} style={{width:5,height:5,borderRadius:"50%",flexShrink:0,
+            background:conn?"#25f4ee":"#252535",boxShadow:conn?"0 0 7px #25f4ee":"none"}}/>
+          <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {conn ? `@${tUser}` : "Sin conexión"}
+          </span>
+        </div>
+
+        <nav style={{display:"flex",flexDirection:"column",gap:2,flex:1}}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={()=>{setTab(t.id);setSb(false);}}
+              style={{display:"flex",alignItems:"center",gap:7,
+                background:tab===t.id?"rgba(254,44,85,.1)":"transparent",
+                border:tab===t.id?"1px solid rgba(254,44,85,.18)":"1px solid transparent",
+                borderRadius:8,padding:"8px 8px",color:tab===t.id?"#fff":"#555",
+                cursor:"pointer",fontSize:11,fontWeight:tab===t.id?700:500,textAlign:"left"}}>
+              <span style={{fontSize:13}}>{t.icon}</span>{t.l}
+            </button>
+          ))}
+        </nav>
+
+        <button onClick={()=>{localStorage.removeItem("tp_session");setUser(null);}}
+          style={{background:"transparent",border:"1px solid #1a1a28",borderRadius:7,
+            padding:"6px 8px",color:"#444",cursor:"pointer",fontSize:10,marginTop:5}}>
+          Cerrar sesión
+        </button>
+      </div>
+
+      {/* Main */}
+      <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
+
+        {/* Topbar */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
+          padding:"9px 12px",borderBottom:"1px solid #1a1a28",background:"#0a0a0f",
+          position:"sticky",top:0,zIndex:30}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <button onClick={()=>setSb(!sb)}
+              style={{background:"#1a1a28",border:"1px solid #252535",borderRadius:6,
+                width:29,height:29,cursor:"pointer",color:"#fff",fontSize:13,
+                display:"flex",alignItems:"center",justifyContent:"center"}}>☰</button>
+            <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:13}}>
+              {TABS.find(t=>t.id===tab)?.icon} {TABS.find(t=>t.id===tab)?.l}
+            </div>
+          </div>
+          {conn && (
+            <div style={{display:"flex",alignItems:"center",gap:6}}>
+              {/* ☀️ Wake Lock indicator */}
+              <span
+                onClick={wakeLockOn ? releaseWakeLock : requestWakeLock}
+                title={wakeLockOn?"Pantalla activa (toca para desactivar)":"Toca para mantener pantalla encendida"}
+                style={{fontSize:13,cursor:"pointer",lineHeight:1,
+                  opacity:wakeLockOn?1:0.3,
+                  filter:wakeLockOn?"drop-shadow(0 0 5px #ffd700)":"none",
+                  transition:"all .4s",userSelect:"none"}}>
+                ☀️
+              </span>
+              <div style={{display:"flex",alignItems:"center",gap:4,
+                background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.2)",
+                borderRadius:20,padding:"3px 9px",color:"#fe2c55",fontWeight:800,fontSize:8,letterSpacing:1}}>
+                <div className="ld" style={{width:4,height:4,borderRadius:"50%",
+                  background:"#fe2c55",boxShadow:"0 0 6px #fe2c55"}}/>EN VIVO
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Contenido */}
+        <div style={{padding:12,flex:1,overflowY:"auto"}}>
+
+          {/* ── DASHBOARD ── */}
+          {tab==="dashboard" && (
+            <div className="ai">
+              {/* Conectar */}
+              <div style={C}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:10}}>
+                  🎯 Conectar al LIVE
+                </div>
+                <div style={{display:"flex",gap:7,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",alignItems:"center",flex:1,minWidth:120,
+                    background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,overflow:"hidden"}}>
+                    <span style={{color:"#fe2c55",fontWeight:800,padding:"0 9px",fontSize:13,flexShrink:0}}>@</span>
+                    <input value={tUser} onChange={e=>setTUser(e.target.value.replace("@",""))}
+                      onKeyDown={e=>e.key==="Enter"&&!conn&&!conn2&&connect()}
+                      placeholder="usuario_tiktok" disabled={conn||conn2}
+                      style={{flex:1,background:"transparent",border:"none",padding:"9px 5px 9px 0",
+                        color:"#fff",fontSize:12,outline:"none",minWidth:0}}/>
+                  </div>
+                  {!conn
+                    ? <button onClick={connect} disabled={conn2||!tUser.trim()}
+                        style={{background:(conn2||!tUser.trim())?"#1e1e2e":"linear-gradient(135deg,#fe2c55,#ff6b81)",
+                          border:"none",borderRadius:8,padding:"9px 14px",
+                          color:(conn2||!tUser.trim())?"#444":"#fff",
+                          fontWeight:700,cursor:(conn2||!tUser.trim())?"not-allowed":"pointer",
+                          fontSize:12,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5}}>
+                        {conn2 ? <><span className="spinner"/>{`Conectando${dots}`}</> : "Conectar"}
+                      </button>
+                    : <button onClick={disconnect}
+                        style={{background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.3)",
+                          borderRadius:8,padding:"9px 14px",color:"#fe2c55",fontWeight:700,
+                          cursor:"pointer",fontSize:12,whiteSpace:"nowrap"}}>
+                        Desconectar
+                      </button>
+                  }
+                </div>
+                {conn2 && (
+                  <div style={{height:3,background:"#1e1e2e",borderRadius:2,marginTop:8,overflow:"hidden"}}>
+                    <div className="cf" style={{height:"100%",width:"50%",
+                      background:"linear-gradient(90deg,#25f4ee,#fe2c55)",borderRadius:2}}/>
+                  </div>
+                )}
+                {connErr && (
+                  <div style={{marginTop:8,background:"rgba(254,44,85,.06)",border:"1px solid rgba(254,44,85,.15)",
+                    borderRadius:7,padding:"7px 10px",color:"#fe2c55",fontSize:11}}>
+                    ⚠️ {connErr} — ¿El usuario está en LIVE ahora?
+                  </div>
+                )}
+              </div>
+
+              {/* Stats */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:9,marginBottom:12}}>
+                {[
+                  {l:"Espectadores",v:stats.viewers,  ic:"👁️", c:"#25f4ee"},
+                  {l:"Regalos",     v:stats.gifts,    ic:"🎁", c:"#fe2c55"},
+                  {l:"Seguidores",  v:stats.follows,  ic:"➕", c:"#ffd700"},
+                  {l:"Mensajes",    v:stats.messages, ic:"💬", c:"#a78bfa"},
+                ].map(s=>(
+                  <div key={s.l} style={{background:"#12121e",border:"1px solid #1e1e2e",
+                    borderRadius:12,padding:12,textAlign:"center"}}>
+                    <div style={{fontSize:16,marginBottom:3}}>{s.ic}</div>
+                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:19,color:s.c}}>
+                      {s.v.toLocaleString()}
+                    </div>
+                    <div style={{color:"#444",fontSize:9,marginTop:2,fontWeight:600}}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Likes card */}
+              <div style={{...C,display:"flex",alignItems:"center",justifyContent:"space-between",
+                position:"relative",overflow:"hidden"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div className={lAnim?"hpa":""} style={{fontSize:26}}>❤️</div>
+                  <div>
+                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:24,
+                      color:"#fe2c55",lineHeight:1}}>{stats.likes.toLocaleString()}</div>
+                    <div style={{color:"#555",fontSize:8,fontWeight:700,marginTop:2,letterSpacing:.5}}>LIKES EN EL LIVE</div>
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{color:"#333",fontSize:9}}>💎 Diamantes</div>
+                  <div style={{color:"#ffd700",fontWeight:800,fontSize:14}}>{totDia.toLocaleString()}</div>
+                </div>
+                {fh.map(h=><span key={h.id} className="fh" style={{left:`${h.x}%`,bottom:4}}>❤️</span>)}
+              </div>
+
+              {/* Log */}
+              <div style={C}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:8}}>
+                  📋 Actividad en tiempo real
+                </div>
+                <div style={{background:"#0a0a0f",borderRadius:8,padding:8,height:195,
+                  overflowY:"auto",display:"flex",flexDirection:"column",gap:2}}>
+                  {log.length===0
+                    ? <div style={{color:"#333",fontSize:11,textAlign:"center",marginTop:70}}>
+                        {conn?"Esperando actividad...":"Conecta tu LIVE"}
+                      </div>
+                    : log.map((item,i)=>(
+                        <div key={i} style={{fontSize:12,padding:"5px 8px",borderRadius:5,
+                          background:LC[item.t]||"rgba(255,255,255,.02)",
+                          borderLeft:`2px solid ${LB[item.t]||"#252535"}`,
+                          color:"#ffffff",fontWeight:500}}>
+                          {item.tx}
+                        </div>
+                      ))
+                  }
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── ACCIONES ── */}
+          {tab==="acciones" && (
+            <div className="ai">
+              {/* Toolbar */}
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+                <button onClick={()=>{setEditA(null);setShowM(true);}}
+                  style={{background:"linear-gradient(135deg,#fe2c55,#ff6b81)",border:"none",
+                    borderRadius:7,padding:"7px 13px",color:"#fff",fontWeight:700,
+                    cursor:"pointer",fontSize:11,whiteSpace:"nowrap"}}>
+                  + Nueva
+                </button>
+                <div style={{display:"flex",alignItems:"center",gap:5,background:"#12121e",
+                  border:"1px solid #1e1e2e",borderRadius:20,padding:"5px 11px",cursor:"pointer"}}
+                  onClick={()=>setAlertsOn(!alertsOn)}>
+                  <div className={alertsOn?"ld":""} style={{width:6,height:6,borderRadius:"50%",
+                    background:alertsOn?"#25f4ee":"#444",boxShadow:alertsOn?"0 0 6px #25f4ee":"none"}}/>
+                  <span style={{fontSize:10,fontWeight:700,color:alertsOn?"#25f4ee":"#555"}}>
+                    {alertsOn?"Alertas ON":"Alertas OFF"}
+                  </span>
+                </div>
+                <input value={searchQ} onChange={e=>setSearchQ(e.target.value)}
+                  placeholder="🔍 Buscar..." style={{flex:1,minWidth:90,background:"#12121e",
+                    border:"1px solid #1e1e2e",borderRadius:7,padding:"6px 10px",
+                    color:"#fff",fontSize:11,outline:"none"}}/>
+              </div>
+
+              {/* Tabla */}
+              <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:13,overflow:"hidden"}}>
+                <div className="tr" style={{background:"#0d0d18",borderBottom:"1px solid #1e1e2e"}}>
+                  {["","Nombre","Evento","Seg","🎵","🔊",""].map((h,i)=>(
+                    <div key={i} className="th">{h}</div>
+                  ))}
+                </div>
+
+                {fActs.length===0 && (
+                  <div style={{textAlign:"center",padding:"30px 16px",color:"#333",fontSize:11}}>
+                    {searchQ ? "Sin resultados" : "Crea tu primera acción ↑"}
+                  </div>
+                )}
+
+                {fActs.map(act => (
+                  <div key={act.id} className={`tr ${act.enabled?"":"dis"}`}>
+                    <button className={`it ${act.enabled?"on":""}`}
+                      onClick={()=>setActions(p=>p.map(a=>a.id===act.id?{...a,enabled:!a.enabled}:a))}/>
+                    <div style={{minWidth:0}}>
+                      <div style={{color:act.enabled?"#fff":"#555",fontSize:11,fontWeight:600,
+                        overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{act.name}</div>
+                      {act.event==="Gift Alert" && (
+                        <div style={{fontSize:8,color:"#444",marginTop:1,fontFamily:"'JetBrains Mono',monospace"}}>
+                          {act.giftName}×{act.minCount}
+                        </div>
+                      )}
+                    </div>
+                    <div><span className={`badge ${bCls(act.event)}`}>{bIco(act.event)} {act.event.replace(" Alert","")}</span></div>
+                    <div style={{fontSize:9,color:"#555",fontFamily:"'JetBrains Mono',monospace"}}>{act.duration}s</div>
+                    <div style={{textAlign:"center",fontSize:12}}>
+                      {act.soundName ? <span style={{color:"#25f4ee"}}>✓</span> : <span style={{color:"#1e1e2e"}}>—</span>}
+                    </div>
+                    <div style={{textAlign:"center",fontSize:11}}>
+                      {act.ttsOn && act.ttsText ? <span style={{color:"#25f4ee"}}>✓</span> : <span style={{color:"#1e1e2e"}}>—</span>}
+                    </div>
+                    <div style={{display:"flex",gap:3,justifyContent:"flex-end"}}>
+                      <IBtn ico="▶" onClick={()=>testAction(act)} color="#25f4ee" title="Probar"/>
+                      <IBtn ico="✏️" onClick={()=>{setEditA(act);setShowM(true);}} color="#aaa" title="Editar"/>
+                      <IBtn ico="🗑" onClick={()=>setDelConfirm(act.id)} color="#fe2c55" title="Eliminar"/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{background:"rgba(37,244,238,.03)",border:"1px solid rgba(37,244,238,.08)",
+                borderRadius:8,padding:"9px 12px",color:"#444",fontSize:10,lineHeight:1.7,marginTop:10}}>
+                💾 Los audios ahora se guardan en base64 — <span style={{color:"#25f4ee"}}>no se pierden al recargar</span>.
+                El TTS usa la voz configurada en la pestaña <strong style={{color:"#fe2c55"}}>Voz & Audio</strong>.
+              </div>
+            </div>
+          )}
+
+          {/* ── VOZ & AUDIO ── */}
+          {tab==="tts" && (
+            <div className="ai">
+              {/* Motor TTS */}
+              <div style={C}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:12}}>
+                  🔊 Motor de Texto a Voz
+                </div>
+
+                {/* Toggle global */}
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10,
+                  background:"#0a0a0f",borderRadius:8,padding:"10px 12px",
+                  border:`1px solid ${ttsOn?"rgba(37,244,238,.2)":"#1e1e2e"}`}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:600}}>TTS de comentarios</div>
+                    <div style={{fontSize:9,color:"#555",marginTop:1}}>Lee automáticamente los mensajes del chat</div>
+                  </div>
+                  <Toggle on={ttsOn} onChange={()=>setTtsOn(!ttsOn)}/>
+                </div>
+
+                {/* Botones Leer a todos / Solo filtrados */}
+                <div style={{marginBottom:14}}>
+                  <label style={lbl}>¿A quién lee el bot?</label>
+                  <div style={{display:"flex",gap:8}}>
+                    <button onClick={()=>setFilterAll(true)}
+                      style={{flex:1,padding:"10px 6px",borderRadius:10,border:`2px solid ${filterAll?"#25f4ee":"#252535"}`,
+                        background:filterAll?"rgba(37,244,238,.12)":"#0a0a0f",
+                        color:filterAll?"#25f4ee":"#555",fontWeight:700,fontSize:11,cursor:"pointer",lineHeight:1.3}}>
+                      🌐 Leer a TODOS<br/><span style={{fontSize:8,fontWeight:400,opacity:.7}}>Sin filtros de usuario</span>
+                    </button>
+                    <button onClick={()=>setFilterAll(false)}
+                      style={{flex:1,padding:"10px 6px",borderRadius:10,border:`2px solid ${!filterAll?"#fe2c55":"#252535"}`,
+                        background:!filterAll?"rgba(254,44,85,.1)":"#0a0a0f",
+                        color:!filterAll?"#fe2c55":"#555",fontWeight:700,fontSize:11,cursor:"pointer",lineHeight:1.3}}>
+                      🎛️ Solo filtrados<br/><span style={{fontSize:8,fontWeight:400,opacity:.7}}>Según pestaña Filtros</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Selector de motor */}
+                <label style={lbl}>Motor de voz</label>
+                <div style={{display:"flex",gap:7,marginBottom:14,flexWrap:"wrap"}}>
+                  <button className={`mode-btn ${ttsMode==="native"?"act":""}`}
+                    onClick={()=>setTtsMode("native")}>
+                    🌐 Navegador<br/><span style={{fontSize:8,fontWeight:400,opacity:.7}}>Gratis, sin API</span>
+                  </button>
+                  <button className={`mode-btn ${ttsMode==="google"?"act":""}`}
+                    onClick={()=>setTtsMode("google")}
+                    style={{borderColor:ttsMode==="google"?"rgba(66,133,244,.4)":undefined,
+                      background:ttsMode==="google"?"rgba(66,133,244,.1)":undefined,
+                      color:ttsMode==="google"?"#4285f4":undefined}}>
+                    🔵 Google TTS<br/><span style={{fontSize:8,fontWeight:400,opacity:.7}}>Gratis, natural</span>
+                  </button>
+                  <button className={`mode-btn ${ttsMode==="elevenlabs"?"act":""}`}
+                    onClick={()=>setTtsMode("elevenlabs")}>
+                    ⚡ ElevenLabs<br/><span style={{fontSize:8,fontWeight:400,opacity:.7}}>Alta calidad</span>
+                  </button>
+                </div>
+
+                {/* Voz nativa */}
+                {ttsMode==="native" && (
+                  <div style={{marginBottom:12}}>
+                    <label style={lbl}>Voz del navegador</label>
+                    {nativeVoices.length===0
+                      ? <div style={{color:"#555",fontSize:11,padding:"8px 12px",background:"#0a0a0f",
+                          border:"1px solid #252535",borderRadius:8}}>
+                          Cargando voces del sistema...
+                        </div>
+                      : <select value={nativeVoice} onChange={e=>setNativeVoice(e.target.value)}
+                          style={{...inp,cursor:"pointer",marginBottom:8}}>
+                          {nativeVoices.map(v=>(
+                            <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>
+                          ))}
+                        </select>
+                    }
+                    <div style={{color:"#444",fontSize:9,marginTop:5,marginBottom:10}}>
+                      💡 Funciona sin internet ni configuración. Calidad depende del sistema operativo.
+                    </div>
+                    {/* Velocidad */}
+                    <label style={lbl}>Velocidad: {nativeRate||1}x</label>
+                    <input type="range" min="0.5" max="2" step="0.1"
+                      value={nativeRate||1}
+                      onChange={e=>{ const v=Number(e.target.value); setNativeRate(v); nativeRateR.current=v; sv("nativeRate",v); }}
+                      style={{width:"100%",accentColor:"#8b5cf6",marginBottom:4}}/>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#333"}}>
+                      <span>🐢 Lento</span><span>Normal</span><span>⚡ Rápido</span>
+                    </div>
+                    {/* Tono */}
+                    <label style={{...lbl,marginTop:10}}>Tono: {nativePitch||1}</label>
+                    <input type="range" min="0.5" max="2" step="0.1"
+                      value={nativePitch||1}
+                      onChange={e=>{ const v=Number(e.target.value); setNativePitch(v); nativePitchR.current=v; sv("nativePitch",v); }}
+                      style={{width:"100%",accentColor:"#fe2c55",marginBottom:4}}/>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#333"}}>
+                      <span>🔽 Grave</span><span>Normal</span><span>🔼 Agudo</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* ElevenLabs */}
+                {ttsMode==="elevenlabs" && (
+                  <div style={{marginBottom:12}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
+                      <label style={{...lbl,marginBottom:0}}>Voz ElevenLabs</label>
+                      {elOk===false && (
+                        <span style={{fontSize:9,color:"#fe2c55",fontWeight:600}}>⚠️ API Error</span>
+                      )}
+                      {elOk===true && (
+                        <span style={{fontSize:9,color:"#25f4ee",fontWeight:600}}>✓ Conectado</span>
+                      )}
+                    </div>
+                    <select value={ttsVoice} onChange={e=>setTtsVoice(e.target.value)}
+                      style={{...inp,cursor:"pointer",marginBottom:8}}>
+                      {elVoices.map(v=><option key={v.id} value={v.id}>{v.name}</option>)}
+                    </select>
+                    <div style={{color:"#444",fontSize:9}}>
+                      💡 Requiere créditos en ElevenLabs. Si falla, cambia a motor Navegador.
+                    </div>
+                  </div>
+                )}
+
+                {/* Google TTS */}
+                {ttsMode==="google" && (
+                  <div style={{marginBottom:12}}>
+                    <label style={lbl}>Voz de Google</label>
+                    <select value={googleVoice} onChange={e=>setGoogleVoice(e.target.value)}
+                      style={{...inp,cursor:"pointer",marginBottom:8}}>
+                      {[
+                        {code:"es-US", label:"Español EE.UU. (Femenina)"},
+                        {code:"es-MX", label:"Español México (Femenina)"},
+                        {code:"es-ES", label:"Español España (Femenina)"},
+                        {code:"es-US-m", label:"Español EE.UU. (Masculina)"},
+                        {code:"pt-BR", label:"Portugués Brasil"},
+                        {code:"en-US", label:"Inglés EE.UU."},
+                        {code:"en-GB", label:"Inglés Reino Unido"},
+                        {code:"fr-FR", label:"Francés"},
+                        {code:"de-DE", label:"Alemán"},
+                        {code:"it-IT", label:"Italiano"},
+                        {code:"ja-JP", label:"Japonés"},
+                        {code:"ko-KR", label:"Coreano"},
+                      ].map(v=><option key={v.code} value={v.code}>{v.label}</option>)}
+                    </select>
+                    <div style={{background:"rgba(66,133,244,.06)",border:"1px solid rgba(66,133,244,.15)",
+                      borderRadius:8,padding:"8px 12px",color:"#4285f4",fontSize:10,lineHeight:1.6}}>
+                      🔵 Usa la API gratuita de Google Translate TTS. Sin límites para uso normal.
+                      Requiere internet.
+                    </div>
+                  </div>
+                )}
+
+                {/* Volumen */}
+                <div style={{marginBottom:12}}>
+                  <label style={lbl}>Volumen global: {ttsVol}%</label>
+                  <input type="range" min="0" max="100" value={ttsVol}
+                    onChange={e=>setTtsVol(Number(e.target.value))}
+                    style={{width:"100%",accentColor:"#fe2c55"}}/>
+                </div>
+              </div>
+
+              {/* Bloquear palabras */}
+              <div style={C}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:4}}>
+                  🚫 Bloquear palabras
+                </div>
+                <div style={{color:"#444",fontSize:10,marginBottom:12}}>
+                  El bot reemplaza estas palabras con *** al leerlas en voz alta
+                </div>
+                <div style={{display:"flex",gap:8,marginBottom:10}}>
+                  <input value={blockedInput} onChange={e=>setBlockedInput(e.target.value)}
+                    onKeyDown={e=>{
+                      if(e.key==="Enter"){const w=blockedInput.trim().toLowerCase();
+                        if(w&&!blockedWords.includes(w)){setBlockedWords(p=>[...p,w]);setBlockedInput("");}
+                      }
+                    }}
+                    placeholder="palabra a bloquear..."
+                    style={{...inp,flex:1,marginBottom:0}}/>
+                  <button onClick={()=>{const w=blockedInput.trim().toLowerCase();
+                    if(w&&!blockedWords.includes(w)){setBlockedWords(p=>[...p,w]);setBlockedInput("");}}}
+                    style={{background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.3)",
+                      borderRadius:8,padding:"0 14px",color:"#fe2c55",fontWeight:700,cursor:"pointer",fontSize:12,whiteSpace:"nowrap"}}>
+                    + Agregar
+                  </button>
+                </div>
+                {blockedWords.length===0 ? (
+                  <div style={{color:"#333",fontSize:10,padding:"8px 12px",background:"#0a0a0f",
+                    border:"1px solid #1e1e2e",borderRadius:8}}>Sin palabras bloqueadas</div>
+                ) : (
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {blockedWords.map(w=>(
+                      <span key={w} style={{background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.25)",
+                        borderRadius:20,padding:"3px 10px",fontSize:10,color:"#fe2c55",
+                        display:"flex",alignItems:"center",gap:6}}>
+                        🚫 {w}
+                        <button onClick={()=>setBlockedWords(p=>p.filter(x=>x!==w))}
+                          style={{background:"none",border:"none",color:"#fe2c55",cursor:"pointer",
+                            fontSize:12,padding:"0 2px",lineHeight:1}}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Plantillas de lectura */}
+              <div style={C}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:4}}>
+                  📋 Plantillas de lectura
+                </div>
+                <div style={{color:"#444",fontSize:10,marginBottom:12}}>
+                  Variables: <span style={{color:"#25f4ee",fontFamily:"monospace",fontSize:9}}>
+                    {"{username}"} {"{nickname}"} {"{message}"} {"{giftName}"} {"{repeatCount}"} {"{totalValue}"}
+                  </span>
+                </div>
+
+                {[
+                  {label:"💬 Chat", tpl:ttsChatTpl, setTpl:setTtsChatTpl, key:"ttsChatTpl",
+                   enableKey:"chat", enabled:true, vars:"{nickname} {username} {message}",
+                   def:"{nickname} dice {message}"},
+                  {label:"🎁 Regalos", tpl:ttsGiftTpl, setTpl:setTtsGiftTpl, key:"ttsGiftTpl",
+                   enableKey:"gift", enabled:ttsReadGift, setEnabled:setTtsReadGift, vars:"{username} {nickname} {giftName} {repeatCount} {totalValue}",
+                   def:"{username} envió {giftName} x{repeatCount}"},
+                  {label:"➕ Seguidores", tpl:ttsFollowTpl, setTpl:setTtsFollowTpl, key:"ttsFollowTpl",
+                   enableKey:"follow", enabled:ttsReadFollow, setEnabled:setTtsReadFollow, vars:"{username} {nickname}",
+                   def:"{username} te siguió"},
+                  {label:"📤 Compartidos", tpl:ttsShareTpl, setTpl:setTtsShareTpl, key:"ttsShareTpl",
+                   enableKey:"share", enabled:ttsReadShare, setEnabled:setTtsReadShare, vars:"{username} {nickname}",
+                   def:"{username} compartió el live"},
+                  {label:"🚪 Se Unió", tpl:ttsJoinTpl, setTpl:setTtsJoinTpl, key:"ttsJoinTpl",
+                   enableKey:"join", enabled:ttsReadJoin, setEnabled:setTtsReadJoin, vars:"{username} {nickname}",
+                   def:"{username} se unió al live"},
+                  {label:"⭐ Super Fan", tpl:ttsSuperFanTpl, setTpl:setTtsSuperFanTpl, key:"ttsSuperFanTpl",
+                   enableKey:"superfan", enabled:ttsReadSuperFan, setEnabled:setTtsReadSuperFan, vars:"{username} {nickname}",
+                   def:"{username} se hizo super fan"},
+                ].map(item => (
+                  <div key={item.key} style={{marginBottom:14}}>
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:5}}>
+                      <label style={{...lbl,marginBottom:0,color:"#aaa"}}>{item.label}</label>
+                      {item.setEnabled && (
+                        <Toggle on={item.enabled} onChange={()=>item.setEnabled(!item.enabled)} color="#25f4ee" size="sm"/>
+                      )}
+                      {!item.setEnabled && (
+                        <span style={{fontSize:9,color:"#444",fontStyle:"italic"}}>siempre activo</span>
+                      )}
+                    </div>
+                    <input
+                      value={item.tpl}
+                      onChange={e=>{item.setTpl(e.target.value); sv(item.key, e.target.value);}}
+                      disabled={item.setEnabled && !item.enabled}
+                      style={{...inp,fontSize:11,opacity:item.setEnabled&&!item.enabled?0.35:1}}
+                    />
+                    <div style={{fontSize:9,color:"#333",marginTop:3}}>
+                      Variables: <span style={{color:"#444",fontFamily:"monospace"}}>{item.vars}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Probar TTS */}
+              <div style={C}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:10}}>
+                  🎤 Probar voz
+                </div>
+                <textarea id="ttsT" placeholder="Escribe algo para probar..."
+                  style={{...inp,resize:"vertical",minHeight:55,marginBottom:8}}
+                  defaultValue="Hola, bienvenido al LIVE"/>
+                <button disabled={!ttsOn} onClick={()=>{
+                    const t=(document.getElementById("ttsT")?.value||"Hola").trim();
+                    if (!t) return;
+                    const voiceParam = ttsMode==="elevenlabs" ? ttsVoice : ttsMode==="google" ? googleVoice : nativeVoice;
+                  enqueueTTS(t, voiceParam, ttsVol/100, ttsMode);
+                  }}
+                  style={{width:"100%",background:ttsOn?"rgba(254,44,85,.1)":"transparent",
+                    border:"1px solid rgba(254,44,85,.2)",borderRadius:8,padding:"9px",
+                    color:ttsOn?"#fe2c55":"#333",fontWeight:700,
+                    cursor:ttsOn?"pointer":"not-allowed",fontSize:12}}>
+                  ▶ Reproducir
+                </button>
+                <button style={{width:"100%",background:"transparent",border:"1px solid #1e1e2e",
+                  borderRadius:8,padding:"7px",color:"#444",cursor:"pointer",fontSize:11,marginTop:6}}
+                  onClick={()=>{window.speechSynthesis?.cancel();ttsQueue.length=0;ttsActive=false;}}>
+                  ⏹ Detener / Limpiar cola
+                </button>
+              </div>
+
+              {/* Resumen de filtros activos */}
+              <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:14}}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:10}}>
+                  🎛️ Estado actual
+                </div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {filterAll && <span style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.25)",
+                    borderRadius:20,padding:"3px 10px",fontSize:10,color:"#25f4ee",fontWeight:600}}>🌐 Leyendo a TODOS</span>}
+                  {!filterAll && filterFollow && <span style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.25)",
+                    borderRadius:20,padding:"3px 10px",fontSize:10,color:"#25f4ee",fontWeight:600}}>✓ Seguidores</span>}
+                  {!filterAll && filterMod && <span style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.25)",
+                    borderRadius:20,padding:"3px 10px",fontSize:10,color:"#25f4ee",fontWeight:600}}>✓ Moderadores</span>}
+                  {!filterAll && filterSuperFan && <span style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.25)",
+                    borderRadius:20,padding:"3px 10px",fontSize:10,color:"#25f4ee",fontWeight:600}}>✓ Super Fans</span>}
+                  {!filterAll && filterFanClub && <span style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.25)",
+                    borderRadius:20,padding:"3px 10px",fontSize:10,color:"#25f4ee",fontWeight:600}}>✓ Fan Club Nv.{filterFanLevel}+</span>}
+                  {!filterAll && customUsers.length>0 && <span style={{background:"rgba(37,244,238,.1)",border:"1px solid rgba(37,244,238,.25)",
+                    borderRadius:20,padding:"3px 10px",fontSize:10,color:"#25f4ee",fontWeight:600}}>✓ {customUsers.length} usuarios</span>}
+                  {blockedWords.length>0 && <span style={{background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.25)",
+                    borderRadius:20,padding:"3px 10px",fontSize:10,color:"#fe2c55",fontWeight:600}}>🚫 {blockedWords.length} palabras bloq.</span>}
+                  {!filterAll && !filterFollow && !filterMod && !filterSuperFan && !filterFanClub && customUsers.length===0 && (
+                    <span style={{color:"#333",fontSize:10}}>Sin filtros — leyendo todo el chat</span>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Filtros de Usuarios (integrado en Voz & Audio) ── */}
+              <div style={C}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:4}}>
+                  🎛️ Filtros de Usuarios
+                </div>
+                <div style={{color:"#444",fontSize:10,marginBottom:14}}>
+                  Define quién es leído por el bot TTS en el chat
+                </div>
+
+                {/* Seguidores */}
+                <div className="ftog" style={{opacity:filterAll?0.4:1}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Seguidores</div>
+                    <div style={{fontSize:10,color:"#555",marginTop:2}}>Lee a los usuarios que te siguen</div>
+                  </div>
+                  <Toggle on={filterFollow} onChange={()=>!filterAll&&setFilterFollow(!filterFollow)} color="#25f4ee"/>
+                </div>
+
+                {/* Moderadores */}
+                <div className="ftog" style={{opacity:filterAll?0.4:1}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Moderadores</div>
+                    <div style={{fontSize:10,color:"#555",marginTop:2}}>Lee a las personas que asignaste como moderadores</div>
+                  </div>
+                  <Toggle on={filterMod} onChange={()=>!filterAll&&setFilterMod(!filterMod)} color="#25f4ee"/>
+                </div>
+
+                {/* Super Fans */}
+                <div className="ftog" style={{opacity:filterAll?0.4:1}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Super Fans</div>
+                    <div style={{fontSize:10,color:"#555",marginTop:2}}>Usuarios que se hicieron super fan</div>
+                  </div>
+                  <Toggle on={filterSuperFan} onChange={()=>!filterAll&&setFilterSuperFan(!filterSuperFan)} color="#25f4ee"/>
+                </div>
+
+                {/* Fan Club */}
+                <div className="ftog" style={{opacity:filterAll?0.4:1}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#fff"}}>Fan Club</div>
+                    <div style={{fontSize:10,color:"#555",marginTop:2}}>Nivel mínimo</div>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <input type="number" min="1" max="100" value={filterFanLevel}
+                      onChange={e=>setFilterFanLevel(Number(e.target.value))}
+                      disabled={filterAll}
+                      style={{width:54,background:"#0a0a0f",border:"1px solid #252535",borderRadius:7,
+                        padding:"5px 8px",color:"#fff",fontSize:12,outline:"none",textAlign:"center"}}/>
+                    <Toggle on={filterFanClub} onChange={()=>!filterAll&&setFilterFanClub(!filterFanClub)} color="#25f4ee"/>
+                  </div>
+                </div>
+              </div>
+
+              {/* Usuarios personalizados */}
+              <div style={C}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:10}}>
+                  👤 Usuarios personalizados
+                </div>
+                <div style={{display:"flex",gap:8,marginBottom:10}}>
+                  <input
+                    value={customUserInput}
+                    onChange={e=>setCustomUserInput(e.target.value)}
+                    onKeyDown={e=>{
+                      if(e.key==="Enter"&&customUserInput.trim()){
+                        const u=customUserInput.trim().replace(/^@/,'');
+                        if(u&&!customUsers.includes(u)){setCustomUsers(p=>[...p,u]);setCustomUserInput("");}
+                      }
+                    }}
+                    placeholder="@usuario"
+                    style={{flex:1,background:"#0a0a0f",border:"1px solid #252535",borderRadius:8,
+                      padding:"9px 12px",color:"#fff",fontSize:12,outline:"none"}}/>
+                  <button
+                    onClick={()=>{
+                      const u=customUserInput.trim().replace(/^@/,'');
+                      if(u&&!customUsers.includes(u)){setCustomUsers(p=>[...p,u]);setCustomUserInput("");}
+                    }}
+                    style={{background:"rgba(254,44,85,.15)",border:"1px solid rgba(254,44,85,.3)",
+                      borderRadius:8,padding:"9px 14px",color:"#fe2c55",fontWeight:700,
+                      cursor:"pointer",fontSize:12,whiteSpace:"nowrap"}}>
+                    + Agregar
+                  </button>
+                </div>
+                {customUsers.length===0 ? (
+                  <div style={{color:"#333",fontSize:11,textAlign:"center",padding:"12px 0"}}>
+                    Sin usuarios personalizados
+                  </div>
+                ) : (
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {customUsers.map(u=>(
+                      <div key={u} style={{display:"flex",alignItems:"center",gap:5,
+                        background:"rgba(37,244,238,.08)",border:"1px solid rgba(37,244,238,.2)",
+                        borderRadius:20,padding:"3px 10px 3px 12px",fontSize:11,color:"#25f4ee",fontWeight:600}}>
+                        @{u}
+                        <button onClick={()=>setCustomUsers(p=>p.filter(x=>x!==u))}
+                          style={{background:"transparent",border:"none",color:"#25f4ee",
+                            cursor:"pointer",fontSize:12,padding:0,lineHeight:1,marginLeft:2}}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Palabras bloqueadas — se gestionan en la sección de arriba */}
+              <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,padding:14}}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:8}}>
+                  🚫 Palabras bloqueadas activas
+                </div>
+                {blockedWords.length===0 ? (
+                  <div style={{color:"#333",fontSize:10,padding:"8px 12px",background:"#0a0a0f",
+                    border:"1px solid #1e1e2e",borderRadius:8}}>Sin palabras bloqueadas</div>
+                ) : (
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                    {blockedWords.map(w=>(
+                      <span key={w} style={{background:"rgba(254,44,85,.1)",border:"1px solid rgba(254,44,85,.25)",
+                        borderRadius:20,padding:"3px 10px",fontSize:10,color:"#fe2c55",
+                        display:"flex",alignItems:"center",gap:6}}>
+                        🚫 {w}
+                        <button onClick={()=>setBlockedWords(p=>p.filter(x=>x!==w))}
+                          style={{background:"none",border:"none",color:"#fe2c55",cursor:"pointer",
+                            fontSize:12,padding:"0 2px",lineHeight:1}}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── RANKING ── */}
+          {tab==="ranking" && (
+            <div className="ai">
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:12}}>
+                {[
+                  {ic:"💎",v:totDia, l:"DIAMANTES TOTALES",c:"#ffd700"},
+                  {ic:"❤️",v:totLike,l:"LIKES TOTALES",    c:"#fe2c55"},
+                ].map(s=>(
+                  <div key={s.l} style={{background:"#12121e",border:"1px solid #1e1e2e",
+                    borderRadius:12,padding:12,textAlign:"center"}}>
+                    <div style={{fontSize:16,marginBottom:3}}>{s.ic}</div>
+                    <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:19,color:s.c}}>
+                      {s.v.toLocaleString()}
+                    </div>
+                    <div style={{color:"#444",fontSize:9,fontWeight:600,marginTop:2}}>{s.l}</div>
+                  </div>
+                ))}
+              </div>
+
+              {[
+                {title:"🎁 Top Tap Tap", data:tapR, key:"diamonds", color:"#ffd700", icon:"💎", empty:"Esperando regalos..."},
+                {title:"❤️ Top Likes",   data:likeR,key:"count",   color:"#fe2c55", icon:"❤️", empty:"Esperando likes..."},
+              ].map(({title,data,key,color,icon,empty})=>(
+                <div key={title} style={C}>
+                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:11}}>
+                    {title}
+                  </div>
+                  {data.length===0
+                    ? <div style={{textAlign:"center",padding:"18px 0",color:"#333",fontSize:11}}>
+                        {conn ? empty : "Conecta tu LIVE"}
+                      </div>
+                    : data.map((item,i)=>{
+                        const medals=["🥇","🥈","🥉","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
+                        const max=data[0][key]||1;
+                        const pct=Math.round((item[key]/max)*100);
+                        return (
+                          <div key={item.user} style={{marginBottom:8}}>
+                            <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                              <span style={{fontSize:13,flexShrink:0}}>{medals[i]||"·"}</span>
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                                  <span style={{color:"#fff",fontSize:11,fontWeight:700,
+                                    overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                    @{item.nickname}
+                                  </span>
+                                  <span style={{color,fontWeight:800,fontSize:11,flexShrink:0,marginLeft:6}}>
+                                    {icon} {item[key].toLocaleString()}
+                                  </span>
+                                </div>
+                                <div style={{height:3,background:"#1a1a28",borderRadius:2,
+                                  marginTop:3,overflow:"hidden"}}>
+                                  <div style={{height:"100%",width:`${pct}%`,borderRadius:2,
+                                    transition:"width .6s",
+                                    background:key==="count"
+                                      ?"linear-gradient(90deg,#fe2c55,#ff6b81)"
+                                      :i===0?"linear-gradient(90deg,#ffd700,#ffaa00)"
+                                      :i===1?"linear-gradient(90deg,#ccc,#888)":"#2a2a3a"}}/>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                  }
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── CHAT ── */}
+          {tab==="chat" && (
+            <div className="ai">
+              <div style={C}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:12,marginBottom:10}}>
+                  💬 Chat en vivo
+                </div>
+                <div style={{background:"#0a0a0f",borderRadius:8,padding:8,
+                  height:400,overflowY:"auto",display:"flex",flexDirection:"column",gap:3}}>
+                  {log.filter(l=>l.t==="msg").length===0
+                    ? <div style={{color:"#333",fontSize:11,textAlign:"center",marginTop:170}}>
+                        {conn ? "Esperando mensajes..." : "Conecta tu LIVE"}
+                      </div>
+                    : log.filter(l=>l.t==="msg").map((item,i)=>(
+                        <div key={i} style={{fontSize:12,padding:"5px 8px",borderRadius:5,
+                          background:"rgba(255,255,255,.02)",borderLeft:"2px solid #252535",color:"#ffffff",fontWeight:500}}>
+                          {item.tx}
+                        </div>
+                      ))
+                  }
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          {/* ── BATALLA / VERSUS ── */}
+          {tab==="batalla" && (
+            <div className="ai">
+              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:15,marginBottom:14,
+                display:"flex",alignItems:"center",gap:8}}>
+                ⚔️ Batalla en vivo
+                {battle && battle.status===1 && (
+                  <span className="ld" style={{width:7,height:7,borderRadius:"50%",
+                    background:"#fe2c55",boxShadow:"0 0 8px #fe2c55",display:"inline-block"}}/>
+                )}
+              </div>
+
+              {!conn ? (
+                <div style={{textAlign:"center",padding:"40px 0",color:"#333",fontSize:12}}>
+                  Conecta tu LIVE para ver la batalla
+                </div>
+              ) : !battle ? (
+                <div style={{textAlign:"center",padding:"30px 0",color:"#444",fontSize:12}}>
+                  <div style={{fontSize:36,marginBottom:12}}>⚔️</div>
+                  Esperando batalla...<br/>
+                  <span style={{fontSize:10,color:"#333"}}>
+                    La batalla aparece automáticamente cuando el LIVE inicia un versus
+                  </span>
+                </div>
+              ) : (
+                <div>
+                  {/* Estado */}
+                  <div style={{textAlign:"center",marginBottom:14}}>
+                    <span style={{background:battle.status===1?"rgba(254,44,85,.12)":"rgba(37,244,238,.1)",
+                      border:`1px solid ${battle.status===1?"rgba(254,44,85,.3)":"rgba(37,244,238,.3)"}`,
+                      borderRadius:20,padding:"4px 14px",fontSize:10,fontWeight:800,
+                      color:battle.status===1?"#fe2c55":"#25f4ee",letterSpacing:1}}>
+                      {battle.status===1?"🔴 EN CURSO":"✅ FINALIZADA"}
+                    </span>
+                  </div>
+
+                  {battle.teams && battle.teams.length >= 2 ? (() => {
+                    // Encontrar qué equipo es el dueño del live
+                    const owner = (battle.ownerUsername || "").toLowerCase().replace(/^@/,"");
+                    const isNumeric = s => /^\d{8,}$/.test(s||"");
+                    const getName = t => {
+                      const nn = t.hostNickname||""; const hn = t.hostName||"";
+                      if (!isNumeric(nn)) return nn;
+                      if (!isNumeric(hn)) return hn;
+                      return nn || hn;
+                    };
+
+                    // Siempre: dueño del live = izquierda (rojo), contrario = derecha (cyan)
+                    const ownerTeamIdx = battle.teams.findIndex(t => {
+                      const hn = (t.hostName||"").toLowerCase().replace(/^@/,"");
+                      const nn = (t.hostNickname||"").toLowerCase().replace(/^@/,"");
+                      return owner && (hn===owner || nn===owner || hn.includes(owner) || owner.includes(hn));
+                    });
+                    // Si no encontramos por nombre, usar índice 0 por defecto
+                    const idx0 = ownerTeamIdx >= 0 ? ownerTeamIdx : 0;
+                    const idx1 = idx0 === 0 ? 1 : 0;
+                    const t0 = battle.teams[idx0]; // dueño — siempre izquierda ROJO
+                    const t1 = battle.teams[idx1]; // contrario — siempre derecha CYAN
+
+                    const total = (t0.points + t1.points) || 1;
+                    const pct0 = Math.round(t0.points / total * 100);
+                    const pct1 = 100 - pct0;
+                    const win0 = t0.points >= t1.points;
+                    const win1 = !win0;
+                    const name0 = getName(t0);
+                    const name1 = getName(t1);
+
+                    return (
+                      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+                        {/* ── VERSUS PRINCIPAL ── */}
+                        <div style={{background:"#12121e",border:"1px solid #1e1e2e",
+                          borderRadius:16,padding:16}}>
+
+                          {/* Nombres — FIJOS, sin corona */}
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10}}>
+                            <div style={{flex:1,textAlign:"left",minWidth:0}}>
+                              <span style={{fontSize:11,fontWeight:800,color:"#fe2c55",
+                                wordBreak:"break-all",lineHeight:1.3}}>
+                                @{name0}
+                              </span>
+                            </div>
+                            <div style={{flexShrink:0,padding:"0 5px"}}>
+                              <span style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
+                                fontSize:13,color:"#333",letterSpacing:2}}>VS</span>
+                            </div>
+                            <div style={{flex:1,textAlign:"right",minWidth:0}}>
+                              <span style={{fontSize:11,fontWeight:800,color:"#25f4ee",
+                                wordBreak:"break-all",lineHeight:1.3}}>
+                                @{name1}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Puntajes — FIJOS en su lado, solo el número cambia */}
+                          <div style={{display:"flex",alignItems:"center",
+                            justifyContent:"space-between",marginBottom:10}}>
+                            <div style={{textAlign:"left"}}>
+                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
+                                fontSize:40,color:"#fe2c55",lineHeight:1}}>
+                                {t0.points.toLocaleString()}
+                              </div>
+                              <div style={{fontSize:10,color:"#fe2c5570",fontWeight:700}}>
+                                {pct0}%
+                              </div>
+                            </div>
+                            <div style={{textAlign:"right"}}>
+                              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
+                                fontSize:40,color:"#25f4ee",lineHeight:1}}>
+                                {t1.points.toLocaleString()}
+                              </div>
+                              <div style={{fontSize:10,color:"#25f4ee70",fontWeight:700}}>
+                                {pct1}%
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Barra — SOLO ESTO se anima con transition */}
+                          <div style={{height:12,borderRadius:6,background:"#0d0d18",
+                            overflow:"hidden",display:"flex"}}>
+                            <div style={{height:"100%",width:`${pct0}%`,
+                              background:"linear-gradient(90deg,#fe2c55,#ff6b81)",
+                              transition:"width 1s ease"}}/>
+                            <div style={{height:"100%",width:`${pct1}%`,
+                              background:"linear-gradient(90deg,#0ea5e9,#25f4ee)",
+                              transition:"width 1s ease"}}/>
+                          </div>
+                        </div>
+
+                        {/* Cards individuales — también fijos */}
+                        {[{team:t0,c:"#fe2c55",pct:pct0,isWin:win0,nm:name0},
+                          {team:t1,c:"#25f4ee",pct:pct1,isWin:win1,nm:name1}].map(({team,c,pct,isWin,nm},i) => (
+                          <div key={i} style={{background:"#12121e",
+                            border:`1px solid ${isWin?"rgba(255,215,0,.25)":"#1e1e2e"}`,
+                            borderRadius:13,padding:13}}>
+                            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                              {isWin && <span style={{fontSize:16}}>👑</span>}
+                              <div style={{flex:1,minWidth:0}}>
+                                <div style={{fontWeight:800,fontSize:12,color:c,
+                                  overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                                  @{nm}
+                                </div>
+                              </div>
+                              <div style={{textAlign:"right",flexShrink:0}}>
+                                <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,
+                                  fontSize:28,color:c,lineHeight:1}}>
+                                  {team.points.toLocaleString()}
+                                </div>
+                                <div style={{fontSize:9,color:"#555",fontWeight:600}}>puntos</div>
+                              </div>
+                            </div>
+                            <div style={{height:5,background:"#0d0d18",borderRadius:3,overflow:"hidden"}}>
+                              <div style={{height:"100%",width:`${pct}%`,borderRadius:3,
+                                transition:"width 1s ease",
+                                background:`linear-gradient(90deg,${c},${c}55)`}}/>
+                            </div>
+                            <div style={{fontSize:9,color:"#444",marginTop:3,textAlign:"right"}}>
+                              {pct}% del total
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })() : battle.teams && battle.teams.length === 1 ? (
+                    <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:13,padding:14}}>
+                      <div style={{fontWeight:800,fontSize:13,color:"#fe2c55",marginBottom:6}}>
+                        @{battle.teams[0].hostNickname||battle.teams[0].hostName}
+                      </div>
+                      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:32,color:"#fe2c55"}}>
+                        {battle.teams[0].points.toLocaleString()}
+                      </div>
+                      <div style={{fontSize:9,color:"#555",marginTop:4}}>Esperando oponente...</div>
+                    </div>
+                  ) : (
+                    <div style={{textAlign:"center",color:"#444",fontSize:11,padding:"20px 0"}}>
+                      Sin datos de equipos aún...
+                    </div>
+                  )}
+
+                                    {/* Última actualización */}
+                  {battle.timestamp && (
+                    <div style={{textAlign:"center",color:"#333",fontSize:9,marginTop:12}}>
+                      Actualizado: {new Date(battle.timestamp).toLocaleTimeString()}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── ESPECTADORES ── */}
+          {tab==="espect" && (
+            <div className="ai">
+              {/* Contador total */}
+              <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,
+                padding:14,marginBottom:12,display:"flex",alignItems:"center",gap:14}}>
+                <div style={{fontSize:28}}>👁️</div>
+                <div>
+                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:32,
+                    color:"#25f4ee",lineHeight:1}}>{stats.viewers.toLocaleString()}</div>
+                  <div style={{color:"#444",fontSize:9,fontWeight:700,marginTop:3,letterSpacing:.5}}>
+                    ESPECTADORES AHORA
+                  </div>
+                </div>
+                <div style={{marginLeft:"auto",textAlign:"right"}}>
+                  <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:20,color:"#fff"}}>
+                    {viewR.length.toLocaleString()}
+                  </div>
+                  <div style={{color:"#444",fontSize:9,fontWeight:600}}>entraron al live</div>
+                </div>
+              </div>
+
+              {/* Sub-tabs espectadores */}
+              <div style={{display:"flex",gap:6,marginBottom:10}}>
+                {[
+                  {id:"historial", label:`📋 Entradas al live (${viewR.length})`},
+                  {id:"activos",   label:`👁 Top activos (${stats.viewers})`},
+                ].map(t => (
+                  <button key={t.id} onClick={()=>setVTab(t.id)}
+                    style={{flex:1,background:vTab===t.id?"rgba(37,244,238,.1)":"transparent",
+                      border:`1px solid ${vTab===t.id?"rgba(37,244,238,.3)":"#1e1e2e"}`,
+                      borderRadius:8,padding:"8px 6px",
+                      color:vTab===t.id?"#25f4ee":"#555",
+                      fontWeight:vTab===t.id?700:500,fontSize:11,cursor:"pointer"}}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Lista espectadores */}
+              <div style={{background:"#12121e",border:"1px solid #1e1e2e",borderRadius:14,overflow:"hidden"}}>
+                <div style={{background:"#0d0d18",borderBottom:"1px solid #1e1e2e",
+                  padding:"8px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{color:"#363655",fontSize:9,fontWeight:700,letterSpacing:.8,textTransform:"uppercase"}}>
+                    {vTab==="activos" ? "👁️ Espectadores activos" : "📋 Quienes entraron al live"}
+                  </span>
+                  {vTab==="historial" && viewR.length > 0 && (
+                    <button onClick={()=>{setViewR([]);sv("viewR",[]);}}
+                      style={{background:"transparent",border:"1px solid #252535",borderRadius:5,
+                        padding:"2px 8px",color:"#555",fontSize:9,cursor:"pointer"}}>
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+
+                {!conn ? (
+                  <div style={{textAlign:"center",padding:"30px 16px",color:"#333",fontSize:11}}>
+                    Conecta tu LIVE para ver espectadores
+                  </div>
+                ) : (vTab==="activos" ? topViewers : viewR).length === 0 ? (
+                  <div style={{textAlign:"center",padding:"30px 16px",color:"#444",fontSize:11}}>
+                    <div style={{fontSize:28,marginBottom:8}}>👁️</div>
+                    {vTab==="activos"
+                      ? "Los activos aparecen con el evento roomUser del live..."
+                      : "Esperando que entren espectadores..."}
+                  </div>
+                ) : (
+                  <div style={{maxHeight:460,overflowY:"auto"}}>
+                    {(vTab==="activos" ? topViewers : viewR).map((item, i) => (
+                      <div key={item.user||i} style={{display:"flex",alignItems:"center",gap:10,
+                        padding:"9px 12px",borderBottom:"1px solid #0f0f1a"}}>
+                        {/* Avatar con inicial */}
+                        <div style={{width:32,height:32,borderRadius:"50%",flexShrink:0,
+                          background:i===0?"linear-gradient(135deg,#ffd700,#ffaa00)":
+                                     i===1?"linear-gradient(135deg,#c0c0c0,#888)":
+                                     i===2?"linear-gradient(135deg,#cd7f32,#a05020)":
+                                     "linear-gradient(135deg,#1e1e2e,#2a2a3a)",
+                          display:"flex",alignItems:"center",justifyContent:"center",
+                          fontSize:i<3?15:11,fontWeight:800,
+                          color:i<3?"#000":"#888"}}>
+                          {i===0?"🥇":i===1?"🥈":i===2?"🥉":((item.nickname||"?")[0].toUpperCase())}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:700,color:"#fff",
+                            overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                            @{item.nickname}
+                          </div>
+                          {item.joinTime && (
+                            <div style={{fontSize:9,color:"#555",marginTop:1}}>
+                              ⏱ {new Date(item.joinTime).toLocaleTimeString()}
+                            </div>
+                          )}
+                          {(item.viewers||0) > 0 && (
+                            <div style={{fontSize:9,color:"#25f4ee",marginTop:1}}>
+                              👁 {item.viewers.toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{fontSize:10,color:"#444",flexShrink:0,
+                          fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>
+                          #{i+1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>{/* /contenido */}
+      </div>{/* /main */}
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>
