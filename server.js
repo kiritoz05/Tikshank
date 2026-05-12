@@ -153,54 +153,45 @@ function normalizeBattleUser(u) {
   return { hostName, hostNickname, points };
 }
 
-// Extraer equipos — soporta 1v1, 2v2, 1v3, 1v4 con puntos individuales
+// Extraer equipos
 function extractTeams(data) {
-  // ── linkMicArmies: formato principal de TikTok ──────────────────────────
   if (Array.isArray(data.battleArmies) && data.battleArmies.length > 0) {
-    const teams = [];
-    for (const army of data.battleArmies) {
+    return data.battleArmies.map(army => {
+      const pts        = Number(army.points || army.teamPoints || army.score || 0);
       const hostUserId = String(army.hostUserId || army.hostId || "");
-      // Puntos del host del army (individual)
-      const pts = Number(army.points || army.battleScore || army.score || army.teamPoints || 0);
 
       let hostName     = hostUserId || "?";
       let hostNickname = hostName;
 
-      // Intentar encontrar al host dentro de participants
       if (Array.isArray(army.participants) && army.participants.length > 0) {
-        const host = army.participants.find(p =>
-          String(p.userId) === hostUserId ||
-          String(p.uniqueId) === hostUserId ||
-          String(p.id) === hostUserId
-        ) || army.participants[0]; // fallback al primero
+        const hostParticipant = army.participants.find(p =>
+          String(p.userId)   === String(hostUserId) ||
+          String(p.uniqueId) === String(hostUserId) ||
+          String(p.id)       === String(hostUserId)
+        ) || null;
 
-        if (host) {
-          if (host.uniqueId && !/^\d+$/.test(host.uniqueId)) hostName = host.uniqueId;
-          hostNickname = host.nickname || host.displayName || host.name || hostName;
+        if (hostParticipant) {
+          hostNickname = hostParticipant.nickname || hostParticipant.displayName || hostParticipant.name || hostName;
+          if (hostParticipant.uniqueId) hostName = hostParticipant.uniqueId;
+        } else {
+          const mapped = userMap[hostUserId];
+          if (mapped?.uniqueId) {
+            hostName     = mapped.uniqueId;
+            hostNickname = mapped.nickname || mapped.uniqueId;
+          } else {
+            hostName = hostUserId || "?";
+            hostNickname = hostName;
+          }
         }
       } else if (army.hostUser) {
-        const h = army.hostUser;
-        if (h.uniqueId && !/^\d+$/.test(h.uniqueId)) hostName = h.uniqueId;
-        hostNickname = h.nickname || h.displayName || h.name || hostName;
+        hostName     = army.hostUser.uniqueId || army.hostUser.userId || hostName;
+        hostNickname = army.hostUser.nickname  || army.hostUser.name  || hostName;
       }
 
-      // Fallback al userMap si sigue siendo numérico
-      if (/^\d{6,}$/.test(hostName)) {
-        const mapped = userMap[hostUserId] || userMap[hostName];
-        if (mapped?.uniqueId && !/^\d+$/.test(mapped.uniqueId)) {
-          hostName     = mapped.uniqueId;
-          hostNickname = mapped.nickname || mapped.uniqueId;
-        }
-      }
-
-      if (hostName !== "?") {
-        teams.push({ hostName, hostNickname, userId: hostUserId, points: pts });
-      }
-    }
-    if (teams.length > 0) return teams;
+      return { hostName, hostNickname, userId: hostUserId, points: pts };
+    }).filter(t => t.hostNickname !== "?");
   }
 
-  // ── linkMicBattle: formato alternativo ─────────────────────────────────
   if (Array.isArray(data.battleUsers) && data.battleUsers.length > 0) {
     return data.battleUsers.map(u => ({
       hostName:     u.uniqueId   || u.displayId || u.userId || "?",
@@ -210,7 +201,6 @@ function extractTeams(data) {
     })).filter(t => t.hostName !== "?");
   }
 
-  // ── Formatos alternativos ───────────────────────────────────────────────
   const candidates = [data.battleItems, data.users, data.armies, data.items, data.teams].filter(Array.isArray);
   for (const arr of candidates) {
     const teams = arr.map(item => {
@@ -249,10 +239,8 @@ async function startTikTokConnection(username) {
 
   await tiktok.connect();
   const ownerUsername = username.replace(/^@/, "").toLowerCase();
-  sessions[username]  = { tiktok, retryTimer: null, ownerUsername, lastBattle: null };
+  sessions[username]  = { tiktok, retryTimer: null, ownerUsername };
   console.log(`✅ Conectado a @${username}`);
-  // Limpiar batalla anterior en el frontend al reconectar para no mostrar datos viejos
-  io.emit("battle_reset", { reason: "reconnect" });
 
   tiktok.on("chat", (data) => {
     registerUser(data);
@@ -296,9 +284,7 @@ async function startTikTokConnection(username) {
     const status = data.battleStatus || 1;
     console.log("[linkMicBattle] teams:", JSON.stringify(teams));
 
-    const battlePayload = { status, teams, ownerUsername, timestamp: Date.now() };
-    sessions[username].lastBattle = battlePayload;
-    io.emit("battle", battlePayload);
+    io.emit("battle", { status, teams, ownerUsername, timestamp: Date.now() });
 
     // Resolver IDs numéricos automáticamente
     const cb = emitUpdatedBattle(ownerUsername, teams, status);
@@ -326,9 +312,7 @@ async function startTikTokConnection(username) {
     lastTeams  = teams;
     lastStatus = 1;
 
-    const battlePayload = { status: 1, teams, ownerUsername, timestamp: Date.now() };
-    sessions[username].lastBattle = battlePayload;
-    io.emit("battle", battlePayload);
+    io.emit("battle", { status: 1, teams, ownerUsername, timestamp: Date.now() });
 
     // Resolver IDs numéricos automáticamente en background
     const cb = emitUpdatedBattle(ownerUsername, teams, 1);
@@ -352,21 +336,13 @@ async function startTikTokConnection(username) {
   return tiktok;
 }
 
-app.get("/", (req, res) => res.json({ status:"TikPanel Server ✅", connections:Object.keys(sessions).length, users:Object.keys(sessions) }));
+// Servir el panel HTML en la raíz — así solo necesitas Railway, sin Vercel
+app.get("/", (req, res) => {
+  const path = require("path");
+  res.sendFile(path.join(__dirname, "tikpanel.html"));
+});
+app.get("/api/status", (req, res) => res.json({ status:"TikPanel Server ✅", connections:Object.keys(sessions).length, users:Object.keys(sessions) }));
 app.get("/status/:username", (req, res) => res.json({ connected: !!sessions[req.params.username]?.tiktok }));
-app.get("/battle/:username", (req, res) => {
-  const s = sessions[req.params.username];
-  res.json(s?.lastBattle || null);
-});
-
-// Socket: cliente pide la batalla actual al reconectarse (carga instantánea)
-io.on("connection", (sock) => {
-  sock.on("get_battle", ({ username }) => {
-    const u = (username||"").replace(/^@/,"").toLowerCase();
-    const s = Object.values(sessions).find(s => s.ownerUsername === u);
-    if (s?.lastBattle) sock.emit("battle", s.lastBattle);
-  });
-});
 
 app.post("/connect", async (req, res) => {
   const { username } = req.body;
@@ -393,4 +369,4 @@ app.post("/disconnect", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => console.log(`🚀 TikPanel Server en puerto ${PORT}`));
+server.listen(PORT, "0.0.0.0", () => console.log(`🚀 TikPanel Server en puerto ${PORT}`));
