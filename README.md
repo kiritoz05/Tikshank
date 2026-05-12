@@ -1,22 +1,8 @@
-# TikShankz — Live Dashboard
+# TikShankz v2
 
-Panel tipo TikControl para TikTok LIVE.
+Panel TikTok LIVE con TTS, Overlays, Batallas y más.
 
-## Stack
-- **Frontend** → Vercel (Next.js)
-- **Backend** → Railway (Node.js + WebSocket)
-- **Repo** → GitHub
-
-## Cómo subir
-
-```bash
-git init
-git add .
-git commit -m "init TikShankz"
-git remote add origin https://github.com/TU_USUARIO/tikshankz.git
-git push -u origin main
-```
-
-Luego:
-1. Railway → New Project → Deploy from GitHub → carpeta `backend`
-2. Vercel → New Project → Import GitHub → carpeta `frontend` → agregar variables `.env`
+## Deploy
+1. Sube a GitHub
+2. Railway → backend/
+3. Vercel → frontend/ + variables NEXT_PUBLIC_API_URL y NEXT_PUBLIC_WS_URL
